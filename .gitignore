@@ -34,3 +34,67 @@ uploads/
 downloads/
 tmp/
 .m2/
+
+# Android --------------------------------------------------------------------
+
+# Built application files
+*.apk
+*.aab
+*.ap_
+*.aab_
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Generated files
+**/gen/
+**/out/
+
+# Gradle files
+**/.gradle/
+**/build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+
+# Local configuration file
+**/local.properties
+
+# Proguard
+**/proguard/*.txt
+!**/proguard/proguard-project.txt
+
+# Keystore files
+*.jks
+*.keystore
+
+# Android Studio IDE
+*.iml
+.idea/
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+*.hprof
+*.ipr
+*.iws
+/app/release/
+
+# Google Services
+**/google-services.json
+!**/app/google-services.json
+
+# Lint
+**/lint-results*.xml
+lint/intermediates/
+lint/outputs/
+lint/reports/
+
+# NDK
+**/obj/
+**/.cxx/
+
+# Signing
+**/signing.properties
+**/keystore.properties
