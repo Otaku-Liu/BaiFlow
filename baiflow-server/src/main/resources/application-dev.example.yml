@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:mysql://example-host:3306/example-db
+    username: example-user
+    password: example-password
+  data:
+    redis:
+      host: example-host
+      port: 6379
+      password: example-password
+      database: 0
+
+baiflow:
+  jwt:
+    secret: replace-with-a-real-secret
+    expire-seconds: 7200
+  init-admin:
+    username: admin
+    password: change-me

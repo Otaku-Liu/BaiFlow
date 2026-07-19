@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: baiflow-server
+  profiles:
+    active: dev
+  datasource:
+    url: ${BAIFLOW_DB_URL:jdbc:mysql://127.0.0.1:3306/baiflow}
+    username: ${BAIFLOW_DB_USERNAME:root}
+    password: ${BAIFLOW_DB_PASSWORD:change-me}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${BAIFLOW_REDIS_HOST:127.0.0.1}
+      port: ${BAIFLOW_REDIS_PORT:6379}
+      password: ${BAIFLOW_REDIS_PASSWORD:}
+      database: ${BAIFLOW_REDIS_DATABASE:0}
+  flyway:
+    enabled: false
+  jackson:
+    time-zone: Asia/Shanghai
+  servlet:
+    multipart:
+      max-file-size: ${BAIFLOW_UPLOAD_MAX_SIZE:2GB}
+      max-request-size: ${BAIFLOW_UPLOAD_MAX_SIZE:2GB}
+  task:
+    scheduling:
+      pool:
+        size: 4
+    execution:
+      pool:
+        core-size: 2
+        max-size: 4
+
+server:
+  port: ${BAIFLOW_SERVER_PORT:8080}
+
+mybatis-plus:
+  mapper-locations: classpath:com/baiflow/**/mapper/xml/**/*.xml
+  type-enums-package: com.baiflow
+  configuration:
+    map-underscore-to-camel-case: true
+
+baiflow:
+  jwt:
+    secret: ${BAIFLOW_JWT_SECRET:replace-with-a-32-byte-secret}
+    expire-seconds: ${BAIFLOW_JWT_EXPIRE_SECONDS:7200}
+  init-admin:
+    username: ${BAIFLOW_INIT_ADMIN_USERNAME:admin}
+    password: ${BAIFLOW_INIT_ADMIN_PASSWORD:admin}
+  storage:
+    default-root-path: ${BAIFLOW_STORAGE_ROOT:./baiflow-files}

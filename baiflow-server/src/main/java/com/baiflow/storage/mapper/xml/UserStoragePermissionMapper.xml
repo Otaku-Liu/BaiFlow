@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.baiflow.storage.mapper.UserStoragePermissionMapper">
+    <select id="selectByUser" resultType="com.baiflow.storage.entity.UserStoragePermission">
+        SELECT id, user_id, storage_root_id, file_item_id, permission, created_by, created_at, updated_at
+        FROM user_storage_permission WHERE user_id = #{userId} ORDER BY created_at DESC
+    </select>
+    <select id="selectByUserAndRoot" resultType="com.baiflow.storage.entity.UserStoragePermission">
+        SELECT id, user_id, storage_root_id, file_item_id, permission, created_by, created_at, updated_at
+        FROM user_storage_permission WHERE user_id = #{userId} AND storage_root_id = #{storageRootId} AND file_item_id IS NULL LIMIT 1
+    </select>
+</mapper>

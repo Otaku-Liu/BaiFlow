@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.baiflow.file.mapper.FileItemMapper">
+
+    <sql id="fileColumns">
+        id, storage_root_id, parent_id, owner_user_id, name, relative_path,
+        item_type, size_bytes, mime_type, hash_sha256, privacy_mode,
+        privacy_password_hash, status, created_at, updated_at, deleted_at
+    </sql>
+
+    <select id="selectChildren" resultType="com.baiflow.file.entity.FileItem">
+        SELECT <include refid="fileColumns"/>
+        FROM file_item
+        WHERE storage_root_id = #{storageRootId}
+        <choose>
+            <when test="parentId != null">AND parent_id = #{parentId}</when>
+            <otherwise>AND parent_id IS NULL</otherwise>
+        </choose>
+        <if test="status != null and status != ''">AND status = #{status}</if>
+        ORDER BY item_type DESC, name ASC
+    </select>
+
+    <select id="selectByPath" resultType="com.baiflow.file.entity.FileItem">
+        SELECT <include refid="fileColumns"/>
+        FROM file_item
+        WHERE storage_root_id = #{storageRootId} AND relative_path = #{relativePath}
+        LIMIT 1
+    </select>
+
+</mapper>

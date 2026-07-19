@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.baiflow.download.mapper.DownloadTaskMapper">
+
+    <sql id="dtColumns">
+        id, created_by, source_url, aria2_gid, target_storage_root_id,
+        target_relative_path, file_name, status, progress, total_bytes,
+        completed_bytes, speed_bytes_per_second, error_message,
+        created_at, updated_at, completed_at
+    </sql>
+
+    <select id="selectByUser" resultType="com.baiflow.download.entity.DownloadTask">
+        SELECT <include refid="dtColumns"/>
+        FROM download_task
+        WHERE created_by = #{userId}
+        <if test="status != null and status != ''">AND status = #{status}</if>
+        ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByUser" resultType="int">
+        SELECT COUNT(*) FROM download_task
+        WHERE created_by = #{userId}
+        <if test="status != null and status != ''">AND status = #{status}</if>
+    </select>
+
+    <select id="selectActive" resultType="com.baiflow.download.entity.DownloadTask">
+        SELECT <include refid="dtColumns"/>
+        FROM download_task
+        WHERE status IN ('WAITING', 'RUNNING', 'PAUSED')
+    </select>
+
+    <select id="selectByAria2Gid" resultType="com.baiflow.download.entity.DownloadTask">
+        SELECT <include refid="dtColumns"/>
+        FROM download_task
+        WHERE aria2_gid = #{aria2Gid}
+        LIMIT 1
+    </select>
+
+</mapper>
