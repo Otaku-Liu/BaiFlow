@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BaiFlow" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/accent</item>
+        <item name="android:statusBarColor">@color/primary</item>
+    </style>
+
+    <color name="primary">#0F766E</color>
+    <color name="primary_dark">#0B5E58</color>
+    <color name="accent">#2A9D8F</color>
+    <color name="white">#FFFFFF</color>
+    <color name="text_primary">#1F2937</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="background">#F8FAFC</color>
+    <color name="divider">#E5E7EB</color>
+
+    <string name="app_name">BaiFlow</string>
+</resources>
