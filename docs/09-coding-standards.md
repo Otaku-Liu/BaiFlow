@@ -52,6 +52,12 @@
 - SQL 关键字（SELECT、FROM、WHERE、ORDER BY 等）使用大写。
 - 列名、表名使用小写下划线。
 - SQL 语句多行格式化，每个子句独占一行。
+- SQL 日志使用 SLF4J 输出：`log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl`，mapper 包日志级别设为 DEBUG。
+
+## 日志
+- 统一使用 SLF4J + Logback（Spring Boot 默认），不直接使用 System.out。
+- Service 和 Controller 层使用 `LoggerFactory.getLogger()` 获取 Logger。
+- MyBatis SQL 日志通过 Slf4jImpl 桥接到 Logback，开发环境 mapper 包设为 DEBUG。
 
 ## MySQL
 - 表名小写下划线。
