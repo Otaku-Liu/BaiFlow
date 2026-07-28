@@ -2,20 +2,26 @@
   <div class="users-view">
     <!-- 筛选栏 -->
     <div class="filter-bar">
-      <el-input v-model="searchDisplayName" placeholder="搜索展示名" clearable style="width: 200px" @clear="fetchUsers" @keyup.enter="fetchUsers" />
-      <el-select v-model="filterRole" placeholder="角色" clearable style="width: 120px" @change="fetchUsers">
-        <el-option label="ADMIN" value="ADMIN" />
-        <el-option label="USER" value="USER" />
-      </el-select>
-      <el-select v-model="filterStatus" placeholder="状态" clearable style="width: 120px" @change="fetchUsers">
-        <el-option label="活跃" value="ACTIVE" />
-        <el-option label="已禁用" value="DISABLED" />
-        <el-option label="已锁定" value="LOCKED" />
-      </el-select>
-      <el-button type="primary" @click="showCreateDialog">创建用户</el-button>
-      <el-button v-if="selectedIds.length > 0" type="danger" @click="handleBatchDelete" :disabled="batchDeleting">
-        批量删除 ({{ selectedIds.length }})
-      </el-button>
+      <div class="filter-row">
+        <el-input v-model="searchDisplayName" placeholder="搜索展示名" clearable style="width: 200px" @keyup.enter="handleSearch" />
+        <el-select v-model="filterRole" placeholder="角色" clearable style="width: 120px">
+          <el-option label="ADMIN" value="ADMIN" />
+          <el-option label="USER" value="USER" />
+        </el-select>
+        <el-select v-model="filterStatus" placeholder="状态" clearable style="width: 120px">
+          <el-option label="活跃" value="ACTIVE" />
+          <el-option label="已禁用" value="DISABLED" />
+          <el-option label="已锁定" value="LOCKED" />
+        </el-select>
+        <el-button type="primary" @click="handleSearch">查询</el-button>
+        <el-button @click="handleReset">重置</el-button>
+      </div>
+      <div class="action-row">
+        <el-button type="primary" @click="showCreateDialog">创建用户</el-button>
+        <el-button v-if="selectedIds.length > 0" type="danger" @click="handleBatchDelete" :disabled="batchDeleting">
+          批量删除 ({{ selectedIds.length }})
+        </el-button>
+      </div>
     </div>
 
     <!-- 用户表格 -->
@@ -179,20 +185,32 @@ function statusLabel(status) {
 async function fetchUsers() {
   loading.value = true
   try {
-    const res = await listUsers({ page: page.value, size: size.value, role: filterRole.value || undefined, status: filterStatus.value || undefined })
-    let records = res.data?.records || []
-    // 前端按展示名搜索（后端暂不支持展示名模糊搜索）
-    if (searchDisplayName.value) {
-      const kw = searchDisplayName.value.toLowerCase()
-      records = records.filter(u => (u.displayName || '').toLowerCase().includes(kw))
-    }
-    users.value = records
-    total.value = records.length
+    const res = await listUsers({
+      page: page.value, size: size.value,
+      role: filterRole.value || undefined,
+      status: filterStatus.value || undefined,
+      displayName: searchDisplayName.value || undefined
+    })
+    users.value = res.data?.records || []
+    total.value = res.data?.total || 0
   } catch (e) {
     ElMessage.error('加载用户列表失败')
   } finally {
     loading.value = false
   }
+}
+
+function handleSearch() {
+  page.value = 1
+  fetchUsers()
+}
+
+function handleReset() {
+  searchDisplayName.value = ''
+  filterRole.value = ''
+  filterStatus.value = ''
+  page.value = 1
+  fetchUsers()
 }
 
 function handleSelectionChange(selection) {
@@ -303,9 +321,13 @@ onMounted(fetchUsers)
 
 <style scoped>
 .users-view { min-height: 400px; }
-.filter-bar {
+.filter-bar { margin-bottom: 16px; }
+.filter-row {
   display: flex; gap: 12px; align-items: center;
-  margin-bottom: 16px; flex-wrap: wrap;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+.action-row {
+  display: flex; gap: 12px; align-items: center;
 }
 .pagination-wrap { margin-top: 16px; display: flex; justify-content: flex-end; }
 </style>

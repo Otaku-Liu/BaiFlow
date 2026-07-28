@@ -21,15 +21,16 @@ public interface UserService {
     UserInfo createUser(CreateUserRequest request);
 
     /**
-     * 分页列出所有用户，支持按角色和状态筛选。仅 ADMIN 可调用。
+     * 分页列出所有用户，支持按角色、状态和展示名筛选。仅 ADMIN 可调用。
      *
-     * @param page   页码（从 1 开始）
-     * @param size   每页数量
-     * @param role   可选的角色筛选（ADMIN / USER / GUEST）
-     * @param status 可选的状态筛选（ACTIVE / DISABLED / LOCKED）
+     * @param page        页码（从 1 开始）
+     * @param size        每页数量
+     * @param role        可选的角色筛选（ADMIN / USER / GUEST）
+     * @param status      可选的状态筛选（ACTIVE / DISABLED / LOCKED）
+     * @param displayName 可选的展示名模糊搜索
      * @return 分页用户列表
      */
-    IPage<UserInfo> listUsers(int page, int size, String role, String status);
+    IPage<UserInfo> listUsers(int page, int size, String role, String status, String displayName);
 
     /**
      * 根据 ID 查询单个用户。

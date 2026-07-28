@@ -1,8 +1,8 @@
 import http from './http'
 
-/** 分页查询用户列表（仅管理员） */
-export function listUsers({ page = 1, size = 20, role, status } = {}) {
-  return http.get('/users', { params: { page, size, role, status } })
+/** 分页查询用户列表（仅管理员），支持展示名模糊搜索 */
+export function listUsers({ page = 1, size = 20, role, status, displayName } = {}) {
+  return http.get('/users', { params: { page, size, role, status, displayName } })
 }
 
 /** 查询单个用户 */

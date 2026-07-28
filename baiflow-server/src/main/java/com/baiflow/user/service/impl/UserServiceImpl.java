@@ -67,18 +67,14 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public IPage<UserInfo> listUsers(int page, int size, String role, String status) {
-        // 从数据库加载全量数据后在内存中进行分页处理（MVP 阶段用户量较小，可以接受）
-        List<User> users = (role != null || status != null)
-                ? userMapper.selectByRole(role, status)
-                : userMapper.selectAllOrdered(null, null);
-        int total = users.size();
-        int from = Math.min((page - 1) * size, total);
-        int to = Math.min(from + size, total);
-        List<UserInfo> records = (from < total ? users.subList(from, to) : List.<User>of())
-                .stream().map(UserInfo::from).toList();
-        IPage<UserInfo> r = new Page<>(page, size, total);
-        r.setRecords(records);
+    public IPage<UserInfo> listUsers(int page, int size, String role, String status, String displayName) {
+        // 使用 MyBatis-Plus 分页插件进行数据库级分页
+        Page<User> userPage = userMapper.selectPage(
+                new Page<>(page, size),
+                role, status, displayName);
+        // 转换为 UserInfo 分页结果
+        IPage<UserInfo> r = new Page<>(page, size, userPage.getTotal());
+        r.setRecords(userPage.getRecords().stream().map(UserInfo::from).toList());
         return r;
     }
 

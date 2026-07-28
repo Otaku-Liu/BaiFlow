@@ -27,14 +27,15 @@ public class UserController {
     public UserController(UserService userService) { this.userService = userService; }
 
     /**
-     * 分页查询用户列表，支持按角色和状态筛选。
+     * 分页查询用户列表，支持按角色、状态和展示名筛选。
      */
     @GetMapping
     public ApiResponse<IPage<UserInfo>> list(@RequestParam(defaultValue = "1") int page,
                                               @RequestParam(defaultValue = "20") int size,
                                               @RequestParam(required = false) String role,
-                                              @RequestParam(required = false) String status) {
-        return ApiResponse.success(userService.listUsers(page, size, role, status));
+                                              @RequestParam(required = false) String status,
+                                              @RequestParam(required = false) String displayName) {
+        return ApiResponse.success(userService.listUsers(page, size, role, status, displayName));
     }
 
     /**
