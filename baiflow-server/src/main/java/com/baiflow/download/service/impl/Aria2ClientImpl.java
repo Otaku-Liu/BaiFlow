@@ -6,8 +6,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.baiflow.common.entity.ApiResponse.Code;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.download.service.Aria2Client;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -31,12 +31,18 @@ public class Aria2ClientImpl implements Aria2Client {
 
     private static final String JSONRPC_VERSION = "2.0";
 
-    @Autowired
     private RestTemplate restTemplate;
-    @Autowired
+
+    @Value("${baiflow.aria2.url:http://127.0.0.1:6800/jsonrpc}")
     private String rpcUrl;
-    @Autowired
+
+    @Value("${baiflow.aria2.secret:}")
     private String secret;
+
+    @PostConstruct
+    public void init() {
+        this.restTemplate = new RestTemplate();
+    }
 
     public Aria2ClientImpl(@Value("${baiflow.aria2.url:http://127.0.0.1:6800/jsonrpc}") String rpcUrl,
                            @Value("${baiflow.aria2.secret:}") String secret) {
