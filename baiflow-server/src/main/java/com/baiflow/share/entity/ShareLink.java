@@ -18,6 +18,13 @@ public class ShareLink {
     private String id;
     private String targetFileItemId;
     private String createdBy;
+
+    /** 创建者用户名快照（用户删除后保留） */
+    private String ownerUsername;
+
+    /** 创建者展示名快照（用户删除后保留） */
+    private String ownerDisplayName;
+
     private String tokenHash;
     private String extractionCodeHash;
     private ShareType shareType;

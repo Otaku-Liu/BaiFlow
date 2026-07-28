@@ -48,4 +48,5 @@ baiflow:
     username: ${BAIFLOW_INIT_ADMIN_USERNAME:admin}
     password: ${BAIFLOW_INIT_ADMIN_PASSWORD:admin}
   storage:
-    default-root-path: ${BAIFLOW_STORAGE_ROOT:./baiflow-files}
+    default-root-path: ${BAIFLOW_STORAGE_ROOT:/home/lxb/baiflow-data/files}
+    avatar-path: ${BAIFLOW_AVATAR_PATH:/home/lxb/baiflow-data/avatars}

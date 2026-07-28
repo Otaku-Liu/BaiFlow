@@ -8,8 +8,11 @@ import com.baiflow.user.dto.response.UserInfo;
 import com.baiflow.user.service.UserService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -66,5 +69,22 @@ public class UserController {
                                                           @Valid @RequestBody ResetPasswordRequest req) {
         userService.resetPassword(id, req);
         return ApiResponse.success(Map.of("result", "密码已重置"));
+    }
+
+    /**
+     * 批量删除用户（逗号分隔的 ID 列表）— 事务性操作。
+     * <p>
+     * 不允许删除当前登录用户。删除用户时其拥有的文件从磁盘和数据库硬删除，
+     * 下载记录和分享记录保留（denormalized owner 字段留存快照）。
+     */
+    @DeleteMapping("/{ids}")
+    public ApiResponse<Map<String, Object>> batchDelete(@PathVariable String ids, Authentication auth) {
+        List<String> idList = Arrays.stream(ids.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        String currentUserId = auth.getPrincipal().toString();
+        userService.batchDelete(idList, currentUserId);
+        return ApiResponse.success(Map.of("result", "已删除 " + idList.size() + " 个用户"));
     }
 }

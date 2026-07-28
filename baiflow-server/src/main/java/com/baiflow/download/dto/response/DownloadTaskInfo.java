@@ -22,7 +22,9 @@ public record DownloadTaskInfo(
         String errorMessage,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        LocalDateTime completedAt
+        LocalDateTime completedAt,
+        String ownerUsername,
+        String ownerDisplayName
 ) {
     public static DownloadTaskInfo from(DownloadTask t) {
         return new DownloadTaskInfo(
@@ -30,7 +32,8 @@ public record DownloadTaskInfo(
                 t.getTargetRelativePath(), t.getFileName(), t.getStatus(),
                 t.getProgress(), t.getTotalBytes(), t.getCompletedBytes(),
                 t.getSpeedBytesPerSecond(), t.getErrorMessage(),
-                t.getCreatedAt(), t.getUpdatedAt(), t.getCompletedAt()
+                t.getCreatedAt(), t.getUpdatedAt(), t.getCompletedAt(),
+                t.getOwnerUsername(), t.getOwnerDisplayName()
         );
     }
 }

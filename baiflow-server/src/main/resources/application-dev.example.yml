@@ -6,7 +6,7 @@ spring:
   data:
     redis:
       host: example-host
-      port: 6379
+      port: 16379
       password: example-password
       database: 0
 
@@ -17,3 +17,6 @@ baiflow:
   init-admin:
     username: admin
     password: change-me
+  storage:
+    default-root-path: /home/lxb/baiflow-data/files
+    avatar-path: /home/lxb/baiflow-data/avatars

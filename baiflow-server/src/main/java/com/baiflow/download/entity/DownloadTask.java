@@ -26,6 +26,12 @@ public class DownloadTask {
     /** 创建者用户 ID */
     private String createdBy;
 
+    /** 创建者用户名快照（用户删除后保留） */
+    private String ownerUsername;
+
+    /** 创建者展示名快照（用户删除后保留） */
+    private String ownerDisplayName;
+
     /** 下载源 URL */
     private String sourceUrl;
 

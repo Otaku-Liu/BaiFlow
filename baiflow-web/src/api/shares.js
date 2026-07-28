@@ -19,6 +19,11 @@ export function updateShare(id, data) { return http.patch(`/shares/${id}`, data)
 /** 撤销分享 */
 export function revokeShare(id) { return http.delete(`/shares/${id}`) }
 
+/** 分享访问日志（仅管理员） */
+export function getShareAnalytics(id, { page = 1, size = 20 } = {}) {
+  return http.get(`/shares/${id}/analytics`, { params: { page, size } })
+}
+
 /**
  * 构建分享链接的公开 URL
  * @param {string} token - 创建分享后返回的 rawToken

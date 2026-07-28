@@ -16,6 +16,9 @@ import com.baiflow.file.enums.PrivacyMode;
 import com.baiflow.file.mapper.FileItemMapper;
 import com.baiflow.storage.entity.StorageRoot;
 import com.baiflow.storage.service.StorageService;
+import com.baiflow.user.entity.User;
+import com.baiflow.user.enums.UserStatus;
+import com.baiflow.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.slf4j.Logger;
@@ -52,18 +55,27 @@ public class DownloadServiceImpl implements DownloadService {
     private final Aria2Client aria2Client;
     private final StorageService storageService;
     private final FileItemMapper fileItemMapper;
+    private final UserMapper userMapper;
 
     public DownloadServiceImpl(DownloadTaskMapper taskMapper, Aria2Client aria2Client,
-                                StorageService storageService, FileItemMapper fileItemMapper) {
+                                StorageService storageService, FileItemMapper fileItemMapper,
+                                UserMapper userMapper) {
         this.taskMapper = taskMapper;
         this.aria2Client = aria2Client;
         this.storageService = storageService;
         this.fileItemMapper = fileItemMapper;
+        this.userMapper = userMapper;
     }
 
     @Override
     @Transactional
     public DownloadTaskInfo createDownload(CreateDownloadRequest req, String userId) {
+        // 校验用户存在且为活跃状态
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException(Code.FORBIDDEN, "用户不存在或已被禁用");
+        }
+
         // 校验目标存储根目录
         StorageRoot root = storageService.getByIdOrThrow(req.targetStorageRootId());
         Path rootPath = storageService.resolveRootPath(root);
@@ -89,6 +101,8 @@ public class DownloadServiceImpl implements DownloadService {
         // 持久化任务记录
         DownloadTask task = new DownloadTask();
         task.setCreatedBy(userId);
+        task.setOwnerUsername(user.getUsername());
+        task.setOwnerDisplayName(user.getDisplayName());
         task.setSourceUrl(req.sourceUrl());
         task.setAria2Gid(gid);
         task.setTargetStorageRootId(req.targetStorageRootId());

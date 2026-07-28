@@ -18,6 +18,10 @@ import com.baiflow.share.mapper.ShareAccessLogMapper;
 import com.baiflow.share.mapper.ShareLinkMapper;
 import com.baiflow.share.service.ShareService;
 import com.baiflow.storage.service.StorageService;
+import com.baiflow.user.entity.User;
+import com.baiflow.user.enums.UserStatus;
+import com.baiflow.user.mapper.UserMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,22 +43,35 @@ import java.util.*;
 @Service
 public class ShareServiceImpl implements ShareService {
     private static final Logger log = LoggerFactory.getLogger(ShareServiceImpl.class);
+    private static final String REDIS_SHARE_VIEW_KEY = "share:view:";
+
     private final ShareLinkMapper shareMapper;
     private final ShareAccessLogMapper logMapper;
     private final FileItemMapper fileItemMapper;
     private final StorageService storageService;
     private final PasswordEncoder passwordEncoder;
+    private final UserMapper userMapper;
+    private final StringRedisTemplate redisTemplate;
 
     public ShareServiceImpl(ShareLinkMapper shareMapper, ShareAccessLogMapper logMapper,
                             FileItemMapper fileItemMapper, StorageService storageService,
-                            PasswordEncoder passwordEncoder) {
+                            PasswordEncoder passwordEncoder, UserMapper userMapper,
+                            StringRedisTemplate redisTemplate) {
         this.shareMapper = shareMapper; this.logMapper = logMapper;
         this.fileItemMapper = fileItemMapper; this.storageService = storageService;
         this.passwordEncoder = passwordEncoder;
+        this.userMapper = userMapper;
+        this.redisTemplate = redisTemplate;
     }
 
     @Override @Transactional
     public ShareLinkInfo createShare(CreateShareRequest req, String userId) {
+        // 校验用户存在且为活跃状态
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException(Code.FORBIDDEN, "用户不存在或已被禁用");
+        }
+
         FileItem target = fileItemMapper.selectById(req.targetFileItemId());
         if (target == null) { throw new BusinessException(Code.NOT_FOUND, "文件/文件夹不存在"); }
 
@@ -64,6 +82,8 @@ public class ShareServiceImpl implements ShareService {
         ShareLink sl = new ShareLink();
         sl.setTargetFileItemId(req.targetFileItemId());
         sl.setCreatedBy(userId);
+        sl.setOwnerUsername(user.getUsername());
+        sl.setOwnerDisplayName(user.getDisplayName());
         sl.setTokenHash(passwordEncoder.encode(rawToken));
         sl.setShareType(ShareType.valueOf(req.shareType()));
         sl.setAccessMode(AccessMode.valueOf(req.accessMode()));
@@ -237,6 +257,14 @@ public class ShareServiceImpl implements ShareService {
         return new FileSystemResource(fp);
     }
 
+    @Override
+    public IPage<ShareAccessLog> getShareAnalytics(String shareLinkId, int page, int size) {
+        LambdaQueryWrapper<ShareAccessLog> qw = new LambdaQueryWrapper<>();
+        qw.eq(ShareAccessLog::getShareLinkId, shareLinkId)
+          .orderByDesc(ShareAccessLog::getCreatedAt);
+        return logMapper.selectPage(new Page<>(page, size), qw);
+    }
+
     // ---- 内部辅助 ----
     private ShareLink validateAndLog(String token, String action, HttpServletRequest request) {
         // 遍历所有 ACTIVE 分享链接，比对 token hash
@@ -264,8 +292,7 @@ public class ShareServiceImpl implements ShareService {
     }
 
     private void incrementView(ShareLink sl) {
-        sl.setViewCount(sl.getViewCount() + 1);
-        shareMapper.updateById(sl);
+        redisTemplate.opsForValue().increment(REDIS_SHARE_VIEW_KEY + sl.getId());
     }
 
     private void recordLog(ShareLink sl, String action, HttpServletRequest req, boolean success, String reason) {

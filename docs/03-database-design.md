@@ -17,6 +17,7 @@
 - username
 - password_hash
 - display_name
+- avatar_url：头像访问 URL（nginx 静态文件链接），可为空
 - role：ADMIN、USER、GUEST
 - status：ACTIVE、DISABLED、LOCKED
 - last_login_at
@@ -78,6 +79,8 @@
 - id
 - target_file_item_id
 - created_by
+- owner_username：创建者用户名快照（用户删除后保留）
+- owner_display_name：创建者展示名快照（用户删除后保留）
 - token_hash
 - extraction_code_hash
 - share_type：FILE、FOLDER
@@ -107,6 +110,8 @@
 下载任务。
 - id
 - created_by
+- owner_username：创建者用户名快照（用户删除后保留）
+- owner_display_name：创建者展示名快照（用户删除后保留）
 - source_url
 - aria2_gid
 - target_storage_root_id

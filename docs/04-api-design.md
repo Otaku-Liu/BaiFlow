@@ -52,12 +52,16 @@
 - `POST /api/auth/login`：登录
 - `POST /api/auth/logout`：退出
 - `GET /api/auth/me`：当前用户信息
+- `PATCH /api/auth/profile`：更新当前用户展示名称
+- `POST /api/auth/avatar`：上传当前用户头像（multipart, ≤1MB, jpg/jpeg/png/gif/webp）
+- `POST /api/auth/change-password`：修改当前用户密码（需旧密码验证）
 
 ## 用户接口
 - `GET /api/users`：用户列表，管理员可用
 - `POST /api/users`：创建用户，管理员可用
 - `PATCH /api/users/{id}`：更新用户显示名、角色、状态，管理员可用
 - `POST /api/users/{id}/reset-password`：重置密码，管理员可用
+- `DELETE /api/users/{ids}`：批量删除用户（逗号分隔 ID 列表），事务性操作，管理员可用
 - `GET /api/users/{id}/permissions`：用户资源权限
 - `PUT /api/users/{id}/permissions`：更新用户资源权限
 
@@ -81,6 +85,7 @@
 - `GET /api/shares/{id}`：分享详情
 - `PATCH /api/shares/{id}`：更新过期时间、次数限制、提取码、状态
 - `DELETE /api/shares/{id}`：撤销分享链接
+- `GET /api/shares/{id}/analytics`：分享访问日志（管理员专用），含 IP、UA、操作类型、时间戳
 
 ## 公开分享访问接口
 - `GET /api/public/shares/{token}`：查看分享元信息

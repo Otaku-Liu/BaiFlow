@@ -58,4 +58,20 @@ public interface UserService {
      * @throws com.baiflow.common.exception.BusinessException NOT_FOUND 用户不存在
      */
     void resetPassword(String id, ResetPasswordRequest request);
+
+    /**
+     * 批量删除用户（事务性 — 全部成功或全部回滚）。
+     * <p>
+     * 删除用户时：
+     * <ul>
+     *   <li>用户拥有的文件从磁盘和 file_item 表硬删除</li>
+     *   <li>下载记录和分享记录保留（denormalized owner 字段已留存快照）</li>
+     *   <li>不允许删除自己</li>
+     * </ul>
+     *
+     * @param ids           要删除的用户 ID 列表
+     * @param currentUserId 当前登录用户 ID（用以防止自删）
+     * @throws com.baiflow.common.exception.BusinessException FORBIDDEN 试图删除自己
+     */
+    void batchDelete(List<String> ids, String currentUserId);
 }

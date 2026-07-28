@@ -4,6 +4,7 @@ import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.share.dto.request.CreateShareRequest;
 import com.baiflow.share.dto.request.UpdateShareRequest;
 import com.baiflow.share.dto.response.ShareLinkInfo;
+import com.baiflow.share.entity.ShareAccessLog;
 import com.baiflow.share.service.ShareService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
@@ -46,6 +47,18 @@ public class ShareController {
     public ApiResponse<Map<String,Object>> revoke(@PathVariable String id, Authentication auth) {
         shareService.revokeShare(id, auth.getPrincipal().toString(), isAdmin(auth));
         return ApiResponse.success(Map.of("result","已撤销"));
+    }
+
+    /** 查询分享链接访问日志 — 仅管理员 */
+    @GetMapping("/{id}/analytics")
+    public ApiResponse<IPage<ShareAccessLog>> analytics(@PathVariable String id,
+                                                         @RequestParam(defaultValue = "1") int page,
+                                                         @RequestParam(defaultValue = "20") int size,
+                                                         Authentication auth) {
+        if (!isAdmin(auth)) {
+            return ApiResponse.error(com.baiflow.common.entity.ApiResponse.Code.FORBIDDEN, "仅管理员可查看");
+        }
+        return ApiResponse.success(shareService.getShareAnalytics(id, page, size));
     }
 
     private boolean isAdmin(Authentication a) { return a.getAuthorities().stream().anyMatch(g->g.getAuthority().equals("ROLE_ADMIN")); }

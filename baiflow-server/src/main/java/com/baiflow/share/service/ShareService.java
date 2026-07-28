@@ -3,6 +3,7 @@ package com.baiflow.share.service;
 import com.baiflow.share.dto.request.CreateShareRequest;
 import com.baiflow.share.dto.request.UpdateShareRequest;
 import com.baiflow.share.dto.response.ShareLinkInfo;
+import com.baiflow.share.entity.ShareAccessLog;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,4 +45,7 @@ public interface ShareService {
 
     /** 下载分享文件 */
     Resource downloadShareFile(String token, String fileId, String privacyToken, HttpServletRequest request);
+
+    /** 查询分享链接访问日志（管理员专用） */
+    IPage<ShareAccessLog> getShareAnalytics(String shareLinkId, int page, int size);
 }

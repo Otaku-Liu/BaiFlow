@@ -36,9 +36,10 @@
         <template #default="{ row }">{{ row.expiresAt || '永不过期' }}</template>
       </el-table-column>
       <el-table-column label="创建时间" width="160" prop="createdAt" />
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === 'ACTIVE'" type="danger" link size="small" @click="doRevoke(row)">撤销</el-button>
+          <el-button v-if="authStore.isAdmin" link size="small" @click="showAnalytics(row)">分析</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -90,6 +91,22 @@
         <el-button type="primary" @click="doCreateShare" :loading="creating">创建分享</el-button>
       </template>
     </el-dialog>
+
+    <!-- 分享分析抽屉 -->
+    <el-drawer v-model="analyticsVisible" title="分享访问日志" size="600px">
+      <el-table :data="analyticsLogs" v-loading="analyticsLoading" stripe>
+        <el-table-column prop="action" label="操作" width="120">
+          <template #default="{ row }">
+            <el-tag :type="row.success ? 'success' : 'danger'" size="small">{{ row.action }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="ipAddress" label="IP 地址" width="140" />
+        <el-table-column prop="userAgent" label="User Agent" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="failureReason" label="失败原因" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="createdAt" label="时间" width="160" />
+      </el-table>
+      <el-empty v-if="!analyticsLoading && analyticsLogs.length === 0" description="暂无访问记录" />
+    </el-drawer>
   </div>
 </template>
 
@@ -97,7 +114,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Share } from '@element-plus/icons-vue'
-import { createShare, listShares, revokeShare, buildShareUrl } from '../api/shares'
+import { createShare, listShares, revokeShare, buildShareUrl, getShareAnalytics } from '../api/shares'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
@@ -152,6 +169,27 @@ async function doRevoke(row) {
 
 function copyShareUrl() {
   navigator.clipboard.writeText(shareResult.value).then(()=>ElMessage.success('已复制到剪贴板'))
+}
+
+// 分析相关
+const analyticsVisible = ref(false)
+const analyticsLoading = ref(false)
+const analyticsLogs = ref([])
+
+async function showAnalytics(row) {
+  analyticsVisible.value = true
+  analyticsLoading.value = true
+  analyticsLogs.value = []
+  try {
+    const { data } = await getShareAnalytics(row.id)
+    if (data.code === 'OK') {
+      analyticsLogs.value = data.data?.records || []
+    }
+  } catch (e) {
+    ElMessage.error('加载分析数据失败')
+  } finally {
+    analyticsLoading.value = false
+  }
 }
 
 function statusType(s) { return {ACTIVE:'success',EXPIRED:'info',REVOKED:'danger'}[s]||'info' }

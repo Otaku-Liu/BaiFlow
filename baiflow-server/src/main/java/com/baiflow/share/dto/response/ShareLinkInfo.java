@@ -9,7 +9,7 @@ public record ShareLinkInfo(
         String id, String targetFileItemId, String shareType, String accessMode,
         String expiresAt, int maxViews, int viewCount, int maxDownloads, int downloadCount,
         boolean requirePrivatePassword, String status, String createdAt,
-        String token
+        String token, String ownerUsername, String ownerDisplayName
 ) {
     public static ShareLinkInfo from(ShareLink s) {
         return new ShareLinkInfo(s.getId(), s.getTargetFileItemId(),
@@ -18,7 +18,7 @@ public record ShareLinkInfo(
                 s.getMaxViews(), s.getViewCount(), s.getMaxDownloads(), s.getDownloadCount(),
                 s.getRequirePrivatePassword(), s.getStatus().name(),
                 s.getCreatedAt() != null ? s.getCreatedAt().toString() : null,
-                null);
+                null, s.getOwnerUsername(), s.getOwnerDisplayName());
     }
 
     public static ShareLinkInfo from(ShareLink s, String token) {
@@ -28,6 +28,6 @@ public record ShareLinkInfo(
                 s.getMaxViews(), s.getViewCount(), s.getMaxDownloads(), s.getDownloadCount(),
                 s.getRequirePrivatePassword(), s.getStatus().name(),
                 s.getCreatedAt() != null ? s.getCreatedAt().toString() : null,
-                token);
+                token, s.getOwnerUsername(), s.getOwnerDisplayName());
     }
 }

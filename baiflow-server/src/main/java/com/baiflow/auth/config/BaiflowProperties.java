@@ -27,6 +27,8 @@ public class BaiflowProperties {
     @Data
     public static class Storage {
         private String defaultRootPath = "./baiflow-files";
+        /** 头像文件存储目录 */
+        private String avatarPath = "./baiflow-files/avatars";
     }
 
     @Data

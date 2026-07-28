@@ -2,6 +2,10 @@ package com.baiflow.user.service.impl;
 
 import com.baiflow.common.entity.ApiResponse.Code;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.file.entity.FileItem;
+import com.baiflow.file.mapper.FileItemMapper;
+import com.baiflow.storage.entity.StorageRoot;
+import com.baiflow.storage.service.StorageService;
 import com.baiflow.user.dto.request.CreateUserRequest;
 import com.baiflow.user.dto.request.ResetPasswordRequest;
 import com.baiflow.user.dto.request.UpdateUserRequest;
@@ -10,11 +14,17 @@ import com.baiflow.user.entity.User;
 import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.UserMapper;
 import com.baiflow.user.service.UserService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -23,12 +33,19 @@ import java.util.List;
 @Service
 public class UserServiceImpl implements UserService {
 
+    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
+
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final FileItemMapper fileItemMapper;
+    private final StorageService storageService;
 
-    public UserServiceImpl(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserMapper userMapper, PasswordEncoder passwordEncoder,
+                          FileItemMapper fileItemMapper, StorageService storageService) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
+        this.fileItemMapper = fileItemMapper;
+        this.storageService = storageService;
     }
 
     @Override
@@ -91,5 +108,44 @@ public class UserServiceImpl implements UserService {
         // 新密码重新 BCrypt 哈希，完全覆盖旧密码
         u.setPasswordHash(passwordEncoder.encode(req.newPassword()));
         userMapper.updateById(u);
+    }
+
+    @Override
+    @Transactional
+    public void batchDelete(List<String> ids, String currentUserId) {
+        // 不允许删除自己
+        if (ids.contains(currentUserId)) {
+            throw new BusinessException(Code.FORBIDDEN, "不允许删除当前登录用户");
+        }
+
+        for (String userId : ids) {
+            User u = userMapper.selectById(userId);
+            if (u == null) {
+                log.warn("批量删除：用户 {} 不存在，跳过", userId);
+                continue;
+            }
+
+            // 删除该用户拥有的所有文件（磁盘 + 数据库）
+            LambdaQueryWrapper<FileItem> qw = new LambdaQueryWrapper<>();
+            qw.eq(FileItem::getOwnerUserId, userId);
+            List<FileItem> ownedFiles = fileItemMapper.selectList(qw);
+            for (FileItem file : ownedFiles) {
+                try {
+                    StorageRoot root = storageService.getByIdOrThrow(file.getStorageRootId());
+                    Path filePath = storageService.resolveRootPath(root)
+                            .resolve(file.getRelativePath()).normalize();
+                    storageService.verifyPathInRoot(root, filePath);
+                    Files.deleteIfExists(filePath);
+                } catch (Exception e) {
+                    log.warn("删除用户文件失败: userId={}, fileId={}, path={}, error={}",
+                            userId, file.getId(), file.getRelativePath(), e.getMessage());
+                }
+                fileItemMapper.deleteById(file.getId());
+            }
+            log.info("已删除用户 {} ({}) 的 {} 个文件", u.getUsername(), userId, ownedFiles.size());
+
+            // 删除用户记录（下载/分享记录因 denormalized owner 字段保留）
+            userMapper.deleteById(userId);
+        }
     }
 }

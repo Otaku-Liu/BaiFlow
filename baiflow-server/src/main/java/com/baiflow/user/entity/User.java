@@ -42,5 +42,8 @@ public class User {
     private LocalDateTime createdAt;
 
     /** 更新时间 */
+    /** 头像访问 URL（nginx 静态文件链接） */
+    private String avatarUrl;
+
     private LocalDateTime updatedAt;
 }
