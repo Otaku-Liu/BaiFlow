@@ -39,6 +39,13 @@ mybatis-plus:
   type-enums-package: com.baiflow
   configuration:
     map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+logging:
+  level:
+    com.baiflow:
+      mapper: DEBUG
+    com.baomidou.mybatisplus: DEBUG
 
 baiflow:
   jwt:
