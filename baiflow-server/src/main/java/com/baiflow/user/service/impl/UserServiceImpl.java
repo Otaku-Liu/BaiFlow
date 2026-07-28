@@ -17,41 +17,31 @@ import com.baiflow.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-
 /**
  * 用户管理服务实现。
  */
+@Slf4j
 @Service
 public class UserServiceImpl implements UserService {
-
-    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
-
     @Autowired
     private UserMapper userMapper;
-    @Autowired
     private PasswordEncoder passwordEncoder;
-    @Autowired
     private FileItemMapper fileItemMapper;
-    @Autowired
     private StorageService storageService;
-
     @Override
     public UserInfo createUser(CreateUserRequest req) {
         // 用户名重复检查
         if (userMapper.selectByUsername(req.username()) != null) {
             throw new BusinessException(Code.USERNAME_EXISTS, "用户名已存在：" + req.username());
         }
-
         User u = new User();
         u.setUsername(req.username());
         // 密码 BCrypt 哈希后再存储——绝不存明文
@@ -62,8 +52,6 @@ public class UserServiceImpl implements UserService {
         userMapper.insert(u);
         return UserInfo.from(u);
     }
-
-    @Override
     public IPage<UserInfo> listUsers(int page, int size, String role, String status, String displayName) {
         // 使用 MyBatis-Plus 分页插件进行数据库级分页
         Page<User> userPage = userMapper.selectPage(
@@ -73,51 +61,29 @@ public class UserServiceImpl implements UserService {
         IPage<UserInfo> r = new Page<>(page, size, userPage.getTotal());
         r.setRecords(userPage.getRecords().stream().map(UserInfo::from).toList());
         return r;
-    }
-
-    @Override
     public UserInfo getUser(String id) {
         User u = userMapper.selectById(id);
         if (u == null) { throw new BusinessException(Code.NOT_FOUND, "用户不存在"); }
-        return UserInfo.from(u);
-    }
-
-    @Override
     public UserInfo updateUser(String id, UpdateUserRequest req) {
-        User u = userMapper.selectById(id);
-        if (u == null) { throw new BusinessException(Code.NOT_FOUND, "用户不存在"); }
         // 仅更新实际传入的字段
         if (req.displayName() != null) { u.setDisplayName(req.displayName()); }
         if (req.role() != null) { u.setRole(req.role()); }
         if (req.status() != null) { u.setStatus(req.status()); }
         userMapper.updateById(u);
-        return UserInfo.from(u);
-    }
-
-    @Override
     public void resetPassword(String id, ResetPasswordRequest req) {
-        User u = userMapper.selectById(id);
-        if (u == null) { throw new BusinessException(Code.NOT_FOUND, "用户不存在"); }
         // 新密码重新 BCrypt 哈希，完全覆盖旧密码
         u.setPasswordHash(passwordEncoder.encode(req.newPassword()));
-        userMapper.updateById(u);
-    }
-
-    @Override
     @Transactional
     public void batchDelete(List<String> ids, String currentUserId) {
         // 不允许删除自己
         if (ids.contains(currentUserId)) {
             throw new BusinessException(Code.FORBIDDEN, "不允许删除当前登录用户");
-        }
-
         for (String userId : ids) {
             User u = userMapper.selectById(userId);
             if (u == null) {
                 log.warn("批量删除：用户 {} 不存在，跳过", userId);
                 continue;
             }
-
             // 删除该用户拥有的所有文件（磁盘 + 数据库）
             LambdaQueryWrapper<FileItem> qw = new LambdaQueryWrapper<>();
             qw.eq(FileItem::getOwnerUserId, userId);
@@ -134,11 +100,7 @@ public class UserServiceImpl implements UserService {
                             userId, file.getId(), file.getRelativePath(), e.getMessage());
                 }
                 fileItemMapper.deleteById(file.getId());
-            }
             log.info("已删除用户 {} ({}) 的 {} 个文件", u.getUsername(), userId, ownedFiles.size());
-
             // 删除用户记录（下载/分享记录因 denormalized owner 字段保留）
             userMapper.deleteById(userId);
-        }
-    }
 }

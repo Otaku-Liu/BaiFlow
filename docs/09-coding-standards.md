@@ -23,6 +23,7 @@
 - Entity 类使用 `@Data` 自动生成 getter/setter/toString/equals/hashCode。
 - 仅需只读字段的类（如异常类）使用 `@Getter`。
 - 配置属性类（@ConfigurationProperties）使用 `@Data` 替代手写 getter/setter。
+- 日志推荐使用 `@Slf4j` 注解（Lombok），简单统一；特殊场景（如静态工具类）可使用 `LoggerFactory.getLogger()`。
 - 不使用 Lombok 的 @Builder、@AllArgsConstructor 等可能引发歧义的注解。
 
 ### 实体类与 DDL 注释规范
@@ -56,8 +57,10 @@
 
 ## 日志
 - 统一使用 SLF4J + Logback（Spring Boot 默认），不直接使用 System.out。
-- Service 和 Controller 层使用 `LoggerFactory.getLogger()` 获取 Logger。
-- MyBatis SQL 日志通过 Slf4jImpl 桥接到 Logback，开发环境 mapper 包设为 DEBUG。
+- 推荐通过 Lombok `@Slf4j` 注解获取 Logger，简洁统一；特殊场景可用 `LoggerFactory.getLogger()`。
+- MyBatis SQL 日志：`log-impl: Slf4jImpl` 桥接到 Logback，`logback-spring.xml` 中 mapper 包设为 DEBUG。
+- HTTP 请求日志：`HttpLoggingFilter` 统一记录每个请求的方法、URI、状态码和耗时。
+- 开发环境日志级别通过 `logback-spring.xml` 管理，生产环境可通过 `application.yml` 的 `logging.level` 覆盖。
 
 ## MySQL
 - 表名小写下划线。

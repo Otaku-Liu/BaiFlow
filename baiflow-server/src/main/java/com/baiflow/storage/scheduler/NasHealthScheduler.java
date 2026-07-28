@@ -1,12 +1,10 @@
 package com.baiflow.storage.scheduler;
 
 import com.baiflow.storage.service.StorageService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
 /**
  * NAS 健康检查定时任务 — 定期检测 NAS_MOUNT 类型存储根目录的连通性。
  * <p>
@@ -15,18 +13,14 @@ import org.springframework.stereotype.Component;
  *   <li>路径可访问 → ACTIVE</li>
  *   <li>路径不可访问 → OFFLINE</li>
  * </ul>
- * <p>
  * DISABLED 状态的存储根目录不会被检查（管理员手动禁用）。
  * 启用条件配置：{@code baiflow.nas.health-check-enabled=true}
  */
+@Slf4j
 @Component
 public class NasHealthScheduler {
-
-    private static final Logger log = LoggerFactory.getLogger(NasHealthScheduler.class);
-
     @Autowired
     private StorageService storageService;
-
     /**
      * 每 60 秒执行一次 NAS 健康检查。
      * 仅在 {@code baiflow.nas.health-check-enabled} 为 true 时执行（默认 true）。

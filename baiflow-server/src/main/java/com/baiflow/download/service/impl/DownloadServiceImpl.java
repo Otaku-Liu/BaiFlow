@@ -21,18 +21,15 @@ import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-
 /**
  * 下载任务管理服务实现。
  * <p>
@@ -47,22 +44,15 @@ import java.util.Map;
  *   <li>用户删除 → DELETED</li>
  * </ol>
  */
+@Slf4j
 @Service
 public class DownloadServiceImpl implements DownloadService {
-
-    private static final Logger log = LoggerFactory.getLogger(DownloadServiceImpl.class);
-
     @Autowired
     private DownloadTaskMapper taskMapper;
-    @Autowired
     private Aria2Client aria2Client;
-    @Autowired
     private StorageService storageService;
-    @Autowired
     private FileItemMapper fileItemMapper;
-    @Autowired
     private UserMapper userMapper;
-
     @Override
     @Transactional
     public DownloadTaskInfo createDownload(CreateDownloadRequest req, String userId) {
@@ -71,29 +61,22 @@ public class DownloadServiceImpl implements DownloadService {
         if (user == null || user.getStatus() != UserStatus.ACTIVE) {
             throw new BusinessException(Code.FORBIDDEN, "用户不存在或已被禁用");
         }
-
         // 校验目标存储根目录
         StorageRoot root = storageService.getByIdOrThrow(req.targetStorageRootId());
         Path rootPath = storageService.resolveRootPath(root);
-
         // 构建目标路径
         String subPath = (req.targetRelativePath() != null && !req.targetRelativePath().isBlank())
                 ? req.targetRelativePath() : "";
         Path targetDir = rootPath.resolve(subPath).normalize();
         storageService.verifyPathInRoot(root, targetDir);
-
         // 从 URL 推断文件名
         String fileName = extractFileName(req.sourceUrl());
-
         // 确保目标目录存在
         try { Files.createDirectories(targetDir); } catch (Exception e) {
             throw new BusinessException(Code.FILE_OPERATION_FAILED, "无法创建下载目标目录：" + e.getMessage());
-        }
-
         // 通过 aria2 RPC 提交下载任务
         String gid = aria2Client.addUri(req.sourceUrl(),
                 targetDir.toAbsolutePath().toString(), fileName);
-
         // 持久化任务记录
         DownloadTask task = new DownloadTask();
         task.setCreatedBy(userId);
@@ -110,21 +93,16 @@ public class DownloadServiceImpl implements DownloadService {
         task.setCompletedBytes(0L);
         task.setSpeedBytesPerSecond(0L);
         taskMapper.insert(task);
-
         log.info("下载任务已创建: id={}, url={}, gid={}, user={}", task.getId(), req.sourceUrl(), gid, userId);
         return DownloadTaskInfo.from(task);
     }
-
-    @Override
     public IPage<DownloadTaskInfo> listDownloads(String userId, boolean isAdmin, String status,
                                                   int page, int size) {
         // 非管理员只能查看自己的任务
         String queryUserId = isAdmin ? null : userId;
         int offset = (page - 1) * size;
-
         List<DownloadTask> tasks;
         int total;
-
         if (isAdmin) {
             // 管理员查看所有：先取所有活跃的，再内存筛选
             List<DownloadTask> all = taskMapper.selectByUser(null, null, 0, 10000);
@@ -140,71 +118,33 @@ public class DownloadServiceImpl implements DownloadService {
         } else {
             total = taskMapper.countByUser(userId, status);
             tasks = taskMapper.selectByUser(userId, status, offset, size);
-        }
-
         IPage<DownloadTaskInfo> result = new Page<>(page, size, total);
         result.setRecords(tasks.stream().map(DownloadTaskInfo::from).toList());
         return result;
-    }
-
-    @Override
     public DownloadTaskInfo getById(String taskId, String userId, boolean isAdmin) {
         DownloadTask task = taskMapper.selectById(taskId);
         if (task == null || task.getStatus() == DownloadTaskStatus.DELETED) {
             throw new BusinessException(Code.NOT_FOUND, "下载任务不存在");
-        }
         if (!isAdmin && !task.getCreatedBy().equals(userId)) {
             throw new BusinessException(Code.FORBIDDEN, "无权查看此下载任务");
-        }
-        return DownloadTaskInfo.from(task);
-    }
-
-    @Override
-    @Transactional
     public DownloadTaskInfo pauseDownload(String taskId, String userId, boolean isAdmin) {
         DownloadTask task = checkOwnership(taskId, userId, isAdmin);
-
         if (task.getStatus() != DownloadTaskStatus.WAITING
                 && task.getStatus() != DownloadTaskStatus.RUNNING) {
             throw new BusinessException(Code.FILE_OPERATION_FAILED, "当前状态不允许暂停：" + task.getStatus());
-        }
-
         // 通过 aria2 RPC 暂停
         if (task.getStatus() == DownloadTaskStatus.RUNNING) {
             aria2Client.pause(task.getAria2Gid());
-        }
-
         // 更新本地状态
         task.setStatus(DownloadTaskStatus.PAUSED);
         taskMapper.updateById(task);
-
-        return DownloadTaskInfo.from(task);
-    }
-
-    @Override
-    @Transactional
     public DownloadTaskInfo resumeDownload(String taskId, String userId, boolean isAdmin) {
-        DownloadTask task = checkOwnership(taskId, userId, isAdmin);
-
         if (task.getStatus() != DownloadTaskStatus.PAUSED) {
             throw new BusinessException(Code.FILE_OPERATION_FAILED, "当前状态不允许恢复：" + task.getStatus());
-        }
-
         // 通过 aria2 RPC 恢复
         aria2Client.unpause(task.getAria2Gid());
-
-        // 更新本地状态
         task.setStatus(DownloadTaskStatus.RUNNING);
-        taskMapper.updateById(task);
-
-        return DownloadTaskInfo.from(task);
-    }
-
-    @Override
-    @Transactional
     public void deleteDownload(String taskId, String userId, boolean isAdmin) {
-        DownloadTask task = checkOwnership(taskId, userId, isAdmin);
-
         // 已完成/失败的任务直接标记删除，不调用 aria2
         if (task.getStatus() != DownloadTaskStatus.COMPLETED
                 && task.getStatus() != DownloadTaskStatus.FAILED
@@ -214,36 +154,19 @@ public class DownloadServiceImpl implements DownloadService {
             } catch (Exception e) {
                 log.warn("aria2 删除任务失败（继续标记本地记录）: gid={}, error={}",
                         task.getAria2Gid(), e.getMessage());
-            }
-        }
-
         task.setStatus(DownloadTaskStatus.DELETED);
-        taskMapper.updateById(task);
-    }
-
-    @Override
-    @Transactional
     public int syncActiveTasks() {
         // 查询所有活跃任务
         List<DownloadTask> activeTasks = taskMapper.selectActive();
         if (activeTasks.isEmpty()) { return 0; }
-
         int updatedCount = 0;
         for (DownloadTask task : activeTasks) {
-            try {
                 updatedCount += syncSingleTask(task);
-            } catch (Exception e) {
                 log.warn("同步下载任务失败: taskId={}, gid={}, error={}",
                         task.getId(), task.getAria2Gid(), e.getMessage());
-            }
-        }
         return updatedCount;
-    }
-
     // -------------------------------------------------------
     // 内部方法
-    // -------------------------------------------------------
-
     /**
      * 同步单个下载任务的状态。
      */
@@ -258,88 +181,55 @@ public class DownloadServiceImpl implements DownloadService {
                 task.setErrorMessage("aria2 返回错误：" + e.getMessage());
                 taskMapper.updateById(task);
                 return 1;
-            }
             return 0;
-        }
-    }
-
-    /**
      * 将 aria2 返回的状态应用到本地任务记录。
-     */
     private int applyAria2Status(DownloadTask task, Map<String, Object> ariaStatus) {
         boolean changed = false;
-
         // 映射 aria2 状态到本地状态
         String ariaState = String.valueOf(ariaStatus.getOrDefault("status", "unknown"));
         DownloadTaskStatus localStatus = mapAria2Status(ariaState);
-
         if (localStatus != task.getStatus()) {
             task.setStatus(localStatus);
             if (localStatus == DownloadTaskStatus.COMPLETED) {
                 task.setCompletedAt(LocalDateTime.now());
                 // 下载完成后自动创建文件记录
                 createFileItemForCompletedTask(task, ariaStatus);
-            }
             changed = true;
-        }
-
         // 更新进度和速度
         long total = toLong(ariaStatus.get("totalLength"));
         long completed = toLong(ariaStatus.get("completedLength"));
         long speed = toLong(ariaStatus.get("downloadSpeed"));
-
         if (total > 0) {
             int progress = (int) ((completed * 100) / total);
             if (!Integer.valueOf(progress).equals(task.getProgress())) {
                 task.setProgress(progress);
                 changed = true;
-            }
-        }
         if (total != (task.getTotalBytes() != null ? task.getTotalBytes() : 0L)) {
             task.setTotalBytes(total);
-            changed = true;
-        }
         if (completed != (task.getCompletedBytes() != null ? task.getCompletedBytes() : 0L)) {
             task.setCompletedBytes(completed);
-            changed = true;
-        }
         if (speed != (task.getSpeedBytesPerSecond() != null ? task.getSpeedBytesPerSecond() : 0L)) {
             task.setSpeedBytesPerSecond(speed);
-            changed = true;
-        }
-
         // 记录错误信息
         String errorMsg = String.valueOf(ariaStatus.getOrDefault("errorMessage", ""));
         if (!errorMsg.isEmpty() && !"null".equals(errorMsg)
                 && !errorMsg.equals(task.getErrorMessage() != null ? task.getErrorMessage() : "")) {
             task.setErrorMessage(errorMsg);
-            changed = true;
-        }
-
         if (changed) { taskMapper.updateById(task); }
         return changed ? 1 : 0;
-    }
-
-    /**
      * 下载完成后在 file_item 表中创建文件记录。
-     */
     private void createFileItemForCompletedTask(DownloadTask task, Map<String, Object> ariaStatus) {
         // 检查是否已存在文件记录（幂等性）
         if (fileItemMapper.selectByPath(task.getTargetStorageRootId(), task.getTargetRelativePath()) != null) {
             return;
-        }
-
         // 从 aria2 状态中获取文件信息
         long fileSize = toLong(ariaStatus.get("totalLength"));
-
         FileItem item = new FileItem();
         item.setStorageRootId(task.getTargetStorageRootId());
-
         // 解析父目录路径
         String relPath = task.getTargetRelativePath();
         if (relPath == null || relPath.isBlank()) {
             relPath = task.getFileName();
-        }
         // 父目录 ID 先设置为 null（根目录），后续可根据实际路径查找
         item.setParentId(null);
         item.setOwnerUserId(task.getCreatedBy());
@@ -350,14 +240,9 @@ public class DownloadServiceImpl implements DownloadService {
         item.setMimeType("application/octet-stream");
         item.setPrivacyMode(PrivacyMode.NORMAL);
         item.setStatus(FileItemStatus.ACTIVE);
-
         fileItemMapper.insert(item);
         log.info("下载完成，已创建文件记录: fileName={}, size={}", item.getName(), fileSize);
-    }
-
-    /**
      * 将 aria2 状态字符串映射为本地状态枚举。
-     */
     private DownloadTaskStatus mapAria2Status(String ariaState) {
         return switch (ariaState) {
             case "waiting" -> DownloadTaskStatus.WAITING;
@@ -367,28 +252,13 @@ public class DownloadServiceImpl implements DownloadService {
             case "error", "removed" -> DownloadTaskStatus.FAILED;
             default -> DownloadTaskStatus.WAITING;
         };
-    }
-
-    /**
      * 校验任务归属：非管理员只能操作自己的任务。
-     */
     private DownloadTask checkOwnership(String taskId, String userId, boolean isAdmin) {
-        DownloadTask task = taskMapper.selectById(taskId);
-        if (task == null || task.getStatus() == DownloadTaskStatus.DELETED) {
-            throw new BusinessException(Code.NOT_FOUND, "下载任务不存在");
-        }
-        if (!isAdmin && !task.getCreatedBy().equals(userId)) {
             throw new BusinessException(Code.FORBIDDEN, "无权操作此下载任务");
-        }
         return task;
-    }
-
-    /**
      * 从 URL 中提取文件名。若无法提取则使用时间戳命名。
-     */
     private String extractFileName(String url) {
         if (url == null || url.isBlank()) { return "download_" + System.currentTimeMillis(); }
-        try {
             String path = url;
             // 去掉 query string
             int qIdx = path.indexOf('?');
@@ -402,12 +272,8 @@ public class DownloadServiceImpl implements DownloadService {
             return name;
         } catch (Exception e) {
             return "download_" + System.currentTimeMillis();
-        }
-    }
-
     private long toLong(Object value) {
         if (value == null) { return 0L; }
         if (value instanceof Number n) { return n.longValue(); }
         try { return Long.parseLong(String.valueOf(value)); } catch (Exception e) { return 0L; }
-    }
 }

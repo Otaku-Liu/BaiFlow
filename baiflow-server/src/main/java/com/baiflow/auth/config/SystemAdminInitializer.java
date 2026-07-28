@@ -4,37 +4,27 @@ import com.baiflow.user.entity.User;
 import com.baiflow.user.enums.UserRole;
 import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.UserMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-
 /**
  * 系统管理员初始化器 — 应用启动时检查并创建默认管理员账户。
  * <p>
  * 如果数据库中不存在配置的管理员用户，则根据 {@code baiflow.init-admin.*} 配置创建。
  * 若数据库表尚未就绪（Flyway 已禁用，需手动执行 DDL），则跳过初始化并记录警告。
  */
+@Slf4j
 @Component
 public class SystemAdminInitializer implements CommandLineRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(SystemAdminInitializer.class);
-
     @Autowired
     private UserMapper userMapper;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private BaiflowProperties baiflowProperties;
-
     @Override
     public void run(String... args) {
         String username = baiflowProperties.getInitAdmin().getUsername();
-
         User existing;
         try {
             existing = userMapper.selectByUsername(username);
@@ -43,7 +33,6 @@ public class SystemAdminInitializer implements CommandLineRunner {
                     e.getMessage());
             return;
         }
-
         if (existing != null) {
             // 确保现有管理员角色正确
             if (existing.getRole() != UserRole.ADMIN) {
@@ -53,9 +42,6 @@ public class SystemAdminInitializer implements CommandLineRunner {
             } else {
                 log.info("管理员用户 '{}' 已存在，跳过初始化", username);
             }
-            return;
-        }
-
         User admin = new User();
         admin.setUsername(username);
         admin.setPasswordHash(passwordEncoder.encode(baiflowProperties.getInitAdmin().getPassword()));

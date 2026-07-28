@@ -3,18 +3,15 @@ package com.baiflow.audit.service.impl;
 import com.baiflow.audit.entity.AuditLog;
 import com.baiflow.audit.mapper.AuditLogMapper;
 import com.baiflow.audit.service.AuditService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
+@Slf4j
 @Service
 public class AuditServiceImpl implements AuditService {
-    private static final Logger log = LoggerFactory.getLogger(AuditServiceImpl.class);
     @Autowired
     private AuditLogMapper mapper;
-
     @Override @Async
     public void log(String actorUserId, String action, String targetType, String targetId,
                     String ipAddress, String userAgent, String detail) {
