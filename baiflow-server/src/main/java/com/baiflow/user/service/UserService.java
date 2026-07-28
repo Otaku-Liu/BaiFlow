@@ -6,6 +6,8 @@ import com.baiflow.user.dto.request.UpdateUserRequest;
 import com.baiflow.user.dto.response.UserInfo;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 
+import java.util.List;
+
 /**
  * 用户管理服务 — 仅限 ADMIN 角色使用。
  */

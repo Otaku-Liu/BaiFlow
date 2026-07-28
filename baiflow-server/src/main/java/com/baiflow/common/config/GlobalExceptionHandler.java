@@ -10,15 +10,19 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 import java.util.UUID;
+
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<Object> handleBusinessException(BusinessException ex, HttpServletRequest request) {
         return ApiResponse.error(ex.getCode(), ex.getMessage(), resolveTraceId(request));
     }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Object> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
@@ -27,17 +31,24 @@ public class GlobalExceptionHandler {
                 .reduce((a, b) -> a + "; " + b)
                 .orElse("Validation failed");
         return ApiResponse.validationError(message);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Object> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return ApiResponse.forbidden("Insufficient privileges");
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Object> handleException(Exception ex, HttpServletRequest request) {
         String traceId = resolveTraceId(request);
         log.error("Unhandled exception traceId={}", traceId, ex);
         return ApiResponse.internalError("Unexpected server error", traceId);
+    }
+
     private String resolveTraceId(HttpServletRequest request) {
         String traceId = request.getHeader("X-Trace-Id");
         return traceId == null || traceId.isBlank() ? UUID.randomUUID().toString().replace("-", "") : traceId;
+    }
 }

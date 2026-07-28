@@ -7,11 +7,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
 @Slf4j
 @Service
 public class AuditServiceImpl implements AuditService {
     @Autowired
     private AuditLogMapper mapper;
+
     @Override @Async
     public void log(String actorUserId, String action, String targetType, String targetId,
                     String ipAddress, String userAgent, String detail) {

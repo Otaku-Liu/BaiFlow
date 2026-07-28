@@ -99,6 +99,12 @@
 - 错误响应必须包含 `code` 和 `message`。
 - 公开分享 API 必须与登录用户 API 分开命名。
 
+## 编码与测试
+- 源文件统一使用 UTF-8 编码，中文注释和字符串确保不乱码。
+- pom.xml 中 `project.build.sourceEncoding` 设为 UTF-8，编译器插件配置 `-encoding utf-8`。
+- 每次代码改动后必须验证：后端 `mvn compile` 通过，前端 `npm run build` 通过。
+- 代码中若包含中文标点（如 `，`、`。`），确保只在注释和字符串字面量中使用。
+
 ## Git 与提交
 - 每个阶段单独提交。
 - 提交信息建议：`feat:`、`fix:`、`docs:`、`test:`、`chore:`。
