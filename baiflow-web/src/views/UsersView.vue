@@ -191,8 +191,8 @@ async function fetchUsers() {
       status: filterStatus.value || undefined,
       displayName: searchDisplayName.value || undefined
     })
-    users.value = res.data?.records || []
-    total.value = res.data?.total || 0
+    users.value = res.data.data?.records || []
+    total.value = res.data.data?.total || 0
   } catch (e) {
     ElMessage.error('加载用户列表失败')
   } finally {
