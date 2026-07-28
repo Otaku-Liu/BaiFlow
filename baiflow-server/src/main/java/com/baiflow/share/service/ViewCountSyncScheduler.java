@@ -4,6 +4,7 @@ import com.baiflow.share.entity.ShareLink;
 import com.baiflow.share.mapper.ShareLinkMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -22,13 +23,10 @@ public class ViewCountSyncScheduler {
     private static final Logger log = LoggerFactory.getLogger(ViewCountSyncScheduler.class);
     private static final String REDIS_SHARE_VIEW_KEY = "share:view:";
 
-    private final StringRedisTemplate redisTemplate;
-    private final ShareLinkMapper shareMapper;
-
-    public ViewCountSyncScheduler(StringRedisTemplate redisTemplate, ShareLinkMapper shareMapper) {
-        this.redisTemplate = redisTemplate;
-        this.shareMapper = shareMapper;
-    }
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+    @Autowired
+    private ShareLinkMapper shareMapper;
 
     @Scheduled(fixedRate = 60_000)
     public void syncViewCounts() {

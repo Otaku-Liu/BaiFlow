@@ -3,6 +3,7 @@ package com.baiflow.storage.scheduler;
 import com.baiflow.storage.service.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -23,11 +24,8 @@ public class NasHealthScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(NasHealthScheduler.class);
 
-    private final StorageService storageService;
-
-    public NasHealthScheduler(StorageService storageService) {
-        this.storageService = storageService;
-    }
+    @Autowired
+    private StorageService storageService;
 
     /**
      * 每 60 秒执行一次 NAS 健康检查。

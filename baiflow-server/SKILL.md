@@ -21,6 +21,7 @@ Work only inside `baiflow-server` unless a change requires docs, deployment, Web
 - Service owns business logic, transactions, validation, and file operation ordering.
 - Mapper owns SQL access only.
 - DTO, VO, Entity, and request classes must be separate.
+- Dependency injection uses `@Autowired` on fields — no constructor injection.
 - Return the unified API shape: `{ code, message, data, traceId }`.
 - Use `/api` as the public API prefix.
 
@@ -39,6 +40,7 @@ Work only inside `baiflow-server` unless a change requires docs, deployment, Web
 - Use MyBatis Plus BaseMapper for simple CRUD.
 - Use XML Mapper for complex searches, statistics, and joins.
 - Keep business decisions out of Mapper XML.
+- Mapper XML formatting: blank lines between SQL elements, SQL keywords in uppercase, multi-line formatting with each clause on its own line.
 - Database DDL scripts under `db/migration/` are for reference only; Flyway auto-migration is disabled (`spring.flyway.enabled: false`).
 
 ## Commenting Rules

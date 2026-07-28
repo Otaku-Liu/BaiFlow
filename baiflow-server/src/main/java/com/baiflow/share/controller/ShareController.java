@@ -8,6 +8,7 @@ import com.baiflow.share.entity.ShareAccessLog;
 import com.baiflow.share.service.ShareService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,8 +18,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/shares")
 public class ShareController {
-    private final ShareService shareService;
-    public ShareController(ShareService s) { this.shareService = s; }
+    @Autowired
+    private ShareService shareService;
 
     @PostMapping
     public ApiResponse<ShareLinkInfo> create(@Valid @RequestBody CreateShareRequest req, Authentication auth) {

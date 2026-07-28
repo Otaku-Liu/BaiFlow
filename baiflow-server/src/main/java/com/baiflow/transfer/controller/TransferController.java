@@ -4,6 +4,7 @@ import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.transfer.dto.response.TransferTaskInfo;
 import com.baiflow.transfer.service.TransferService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,9 +15,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/transfers")
 public class TransferController {
 
-    private final TransferService transferService;
-
-    public TransferController(TransferService transferService) { this.transferService = transferService; }
+    @Autowired
+    private TransferService transferService;
 
     /**
      * 分页查询当前用户的传输任务，支持按任务类型和状态筛选。

@@ -5,15 +5,15 @@ import com.baiflow.audit.mapper.AuditLogMapper;
 import com.baiflow.audit.service.AuditService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuditServiceImpl implements AuditService {
     private static final Logger log = LoggerFactory.getLogger(AuditServiceImpl.class);
-    private final AuditLogMapper mapper;
-
-    public AuditServiceImpl(AuditLogMapper mapper) { this.mapper = mapper; }
+    @Autowired
+    private AuditLogMapper mapper;
 
     @Override @Async
     public void log(String actorUserId, String action, String targetType, String targetId,

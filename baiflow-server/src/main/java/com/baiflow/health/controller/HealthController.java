@@ -2,6 +2,7 @@ package com.baiflow.health.controller;
 
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.health.service.HealthService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,9 +16,8 @@ import java.util.Map;
 @RequestMapping("/api/health")
 public class HealthController {
 
-    private final HealthService healthService;
-
-    public HealthController(HealthService healthService) { this.healthService = healthService; }
+    @Autowired
+    private HealthService healthService;
 
     /**
      * 返回服务健康状态，包含数据库连通性检测。

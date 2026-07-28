@@ -8,6 +8,7 @@ import com.baiflow.user.dto.response.UserInfo;
 import com.baiflow.user.service.UserService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,9 +23,8 @@ import java.util.Map;
 @RequestMapping("/api/users")
 public class UserController {
 
-    private final UserService userService;
-
-    public UserController(UserService userService) { this.userService = userService; }
+    @Autowired
+    private UserService userService;
 
     /**
      * 分页查询用户列表，支持按角色、状态和展示名筛选。
@@ -73,13 +73,13 @@ public class UserController {
     }
 
     /**
-     * 批量删除用户（逗号分隔的 ID 列表）— 事务性操作。
+     * 批量删除用户（ID 列表通过 ids 查询参数传入，逗号分隔）— 事务性操作。
      * <p>
      * 不允许删除当前登录用户。删除用户时其拥有的文件从磁盘和数据库硬删除，
      * 下载记录和分享记录保留（denormalized owner 字段留存快照）。
      */
-    @DeleteMapping("/{ids}")
-    public ApiResponse<Map<String, Object>> batchDelete(@PathVariable String ids, Authentication auth) {
+    @DeleteMapping
+    public ApiResponse<Map<String, Object>> batchDelete(@RequestParam String ids, Authentication auth) {
         List<String> idList = Arrays.stream(ids.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())

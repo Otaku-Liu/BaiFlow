@@ -4,6 +4,7 @@ import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.transfer.dto.response.NotificationInfo;
 import com.baiflow.transfer.service.NotificationService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,11 +17,8 @@ import java.util.Map;
 @RequestMapping("/api/notifications")
 public class NotificationController {
 
-    private final NotificationService notificationService;
-
-    public NotificationController(NotificationService notificationService) {
-        this.notificationService = notificationService;
-    }
+    @Autowired
+    private NotificationService notificationService;
 
     /**
      * 分页查询当前用户的通知，支持按阅读状态筛选。

@@ -10,6 +10,7 @@ import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.file.service.FileService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -33,9 +34,8 @@ import java.util.Map;
 @RequestMapping("/api/files")
 public class FileController {
 
-    private final FileService fileService;
-
-    public FileController(FileService fileService) { this.fileService = fileService; }
+    @Autowired
+    private FileService fileService;
 
     /**
      * 列出指定存储根目录或文件夹下的子文件/子目录（目录优先排序）。

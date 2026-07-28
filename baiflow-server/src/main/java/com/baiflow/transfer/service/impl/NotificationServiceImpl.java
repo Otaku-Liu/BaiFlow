@@ -10,6 +10,7 @@ import com.baiflow.transfer.mapper.NotificationMapper;
 import com.baiflow.transfer.service.NotificationService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,9 +22,8 @@ import java.util.List;
 @Service
 public class NotificationServiceImpl implements NotificationService {
 
-    private final NotificationMapper mapper;
-
-    public NotificationServiceImpl(NotificationMapper mapper) { this.mapper = mapper; }
+    @Autowired
+    private NotificationMapper mapper;
 
     @Override
     public IPage<NotificationInfo> listNotifications(String userId, String readStatus, int page, int size) {

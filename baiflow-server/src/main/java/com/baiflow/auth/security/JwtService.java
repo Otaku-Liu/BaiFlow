@@ -5,6 +5,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -15,11 +16,8 @@ import java.util.UUID;
 @Service
 public class JwtService {
 
-    private final BaiflowProperties baiflowProperties;
-
-    public JwtService(BaiflowProperties baiflowProperties) {
-        this.baiflowProperties = baiflowProperties;
-    }
+    @Autowired
+    private BaiflowProperties baiflowProperties;
 
     public String generateToken(String userId, String username, String role) {
         long now = System.currentTimeMillis();

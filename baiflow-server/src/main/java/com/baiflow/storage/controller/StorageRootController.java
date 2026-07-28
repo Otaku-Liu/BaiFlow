@@ -8,6 +8,7 @@ import com.baiflow.storage.dto.response.StorageRootInfo;
 import com.baiflow.storage.service.StorageService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,9 +20,8 @@ import java.util.List;
 @RequestMapping("/api/storage-roots")
 public class StorageRootController {
 
-    private final StorageService storageService;
-
-    public StorageRootController(StorageService storageService) { this.storageService = storageService; }
+    @Autowired
+    private StorageService storageService;
 
     /**
      * 分页列出所有存储根目录。

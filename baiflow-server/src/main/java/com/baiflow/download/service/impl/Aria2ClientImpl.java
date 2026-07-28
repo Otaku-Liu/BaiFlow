@@ -6,6 +6,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.baiflow.common.entity.ApiResponse.Code;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.download.service.Aria2Client;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,14 +32,16 @@ public class Aria2ClientImpl implements Aria2Client {
     private static final Logger log = LoggerFactory.getLogger(Aria2ClientImpl.class);
     private static final String JSONRPC_VERSION = "2.0";
 
-    private final RestTemplate restTemplate;
-    private final String rpcUrl;
-    private final String secret;
+    private RestTemplate restTemplate;
 
-    public Aria2ClientImpl(@Value("${baiflow.aria2.url:http://127.0.0.1:6800/jsonrpc}") String rpcUrl,
-                           @Value("${baiflow.aria2.secret:}") String secret) {
-        this.rpcUrl = rpcUrl;
-        this.secret = secret;
+    @Value("${baiflow.aria2.url:http://127.0.0.1:6800/jsonrpc}")
+    private String rpcUrl;
+
+    @Value("${baiflow.aria2.secret:}")
+    private String secret;
+
+    @PostConstruct
+    public void init() {
         this.restTemplate = new RestTemplate();
     }
 

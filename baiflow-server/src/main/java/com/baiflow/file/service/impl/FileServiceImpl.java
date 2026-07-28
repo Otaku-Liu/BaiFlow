@@ -22,6 +22,7 @@ import com.baiflow.storage.mapper.UserStoragePermissionMapper;
 import com.baiflow.storage.service.StorageService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -54,22 +55,16 @@ public class FileServiceImpl implements FileService {
      */
     private static final int ACCESS_SESSION_MINUTES = 30;
 
-    private final FileItemMapper fileItemMapper;
-    private final StorageService storageService;
-    private final UserStoragePermissionMapper permMapper;
-    private final PrivateFolderAccessMapper pfaMapper;
-    private final PasswordEncoder passwordEncoder;
-
-    public FileServiceImpl(FileItemMapper fileItemMapper, StorageService storageService,
-                           UserStoragePermissionMapper permMapper,
-                           PrivateFolderAccessMapper pfaMapper,
-                           PasswordEncoder passwordEncoder) {
-        this.fileItemMapper = fileItemMapper;
-        this.storageService = storageService;
-        this.permMapper = permMapper;
-        this.pfaMapper = pfaMapper;
-        this.passwordEncoder = passwordEncoder;
-    }
+    @Autowired
+    private FileItemMapper fileItemMapper;
+    @Autowired
+    private StorageService storageService;
+    @Autowired
+    private UserStoragePermissionMapper permMapper;
+    @Autowired
+    private PrivateFolderAccessMapper pfaMapper;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Override
     public IPage<FileItemInfo> listFiles(String rootId, String parentId, int page, int size,

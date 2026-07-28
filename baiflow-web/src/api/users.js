@@ -20,9 +20,9 @@ export function updateUser(id, data) {
   return http.patch(`/users/${id}`, data)
 }
 
-/** 批量删除用户（ids 逗号分隔） */
+/** 批量删除用户（ids 逗号分隔，通过查询参数传递） */
 export function batchDeleteUsers(ids) {
-  return http.delete(`/users/${ids}`)
+  return http.delete('/users', { params: { ids } })
 }
 
 /** 重置用户密码 */

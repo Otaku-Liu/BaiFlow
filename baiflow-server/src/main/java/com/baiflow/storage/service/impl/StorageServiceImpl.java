@@ -13,6 +13,7 @@ import com.baiflow.storage.mapper.StorageRootMapper;
 import com.baiflow.storage.service.StorageService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
@@ -25,11 +26,8 @@ import java.util.List;
 @Service
 public class StorageServiceImpl implements StorageService {
 
-    private final StorageRootMapper mapper;
-
-    public StorageServiceImpl(StorageRootMapper mapper) {
-        this.mapper = mapper;
-    }
+    @Autowired
+    private StorageRootMapper mapper;
 
     @Override
     public StorageRootInfo createRoot(CreateStorageRootRequest req) {

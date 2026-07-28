@@ -16,6 +16,7 @@
 - 所有用户可见的提示信息（错误消息、响应消息）使用中文。
 - 源文件使用 UTF-8 编码，确保中文不乱码。
 - 所有 if/for/while 语句必须使用大括号，即使只有一行执行体。
+- 依赖注入统一使用 @Autowired 字段注入，不使用构造器注入。
 - 后续阶段 TODO：引入 i18n 消息资源束以支持多语言切换。
 
 ### Lombok
@@ -47,6 +48,10 @@
 - 分页统一使用 MyBatis Plus 分页插件。
 - 不在 XML 中拼接未清洗的用户输入。
 - 逻辑删除字段统一为 `deleted`。
+- Mapper XML 中每个 SQL 语句之间用空行分隔。
+- SQL 关键字（SELECT、FROM、WHERE、ORDER BY 等）使用大写。
+- 列名、表名使用小写下划线。
+- SQL 语句多行格式化，每个子句独占一行。
 
 ## MySQL
 - 表名小写下划线。
@@ -76,6 +81,9 @@
 
 ## API
 - REST 路径使用名词复数。
+- 资源集合：`GET /api/users`（列表）、`POST /api/users`（创建）。
+- 单个资源：`GET /api/users/{id}`（详情）、`PATCH /api/users/{id}`（更新）、`DELETE /api/users/{id}`（删除）。
+- 批量操作通过查询参数传递：`DELETE /api/users?ids=id1,id2`。
 - 修改状态使用 POST 或 PATCH。
 - 删除使用 DELETE。
 - 分页参数统一为 `page` 和 `size`。

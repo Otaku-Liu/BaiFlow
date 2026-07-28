@@ -8,6 +8,7 @@ import com.baiflow.share.service.ShareService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -16,8 +17,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/public/shares")
 public class PublicShareController {
-    private final ShareService shareService;
-    public PublicShareController(ShareService s) { this.shareService = s; }
+    @Autowired
+    private ShareService shareService;
 
     /** 查看分享元信息 */
     @GetMapping("/{token}")

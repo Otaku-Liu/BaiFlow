@@ -23,6 +23,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,21 +52,16 @@ public class DownloadServiceImpl implements DownloadService {
 
     private static final Logger log = LoggerFactory.getLogger(DownloadServiceImpl.class);
 
-    private final DownloadTaskMapper taskMapper;
-    private final Aria2Client aria2Client;
-    private final StorageService storageService;
-    private final FileItemMapper fileItemMapper;
-    private final UserMapper userMapper;
-
-    public DownloadServiceImpl(DownloadTaskMapper taskMapper, Aria2Client aria2Client,
-                                StorageService storageService, FileItemMapper fileItemMapper,
-                                UserMapper userMapper) {
-        this.taskMapper = taskMapper;
-        this.aria2Client = aria2Client;
-        this.storageService = storageService;
-        this.fileItemMapper = fileItemMapper;
-        this.userMapper = userMapper;
-    }
+    @Autowired
+    private DownloadTaskMapper taskMapper;
+    @Autowired
+    private Aria2Client aria2Client;
+    @Autowired
+    private StorageService storageService;
+    @Autowired
+    private FileItemMapper fileItemMapper;
+    @Autowired
+    private UserMapper userMapper;
 
     @Override
     @Transactional

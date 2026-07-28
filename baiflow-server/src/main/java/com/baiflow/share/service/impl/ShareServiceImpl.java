@@ -27,6 +27,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -45,24 +46,20 @@ public class ShareServiceImpl implements ShareService {
     private static final Logger log = LoggerFactory.getLogger(ShareServiceImpl.class);
     private static final String REDIS_SHARE_VIEW_KEY = "share:view:";
 
-    private final ShareLinkMapper shareMapper;
-    private final ShareAccessLogMapper logMapper;
-    private final FileItemMapper fileItemMapper;
-    private final StorageService storageService;
-    private final PasswordEncoder passwordEncoder;
-    private final UserMapper userMapper;
-    private final StringRedisTemplate redisTemplate;
-
-    public ShareServiceImpl(ShareLinkMapper shareMapper, ShareAccessLogMapper logMapper,
-                            FileItemMapper fileItemMapper, StorageService storageService,
-                            PasswordEncoder passwordEncoder, UserMapper userMapper,
-                            StringRedisTemplate redisTemplate) {
-        this.shareMapper = shareMapper; this.logMapper = logMapper;
-        this.fileItemMapper = fileItemMapper; this.storageService = storageService;
-        this.passwordEncoder = passwordEncoder;
-        this.userMapper = userMapper;
-        this.redisTemplate = redisTemplate;
-    }
+    @Autowired
+    private ShareLinkMapper shareMapper;
+    @Autowired
+    private ShareAccessLogMapper logMapper;
+    @Autowired
+    private FileItemMapper fileItemMapper;
+    @Autowired
+    private StorageService storageService;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserMapper userMapper;
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     @Override @Transactional
     public ShareLinkInfo createShare(CreateShareRequest req, String userId) {

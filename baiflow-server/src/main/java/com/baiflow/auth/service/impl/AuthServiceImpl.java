@@ -15,6 +15,7 @@ import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.UserMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,25 +40,18 @@ public class AuthServiceImpl implements AuthService {
     private static final Set<String> ALLOWED_AVATAR_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
     private static final long AVATAR_MAX_SIZE = 1024 * 1024; // 1MB
 
-    private final UserMapper userMapper;
-    private final JwtService jwtService;
-    private final PasswordEncoder passwordEncoder;
-    private final AccountLockService accountLockService;
-    private final AuditService auditService;
-    private final BaiflowProperties baiflowProperties;
-
-    public AuthServiceImpl(UserMapper userMapper, JwtService jwtService,
-                           PasswordEncoder passwordEncoder,
-                           AccountLockService accountLockService,
-                           AuditService auditService,
-                           BaiflowProperties baiflowProperties) {
-        this.userMapper = userMapper;
-        this.jwtService = jwtService;
-        this.passwordEncoder = passwordEncoder;
-        this.accountLockService = accountLockService;
-        this.auditService = auditService;
-        this.baiflowProperties = baiflowProperties;
-    }
+    @Autowired
+    private UserMapper userMapper;
+    @Autowired
+    private JwtService jwtService;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private AccountLockService accountLockService;
+    @Autowired
+    private AuditService auditService;
+    @Autowired
+    private BaiflowProperties baiflowProperties;
 
     @Override
     public LoginResponse login(LoginRequest request) {

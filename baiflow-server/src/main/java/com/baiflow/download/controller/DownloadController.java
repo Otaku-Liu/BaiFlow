@@ -6,6 +6,7 @@ import com.baiflow.download.dto.response.DownloadTaskInfo;
 import com.baiflow.download.service.DownloadService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,11 +21,8 @@ import java.util.Map;
 @RequestMapping("/api/downloads")
 public class DownloadController {
 
-    private final DownloadService downloadService;
-
-    public DownloadController(DownloadService downloadService) {
-        this.downloadService = downloadService;
-    }
+    @Autowired
+    private DownloadService downloadService;
 
     /**
      * 创建下载任务，提交给 aria2 引擎。

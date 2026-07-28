@@ -6,6 +6,7 @@ import com.baiflow.auth.service.AuthService;
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.user.dto.response.UserInfo;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,9 +20,8 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final AuthService authService;
-
-    public AuthController(AuthService authService) { this.authService = authService; }
+    @Autowired
+    private AuthService authService;
 
     /**
      * 用户登录 — 验证凭据，返回 JWT 令牌和用户信息。

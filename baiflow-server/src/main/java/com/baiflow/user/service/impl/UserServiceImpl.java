@@ -19,6 +19,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,18 +36,14 @@ public class UserServiceImpl implements UserService {
 
     private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
-    private final UserMapper userMapper;
-    private final PasswordEncoder passwordEncoder;
-    private final FileItemMapper fileItemMapper;
-    private final StorageService storageService;
-
-    public UserServiceImpl(UserMapper userMapper, PasswordEncoder passwordEncoder,
-                          FileItemMapper fileItemMapper, StorageService storageService) {
-        this.userMapper = userMapper;
-        this.passwordEncoder = passwordEncoder;
-        this.fileItemMapper = fileItemMapper;
-        this.storageService = storageService;
-    }
+    @Autowired
+    private UserMapper userMapper;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private FileItemMapper fileItemMapper;
+    @Autowired
+    private StorageService storageService;
 
     @Override
     public UserInfo createUser(CreateUserRequest req) {

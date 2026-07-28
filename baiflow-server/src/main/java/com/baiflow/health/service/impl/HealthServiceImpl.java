@@ -1,6 +1,7 @@
 package com.baiflow.health.service.impl;
 
 import com.baiflow.health.service.HealthService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
@@ -15,9 +16,8 @@ import java.util.Map;
 @Service
 public class HealthServiceImpl implements HealthService {
 
-    private final DataSource dataSource;
-
-    public HealthServiceImpl(DataSource dataSource) { this.dataSource = dataSource; }
+    @Autowired
+    private DataSource dataSource;
 
     @Override
     public Map<String, Object> health() {
