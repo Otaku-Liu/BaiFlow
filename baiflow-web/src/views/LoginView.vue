@@ -2,7 +2,8 @@
   <div class="login-wrapper">
     <el-card class="login-card" shadow="hover">
       <template #header>
-        <h2 style="margin:0;text-align:center">BaiFlow 登录</h2>
+        <h2 style="margin:0;text-align:center;font-size:24px;font-weight:600;letter-spacing:-0.02em">BaiFlow</h2>
+        <p style="margin:6px 0 0;text-align:center;font-size:13px;color:var(--el-text-color-secondary)">登录到你的账户</p>
       </template>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="handleLogin">
         <el-form-item label="用户名" prop="username">
@@ -71,9 +72,57 @@ async function handleLogin() {
 
 <style scoped>
 .login-wrapper {
-  display: flex; align-items: center; justify-content: center;
-  min-height: 100vh; background: var(--el-bg-color-page);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f5f5f7 0%, #ececf1 100%);
 }
-.login-card { width: 380px; }
-.error-msg { color: var(--el-color-danger); text-align: center; margin-top: 12px; }
+
+.login-card {
+  width: 400px;
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.login-card :deep(.el-card__header) {
+  padding: 28px 24px 0;
+  border-bottom: none;
+}
+
+.login-card :deep(.el-card__body) {
+  padding: 24px;
+}
+
+.login-card h2 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--el-text-color-primary);
+}
+
+.login-wrapper :deep(.el-form-item__label) {
+  font-weight: 500;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.login-wrapper :deep(.el-button--primary) {
+  height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 10px;
+  letter-spacing: 0.02em;
+}
+
+.error-msg {
+  color: var(--el-color-danger);
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
 </style>

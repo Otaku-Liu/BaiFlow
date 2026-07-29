@@ -1,0 +1,66 @@
+# 数据库设计
+
+数据库：MySQL 8。文件本体保存在磁盘，数据库只存元数据。
+
+## 命名规范
+
+- 表名/字段名：小写下划线
+- 主键：`id`（varchar 类型）
+- 时间：`created_at`、`updated_at`、`deleted_at`
+- 逻辑删除：`deleted`（0/1）
+- 密码/提取码/token 只存 hash
+
+## 核心表
+
+### user — 系统用户
+`id, username, password_hash, display_name, avatar_url, role(ADMIN/USER/GUEST), status(ACTIVE/DISABLED/LOCKED), last_login_at, created_at, updated_at`
+
+### user_storage_permission — 用户存储权限
+`id, user_id, storage_root_id, file_item_id, permission(READ/WRITE/MANAGE), created_by, created_at, updated_at`
+
+### storage_root — 存储根目录
+`id, name, type(LOCAL/NAS_MOUNT), root_path, status(ACTIVE/OFFLINE/DISABLED), readonly, created_at, updated_at`
+
+### file_item — 文件/目录元数据
+`id, storage_root_id, parent_id, owner_user_id, name, relative_path, item_type(FILE/DIRECTORY), size_bytes, mime_type, hash_sha256, privacy_mode(NORMAL/PRIVATE), privacy_password_hash, status(ACTIVE/DELETED), created_at, updated_at, deleted_at`
+
+### private_folder_access — 隐私访问会话
+`id, user_id, file_item_id, access_token_hash, expires_at, created_at`
+
+### share_link — 分享链接
+`id, target_file_item_id, created_by, token_hash, extraction_code_hash, share_type(FILE/FOLDER), access_mode(VIEW/DOWNLOAD), expires_at, max_views, view_count, max_downloads, download_count, status(ACTIVE/EXPIRED/REVOKED), created_at, updated_at`
+
+### share_access_log — 分享访问日志
+`id, share_link_id, action(VIEW/DOWNLOAD/VERIFY_CODE/FAILED), ip_address, user_agent, success, failure_reason, created_at`
+
+### download_task — 下载任务
+`id, created_by, source_url, aria2_gid, target_storage_root_id, target_relative_path, status(WAITING/RUNNING/PAUSED/FAILED/COMPLETED/DELETED), progress, speed_bytes_per_second, error_message, created_at, updated_at, completed_at`
+
+### transfer_task — 传输任务
+`id, created_by, task_type(UPLOAD/DOWNLOAD/DEVICE_SEND), status(WAITING/RUNNING/PAUSED/FAILED/COMPLETED), progress, error_message, created_at, updated_at`
+
+### device — 客户端设备
+`id, user_id, name, device_type(ANDROID/WEB/SERVER/NAS), token_hash, last_seen_at, status, created_at, updated_at`
+
+### notification — 通知
+`id, user_id, level(INFO/WARN/ERROR), title, content, read_status, created_at, read_at`
+
+### audit_log — 操作审计
+`id, actor_user_id, action, target_type, target_id, ip_address, user_agent, created_at`
+
+## 主要索引
+
+- `user(username)` UNIQUE
+- `file_item(storage_root_id, parent_id, deleted)`
+- `file_item(storage_root_id, relative_path)` UNIQUE
+- `share_link(token_hash)` UNIQUE
+- `share_link(created_by, status, created_at)`
+- `download_task(created_by, status, created_at)`
+- `notification(user_id, read_status, created_at)`
+
+## 一致性原则
+
+- 磁盘操作成功后再提交数据库状态
+- 下载完成后创建 file_item 记录
+- 隐私密码更新后清理已有 private_folder_access
+- 分享过期/撤销/超次后不可访问

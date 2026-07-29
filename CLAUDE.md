@@ -61,17 +61,12 @@ docs/               项目文档（需求、架构、API、数据库等）
 
 ## 参考文档
 
-处理相关工作时先读取：
-- `docs/01-requirements.md` — 需求范围和非目标
-- `docs/02-architecture.md` — 模块边界和数据流
-- `docs/03-database-design.md` — 表结构和状态枚举
-- `docs/04-api-design.md` — API 约定和统一响应格式
-- `docs/05-frontend-design.md` — Web 前端设计
-- `docs/06-android-design.md` — Android 客户端设计
-- `docs/07-deployment-security.md` — 部署和安全约束
-- `docs/08-development-roadmap.md` — 完整阶段路线图
-- `docs/09-coding-standards.md` — 编码规范
-- `docs/10-continuation-guide.md` — 新对话续接指南
+- `docs/01-architecture.md` — 技术架构、需求范围、部署与安全
+- `docs/02-database.md` — 数据库表结构与索引
+- `docs/03-api.md` — API 约定与接口清单
+- `docs/04-frontend.md` — Web 前端设计与 Apple 风格 Design Token
+- `docs/05-android.md` — Android 客户端设计
+- `docs/06-coding-standards.md` — 编码规范（后端/前端/Android）
 
 ## 测试与验收
 

@@ -1,68 +1,20 @@
-﻿---
+---
 name: baiflow-server
-description: Use when working on the BaiFlow Spring Boot backend, including API design, authentication, MyBatis Plus persistence, MySQL schema usage, file operations, download tasks, transfer tasks, notifications, and aria2 integration.
+description: BaiFlow Spring Boot 后端：API、认证、MyBatis Plus、MySQL、文件操作、下载任务、传输、通知、aria2
 ---
 
-# BaiFlow Server Skill
+# BaiFlow Server
 
-## Scope
-Work only inside `baiflow-server` unless a change requires docs, deployment, Web API consumers, or Android API consumers to be updated.
+## 约束
 
-## Stack
-- JDK 17.
-- Spring Boot 3.x.
-- MyBatis Plus.
-- Lombok（@Data / @Getter 自动生成 getter/setter）。
-- MySQL 8.
-- aria2 RPC for download execution.
+- Controller → HTTP 映射 · Service → 业务逻辑 · Mapper → SQL
+- DTO/VO/Entity/Request 分离，返回 `{ code, message, data, traceId }`
+- 密码/token/hash 不存明文，文件 ID 仅在服务端解析路径
+- `@Autowired` 字段注入，`@Slf4j` 日志，UTF-8 编码，中文注释
+- 详见 `docs/06-coding-standards.md`
 
-## Architecture Rules
-- Controller handles HTTP mapping and request/response conversion only.
-- Service owns business logic, transactions, validation, and file operation ordering.
-- Mapper owns SQL access only.
-- DTO, VO, Entity, and request classes must be separate.
-- Dependency injection uses `@Autowired` on fields — no constructor injection.
-- Return the unified API shape: `{ code, message, data, traceId }`.
-- Use `/api` as the public API prefix.
+## 参考
 
-## Security Rules
-- Require `Authorization: Bearer <token>` for protected APIs.
-- Enforce ADMIN, USER, and GUEST role behavior.
-- Hash user passwords, share tokens, extraction codes, and privacy folder passwords.
-- Never return server absolute paths to Web or Android.
-- Resolve file IDs to server paths only inside the backend.
-- Normalize paths and verify every operation remains inside a configured Storage Root.
-- Store file contents on disk; store only metadata in MySQL.
-- Keep MySQL and aria2 internal; do not expose them through public routes.
-
-## Persistence Rules
-- Follow `docs/03-database-design.md` for table names, statuses, and indexes.
-- Use MyBatis Plus BaseMapper for simple CRUD.
-- Use XML Mapper for complex searches, statistics, and joins.
-- Keep business decisions out of Mapper XML.
-- Mapper XML formatting: blank lines between SQL elements, SQL keywords in uppercase, multi-line formatting with each clause on its own line.
-- Database DDL scripts under `db/migration/` are for reference only; Flyway auto-migration is disabled (`spring.flyway.enabled: false`).
-
-## Commenting Rules
-- Every Service interface method must carry a Javadoc describing the purpose, parameters, return value, and side effects. 注释使用中文。
-- Service implementation methods that contain multi-step logic (transaction boundaries, path safety checks, file operation ordering) must include inline comments explaining each step's intent. 注释和提示信息使用中文。
-- Controller methods must carry a brief Javadoc or comment describing the endpoint's purpose, required authentication, and response shape. 注释使用中文。
-- Complex algorithms (e.g. path traversal prevention, file hashing, directory deletion) must be documented with inline comments. 注释使用中文。
-- All user-facing messages (error messages, response messages) should be in Chinese.
-- Source files must use UTF-8 encoding. Ensure `application.yml` sets `spring.jackson.time-zone: Asia/Shanghai`.
-- Future-phase TODO: introduce i18n message resource bundles for multi-language support.
-
-## Entity & DDL Documentation Rules
-- Every entity class must carry a class-level Javadoc explaining its business concept.
-- Every entity field must carry a field-level Javadoc (`/** ... */`) describing the business meaning, allowed values, and null semantics. 注释使用中文。
-- Enum values must each have a comment documenting their meaning.
-- Database DDL scripts are kept under `db/migration/` as reference documentation only. Flyway auto-migration is disabled.
-- DDL scripts must include `COMMENT` on every field and table, matching the entity Javadoc. 注释使用中文。
-
-## Phase Discipline
-- Phase 1 only creates startup, MySQL connection, MyBatis Plus config, unified response, global exception handling, and `/api/health`.
-- Phase 2 includes users, roles, JWT, and resource permission foundations.
-- Sharing and privacy folders must follow docs before implementation.
-- Do not implement auth, file operations, downloads, or Android-specific behavior until their phase starts.
-
-
+- `docs/01-architecture.md` — 架构、需求、安全基线
+- `docs/02-database.md` — 表结构
+- `docs/03-api.md` — 接口设计

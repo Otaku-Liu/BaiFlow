@@ -4,18 +4,28 @@
       <!-- 顶部导航 -->
       <el-header class="app-header">
         <div class="header-left">
+          <button class="sidebar-toggle" @click="toggleSidebar" :aria-label="sidebarOpen ? '收起侧边栏' : '展开侧边栏'">
+            <el-icon :size="20"><Fold v-if="sidebarOpen" /><Expand v-else /></el-icon>
+          </button>
           <h3>BaiFlow</h3>
         </div>
         <div class="header-right">
-          <span class="user-info" style="cursor:pointer" @click="profileDialogVisible = true">
+          <span class="user-info" @click="profileDialogVisible = true">
             {{ authStore.user?.displayName || authStore.user?.username }}
           </span>
           <el-button type="danger" text @click="handleLogout">退出</el-button>
         </div>
       </el-header>
-      <el-container>
+      <el-container class="body-container">
+        <!-- 移动端遮罩 -->
+        <div
+          class="sidebar-overlay"
+          :class="{ visible: sidebarOpen }"
+          @click="closeSidebar"
+        />
+
         <!-- 侧边栏 -->
-        <el-aside width="200px" class="app-aside">
+        <el-aside class="app-aside" :class="{ open: sidebarOpen }">
           <el-menu :default-active="activeMenu" @select="handleMenuSelect">
             <el-menu-item index="files">
               <el-icon><FolderOpened /></el-icon>
@@ -35,12 +45,15 @@
             </el-menu-item>
           </el-menu>
         </el-aside>
+
         <!-- 主内容区 -->
         <el-main class="app-main">
-          <FilesView v-if="activeMenu === 'files'" />
-          <DownloadsView v-if="activeMenu === 'downloads'" />
-          <SharesView v-if="activeMenu === 'shares'" />
-          <UsersView v-if="activeMenu === 'users'" />
+          <transition name="view-fade" mode="out-in">
+            <FilesView v-if="activeMenu === 'files'" key="files" />
+            <DownloadsView v-else-if="activeMenu === 'downloads'" key="downloads" />
+            <SharesView v-else-if="activeMenu === 'shares'" key="shares" />
+            <UsersView v-else-if="activeMenu === 'users'" key="users" />
+          </transition>
         </el-main>
       </el-container>
     </el-container>
@@ -88,10 +101,10 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { FolderOpened, Download, Share, User } from '@element-plus/icons-vue'
+import { FolderOpened, Download, Share, User, Fold, Expand } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { updateProfile, uploadAvatar, changePassword } from '../api/auth'
 import FilesView from './FilesView.vue'
@@ -103,13 +116,40 @@ const router = useRouter()
 const authStore = useAuthStore()
 const activeMenu = ref('files')
 
+// ---- 响应式侧边栏 ----
+const sidebarOpen = ref(false)
+const isMobile = ref(false)
+
+function checkMobile() {
+  isMobile.value = window.innerWidth < 768
+  if (!isMobile.value) {
+    sidebarOpen.value = false  // 桌面端始终不显示 overlay
+  }
+}
+
+function toggleSidebar() {
+  sidebarOpen.value = !sidebarOpen.value
+}
+
+function closeSidebar() {
+  sidebarOpen.value = false
+}
+
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+})
+
 // 个人资料弹窗
 const profileDialogVisible = ref(false)
 const profileDisplayName = ref('')
 const oldPassword = ref('')
 const newPassword = ref('')
 
-// 打开弹窗时预填当前展示名
 watch(profileDialogVisible, (v) => {
   if (v) {
     profileDisplayName.value = authStore.user?.displayName || ''
@@ -120,6 +160,10 @@ watch(profileDialogVisible, (v) => {
 
 function handleMenuSelect(index) {
   activeMenu.value = index
+  // 移动端选择菜单后关闭侧边栏
+  if (isMobile.value) {
+    closeSidebar()
+  }
 }
 
 function handleLogout() {
@@ -131,7 +175,6 @@ async function handleSaveProfile() {
   try {
     const res = await updateProfile(profileDisplayName.value)
     ElMessage.success('资料已更新')
-    // 更新本地 store
     if (authStore.user) {
       authStore.user.displayName = res.data?.displayName || profileDisplayName.value
     }
@@ -154,7 +197,7 @@ async function handleAvatarUpload(file) {
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '头像上传失败')
   }
-  return false // 阻止 el-upload 默认上传
+  return false
 }
 
 async function handleChangePassword() {
@@ -177,15 +220,217 @@ async function handleChangePassword() {
 </script>
 
 <style scoped>
-.app-shell { min-height: 100vh; background: var(--el-bg-color-page); }
-.app-header {
-  display: flex; align-items: center; justify-content: space-between;
-  background: #fff; border-bottom: 1px solid var(--el-border-color-light);
-  padding: 0 20px; height: 56px;
+.app-shell {
+  min-height: 100vh;
+  background: var(--el-bg-color-page);
 }
-.header-left h3 { margin: 0; }
-.header-right { display: flex; align-items: center; gap: 12px; }
-.user-info { color: var(--el-text-color-secondary); font-size: 14px; }
-.app-aside { background: #fff; border-right: 1px solid var(--el-border-color-light); }
-.app-main { padding: 20px; }
+
+/* ---- 顶栏 ---- */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--el-border-color-light);
+  padding: 0 24px;
+  height: 52px;
+  position: relative;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-left h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--el-text-color-primary);
+}
+
+/* 侧边栏切换按钮 */
+.sidebar-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--el-text-color-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--el-text-color-primary);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-info {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.user-info:hover {
+  color: var(--el-text-color-primary);
+}
+
+/* ---- Body 布局 ---- */
+.body-container {
+  position: relative;
+}
+
+/* ---- 侧边栏: iPad 分栏风格 (方案 1) ---- */
+.app-aside {
+  background: #f2f2f7;
+  border-right: none;
+  padding: 12px 8px;
+  width: 220px;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 菜单项覆写 */
+.app-aside :deep(.el-menu) {
+  border-right: none;
+  background: transparent;
+}
+
+.app-aside :deep(.el-menu-item) {
+  border-radius: 8px;
+  margin-bottom: 2px;
+  height: 40px;
+  line-height: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  padding-left: 16px !important;
+  transition: background-color 0.15s ease;
+}
+
+.app-aside :deep(.el-menu-item:hover) {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.app-aside :deep(.el-menu-item.is-active) {
+  background-color: rgba(0, 122, 255, 0.1);
+  color: #007AFF;
+  font-weight: 600;
+}
+
+.app-aside :deep(.el-menu-item .el-icon) {
+  font-size: 18px;
+  margin-right: 10px;
+}
+
+/* ---- 移动端遮罩 ---- */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.sidebar-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ---- 主内容区 ---- */
+.app-main {
+  padding: 24px;
+  background: #f5f5f7;
+  min-height: calc(100vh - 52px);
+  flex: 1;
+  overflow-x: auto;
+}
+
+/* ---- 内容区过渡 ---- */
+.view-fade-enter-active,
+.view-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.view-fade-enter-from,
+.view-fade-leave-to {
+  opacity: 0;
+}
+
+/* ---- 个人资料弹窗 ---- */
+.avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ================================================================
+   响应式: 平板 / 手机
+   ================================================================ */
+@media (max-width: 1023px) {
+  .app-aside {
+    width: 240px;  /* 移动端略宽，方便触摸 */
+  }
+}
+
+@media (max-width: 767px) {
+  .sidebar-toggle {
+    display: flex;
+  }
+
+  .app-header {
+    padding: 0 16px;
+  }
+
+  .header-right .user-info {
+    display: none;  /* 移动端隐藏用户名文字 */
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .app-aside {
+    position: fixed;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+    z-index: 95;
+    width: 260px;
+    transform: translateX(-100%);
+    box-shadow: 0 0 0 0 transparent;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s ease;
+  }
+
+  .app-aside.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .app-main {
+    padding: 16px;
+  }
+}
 </style>

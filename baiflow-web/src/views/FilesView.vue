@@ -498,10 +498,44 @@ function formatSize(bytes) {
 
 <style scoped>
 .files-view { max-width: 1200px; }
-.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.breadcrumb { flex: 1; }
-.toolbar-actions { display: flex; gap: 8px; }
-.name-cell { display: flex; align-items: center; }
-.action-btns { display: flex; gap: 4px; flex-wrap: wrap; }
-.error-msg { color: var(--el-color-danger); margin-top: 12px; font-size: 13px; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+
+.breadcrumb {
+  flex: 1;
+  font-size: 14px;
+}
+
+.breadcrumb :deep(.el-breadcrumb__inner) {
+  font-weight: 500;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.name-cell {
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.action-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.error-msg {
+  color: var(--el-color-danger);
+  margin-top: 12px;
+  font-size: 13px;
+}
 </style>

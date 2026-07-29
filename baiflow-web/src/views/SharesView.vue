@@ -197,8 +197,24 @@ function statusLabel(s) { return {ACTIVE:'有效',EXPIRED:'已过期',REVOKED:'�
 </script>
 
 <style scoped>
-.shares-view { max-width:1200px }
-.toolbar { display:flex; align-items:center; gap:12px }
-.share-result { margin-top:16px }
-.share-token { font-family:monospace; word-break:break-all; font-size:12px; background:var(--el-fill-color-light); padding:8px; border-radius:4px }
+.shares-view { max-width: 1200px; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 4px;
+}
+
+.share-result { margin-top: 16px; }
+
+.share-token {
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", monospace;
+  word-break: break-all;
+  font-size: 12px;
+  background: var(--el-fill-color-light);
+  padding: 10px;
+  border-radius: var(--baiflow-radius-md);
+  color: var(--el-text-color-primary);
+}
 </style>

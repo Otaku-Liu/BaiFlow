@@ -242,10 +242,43 @@ function formatSpeed(bytes) {
 
 <style scoped>
 .downloads-view { max-width: 1200px; }
-.toolbar { display: flex; align-items: center; gap: 12px; }
-.task-name { font-weight: 500; }
-.task-url { font-size: 12px; color: var(--el-text-color-secondary); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.speed-text { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 2px; }
-.size-text { font-size: 13px; color: var(--el-text-color-regular); }
-.action-btns { display: flex; gap: 4px; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 4px;
+}
+
+.task-name {
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+.task-url {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.speed-text {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.size-text {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
+.action-btns {
+  display: flex;
+  gap: 6px;
+}
 </style>

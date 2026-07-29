@@ -321,13 +321,26 @@ onMounted(fetchUsers)
 
 <style scoped>
 .users-view { min-height: 400px; }
-.filter-bar { margin-bottom: 16px; }
+
+.filter-bar { margin-bottom: 20px; }
+
 .filter-row {
-  display: flex; gap: 12px; align-items: center;
-  margin-bottom: 12px; flex-wrap: wrap;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
 }
+
 .action-row {
-  display: flex; gap: 12px; align-items: center;
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
-.pagination-wrap { margin-top: 16px; display: flex; justify-content: flex-end; }
+
+.pagination-wrap {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
 </style>
