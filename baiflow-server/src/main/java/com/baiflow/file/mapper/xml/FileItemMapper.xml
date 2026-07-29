@@ -20,6 +20,19 @@
         ORDER BY item_type DESC, name ASC
     </select>
 
+    <select id="selectChildrenByOwner" resultType="com.baiflow.file.entity.FileItem">
+        SELECT <include refid="fileColumns"/>
+        FROM file_item
+        WHERE storage_root_id = #{storageRootId}
+        <choose>
+            <when test="parentId != null">AND parent_id = #{parentId}</when>
+            <otherwise>AND parent_id IS NULL</otherwise>
+        </choose>
+        AND owner_user_id = #{ownerUserId}
+        <if test="status != null and status != ''">AND status = #{status}</if>
+        ORDER BY item_type DESC, name ASC
+    </select>
+
     <select id="selectByPath" resultType="com.baiflow.file.entity.FileItem">
         SELECT <include refid="fileColumns"/>
         FROM file_item

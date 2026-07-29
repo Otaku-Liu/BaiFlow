@@ -46,12 +46,13 @@ public class FileController {
                                                   @RequestParam(required = false) String parentId,
                                                   @RequestParam(defaultValue = "1") int page,
                                                   @RequestParam(defaultValue = "50") int size,
+                                                  @RequestParam(required = false) String viewUserId,
                                                   @RequestHeader(value = "X-Privacy-Access-Token",
                                                           required = false) String privacyAccessToken,
                                                   Authentication auth) {
         return ApiResponse.success(
                 fileService.listFiles(storageRootId, parentId, page, size,
-                        auth.getPrincipal().toString(), isAdmin(auth), privacyAccessToken));
+                        auth.getPrincipal().toString(), isAdmin(auth), privacyAccessToken, viewUserId));
     }
 
     /**

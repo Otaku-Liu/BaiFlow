@@ -1,6 +1,6 @@
 package com.baiflow.storage.service.impl;
 
-import com.baiflow.common.entity.ApiResponse.Code;
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.storage.dto.request.CreateStorageRootRequest;
 import com.baiflow.storage.dto.request.UpdateStorageRootRequest;
@@ -54,7 +54,7 @@ public class StorageServiceImpl implements StorageService {
             try {
                 Files.createDirectories(resolveRootPath(r));
             } catch (Exception e) {
-                throw new BusinessException(Code.FILE_OPERATION_FAILED,
+                throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
                         "无法创建存储根目录：" + resolveRootPath(r));
             }
         }
@@ -96,9 +96,9 @@ public class StorageServiceImpl implements StorageService {
     @Override
     public StorageRoot getByIdOrThrow(String id) {
         StorageRoot r = mapper.selectById(id);
-        if (r == null) { throw new BusinessException(Code.NOT_FOUND, "存储根目录不存在"); }
+        if (r == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "存储根目录不存在"); }
         if (r.getStatus() == StorageRootStatus.DISABLED) {
-            throw new BusinessException(Code.STORAGE_ROOT_OFFLINE, "存储根目录已禁用：" + r.getName());
+            throw new BusinessException(ErrorCode.STORAGE_ROOT_OFFLINE, "存储根目录已禁用：" + r.getName());
         }
         // OFFLINE 状态仅记录 NAS 暂不可用，仍允许返回实体以支持元数据浏览
         return r;
@@ -115,14 +115,14 @@ public class StorageServiceImpl implements StorageService {
         // 核心路径穿越防护：
         // 每个被解析的路径必须在存储根目录的绝对路径范围内，否则拒绝访问
         if (!resolved.startsWith(resolveRootPath(root))) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "检测到路径穿越攻击");
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "检测到路径穿越攻击");
         }
     }
 
     @Override
     public NasCheckResult checkNasAccessibility(String rootId) {
         StorageRoot root = mapper.selectById(rootId);
-        if (root == null) { throw new BusinessException(Code.NOT_FOUND, "存储根目录不存在"); }
+        if (root == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "存储根目录不存在"); }
 
         Path path = resolveRootPath(root);
         boolean accessible = Files.exists(path) && Files.isDirectory(path);

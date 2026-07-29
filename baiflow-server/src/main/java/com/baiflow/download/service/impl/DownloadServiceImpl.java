@@ -1,6 +1,6 @@
 package com.baiflow.download.service.impl;
 
-import com.baiflow.common.entity.ApiResponse.Code;
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.download.dto.request.CreateDownloadRequest;
 import com.baiflow.download.dto.response.DownloadTaskInfo;
@@ -67,7 +67,7 @@ public class DownloadServiceImpl implements DownloadService {
         // 校验用户存在且为活跃状态
         User user = userMapper.selectById(userId);
         if (user == null || user.getStatus() != UserStatus.ACTIVE) {
-            throw new BusinessException(Code.FORBIDDEN, "用户不存在或已被禁用");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "用户不存在或已被禁用");
         }
 
         // 校验目标存储根目录
@@ -85,7 +85,7 @@ public class DownloadServiceImpl implements DownloadService {
 
         // 确保目标目录存在
         try { Files.createDirectories(targetDir); } catch (Exception e) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "无法创建下载目标目录：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "无法创建下载目标目录：" + e.getMessage());
         }
 
         // 通过 aria2 RPC 提交下载任务
@@ -149,10 +149,10 @@ public class DownloadServiceImpl implements DownloadService {
     public DownloadTaskInfo getById(String taskId, String userId, boolean isAdmin) {
         DownloadTask task = taskMapper.selectById(taskId);
         if (task == null || task.getStatus() == DownloadTaskStatus.DELETED) {
-            throw new BusinessException(Code.NOT_FOUND, "下载任务不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "下载任务不存在");
         }
         if (!isAdmin && !task.getCreatedBy().equals(userId)) {
-            throw new BusinessException(Code.FORBIDDEN, "无权查看此下载任务");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看此下载任务");
         }
         return DownloadTaskInfo.from(task);
     }
@@ -164,7 +164,7 @@ public class DownloadServiceImpl implements DownloadService {
 
         if (task.getStatus() != DownloadTaskStatus.WAITING
                 && task.getStatus() != DownloadTaskStatus.RUNNING) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "当前状态不允许暂停：" + task.getStatus());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "当前状态不允许暂停：" + task.getStatus());
         }
 
         // 通过 aria2 RPC 暂停
@@ -185,7 +185,7 @@ public class DownloadServiceImpl implements DownloadService {
         DownloadTask task = checkOwnership(taskId, userId, isAdmin);
 
         if (task.getStatus() != DownloadTaskStatus.PAUSED) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "当前状态不允许恢复：" + task.getStatus());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "当前状态不允许恢复：" + task.getStatus());
         }
 
         // 通过 aria2 RPC 恢复
@@ -373,10 +373,10 @@ public class DownloadServiceImpl implements DownloadService {
     private DownloadTask checkOwnership(String taskId, String userId, boolean isAdmin) {
         DownloadTask task = taskMapper.selectById(taskId);
         if (task == null || task.getStatus() == DownloadTaskStatus.DELETED) {
-            throw new BusinessException(Code.NOT_FOUND, "下载任务不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "下载任务不存在");
         }
         if (!isAdmin && !task.getCreatedBy().equals(userId)) {
-            throw new BusinessException(Code.FORBIDDEN, "无权操作此下载任务");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此下载任务");
         }
         return task;
     }

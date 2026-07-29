@@ -69,12 +69,13 @@ public interface UserService {
      * <ul>
      *   <li>用户拥有的文件从磁盘和 file_item 表硬删除</li>
      *   <li>下载记录和分享记录保留（denormalized owner 字段已留存快照）</li>
-     *   <li>不允许删除自己</li>
+     *   <li>不允许删除当前登录用户</li>
+     *   <li>不允许删除系统内置管理员账号（admin）</li>
      * </ul>
      *
      * @param ids           要删除的用户 ID 列表
      * @param currentUserId 当前登录用户 ID（用以防止自删）
-     * @throws com.baiflow.common.exception.BusinessException FORBIDDEN 试图删除自己
+     * @throws com.baiflow.common.exception.BusinessException FORBIDDEN 试图删除自己或内置管理员
      */
     void batchDelete(List<String> ids, String currentUserId);
 }

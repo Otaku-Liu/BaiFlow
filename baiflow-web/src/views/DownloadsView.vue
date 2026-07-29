@@ -50,7 +50,7 @@
         <template #default="{ row }">{{ row.totalBytes ? formatSize(row.totalBytes) : '-' }}</template>
       </el-table-column>
       <el-table-column label="创建时间" width="160">
-        <template #default="{ row }">{{ row.createdAt }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
@@ -110,6 +110,7 @@ import {
   createDownload, listDownloads, pauseDownload, resumeDownload, removeDownload
 } from '../api/downloads'
 import { listStorageRoots } from '../api/files'
+import { formatDateTime, formatSize, formatSpeed } from '../utils/format'
 
 // ---- 状态 ----
 const tasks = ref([])
@@ -227,17 +228,6 @@ function statusLabel(status) {
   return map[status] || status
 }
 
-function formatSize(bytes) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let i = 0, size = bytes
-  while (size >= 1024 && i < units.length - 1) { size /= 1024; i++ }
-  return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i]
-}
-
-function formatSpeed(bytes) {
-  return formatSize(bytes) + '/s'
-}
 </script>
 
 <style scoped>
@@ -246,8 +236,8 @@ function formatSpeed(bytes) {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding-bottom: 4px;
+  gap: 10px;
+  padding-bottom: 12px;
 }
 
 .task-name {

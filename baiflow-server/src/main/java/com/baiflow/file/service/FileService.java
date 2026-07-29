@@ -35,14 +35,16 @@ public interface FileService {
      * @param parentId           父文件夹 ID（null 表示根目录）
      * @param page               页码（从 1 开始）
      * @param size               每页数量
-     * @param userId             调用者 ID（用于权限校验）
+     * @param userId             调用者 ID（用于权限校验 / 非管理员文件范围）
      * @param isAdmin            调用者是否拥有 ROLE_ADMIN
      * @param privacyAccessToken 隐私访问令牌（可空，进入隐私文件夹时必须提供）
+     * @param viewUserId         管理员视角切换（非 null 时限定到该用户文件范围）；非管理员忽略此参数
      * @return 分页文件项列表
      * @throws com.baiflow.common.exception.BusinessException FORBIDDEN 无访问权限
      */
     IPage<FileItemInfo> listFiles(String storageRootId, String parentId, int page, int size,
-                                  String userId, boolean isAdmin, String privacyAccessToken);
+                                  String userId, boolean isAdmin, String privacyAccessToken,
+                                  String viewUserId);
 
     /**
      * 接收多部分文件上传，将文件写入存储根目录内的磁盘位置，计算 SHA-256 哈希，并持久化元数据。

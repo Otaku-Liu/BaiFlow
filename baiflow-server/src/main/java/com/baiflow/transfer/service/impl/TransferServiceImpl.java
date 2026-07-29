@@ -1,6 +1,6 @@
 package com.baiflow.transfer.service.impl;
 
-import com.baiflow.common.entity.ApiResponse.Code;
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.transfer.dto.response.TransferTaskInfo;
 import com.baiflow.transfer.entity.TransferTask;
@@ -40,10 +40,10 @@ public class TransferServiceImpl implements TransferService {
     @Override
     public TransferTaskInfo getTask(String taskId, String userId) {
         TransferTask t = mapper.selectById(taskId);
-        if (t == null) { throw new BusinessException(Code.NOT_FOUND, "传输任务不存在"); }
+        if (t == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "传输任务不存在"); }
         // 校验任务归属：用户只能查看自己的任务
         if (!t.getCreatedBy().equals(userId)) {
-            throw new BusinessException(Code.FORBIDDEN, "无权查看此任务");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看此任务");
         }
         return TransferTaskInfo.from(t);
     }

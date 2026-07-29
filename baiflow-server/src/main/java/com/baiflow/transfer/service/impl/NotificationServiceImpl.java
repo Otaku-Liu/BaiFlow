@@ -1,6 +1,6 @@
 package com.baiflow.transfer.service.impl;
 
-import com.baiflow.common.entity.ApiResponse.Code;
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.transfer.dto.response.NotificationInfo;
 import com.baiflow.transfer.entity.Notification;
@@ -46,10 +46,10 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public void markAsRead(String notificationId, String userId) {
         Notification n = mapper.selectById(notificationId);
-        if (n == null) { throw new BusinessException(Code.NOT_FOUND, "通知不存在"); }
+        if (n == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "通知不存在"); }
         // 校验通知归属
         if (!n.getUserId().equals(userId)) {
-            throw new BusinessException(Code.FORBIDDEN, "无权操作此通知");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此通知");
         }
         // 已读通知无需重复标记
         if (n.getReadStatus() == ReadStatus.READ) { return; }

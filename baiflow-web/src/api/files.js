@@ -1,13 +1,13 @@
 import http from './http'
 
 /** 文件列表查询参数 */
-export function listFiles({ storageRootId, parentId, page = 1, size = 50 }, privacyToken) {
+export function listFiles({ storageRootId, parentId, page = 1, size = 50, viewUserId }, privacyToken) {
   const headers = {}
   if (privacyToken) headers['X-Privacy-Access-Token'] = privacyToken
-  return http.get('/files', {
-    params: { storageRootId, parentId, page, size },
-    headers
-  })
+  const params = { storageRootId, page, size }
+  if (parentId) params.parentId = parentId
+  if (viewUserId) params.viewUserId = viewUserId
+  return http.get('/files', { params, headers })
 }
 
 /** 上传文件 */

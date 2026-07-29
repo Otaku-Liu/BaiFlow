@@ -7,7 +7,7 @@ import com.baiflow.auth.security.JwtService;
 import com.baiflow.auth.service.AccountLockService;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.audit.service.AuditService;
-import com.baiflow.common.entity.ApiResponse.Code;
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.user.dto.response.UserInfo;
 import com.baiflow.user.entity.User;
@@ -60,7 +60,7 @@ public class AuthServiceImpl implements AuthService {
         // 0. 检查登录失败锁定
         if (accountLockService.isLocked(request.username())) {
             auditService.log(null, "LOGIN_FAILED", "USER", request.username(), ip, ua, "账号已被临时锁定");
-            throw new BusinessException(Code.ACCOUNT_LOCKED, "登录失败次数过多，账号已临时锁定，请15分钟后再试");
+            throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "登录失败次数过多，账号已临时锁定，请15分钟后再试");
         }
 
         // 1. 根据用户名查找用户
@@ -68,17 +68,17 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             accountLockService.recordFailure(request.username());
             auditService.log(null, "LOGIN_FAILED", "USER", request.username(), ip, ua, "用户名不存在");
-            throw new BusinessException(Code.INVALID_CREDENTIALS, "用户名或密码错误");
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
         // 2. 检查账号状态
         if (user.getStatus() == UserStatus.DISABLED) {
             auditService.log(user.getId(), "LOGIN_FAILED", "USER", user.getId(), ip, ua, "账号已禁用");
-            throw new BusinessException(Code.ACCOUNT_DISABLED, "账号已被禁用");
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "账号已被禁用");
         }
         if (user.getStatus() == UserStatus.LOCKED) {
             auditService.log(user.getId(), "LOGIN_FAILED", "USER", user.getId(), ip, ua, "账号已锁定");
-            throw new BusinessException(Code.ACCOUNT_LOCKED, "账号已被锁定");
+            throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "账号已被锁定");
         }
 
         // 3. 校验密码（BCrypt 比对）
@@ -86,7 +86,7 @@ public class AuthServiceImpl implements AuthService {
             accountLockService.recordFailure(request.username());
             auditService.log(user.getId(), "LOGIN_FAILED", "USER", user.getId(), ip, ua,
                     "密码错误（剩余尝试次数：" + accountLockService.remainingAttempts(request.username()) + "）");
-            throw new BusinessException(Code.INVALID_CREDENTIALS, "用户名或密码错误");
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
         // 4. 登录成功：清除失败计数，更新最后登录时间，签发 JWT
@@ -104,7 +104,7 @@ public class AuthServiceImpl implements AuthService {
     public UserInfo me(String userId) {
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new BusinessException(Code.NOT_FOUND, "用户不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
         return UserInfo.from(user);
     }
@@ -139,7 +139,7 @@ public class AuthServiceImpl implements AuthService {
     public UserInfo updateProfile(String userId, String displayName) {
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new BusinessException(Code.NOT_FOUND, "用户不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
         user.setDisplayName(displayName != null ? displayName : "");
         userMapper.updateById(user);
@@ -150,18 +150,18 @@ public class AuthServiceImpl implements AuthService {
     public UserInfo uploadAvatar(String userId, MultipartFile file) {
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new BusinessException(Code.NOT_FOUND, "用户不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
 
         // 校验文件大小
         if (file.getSize() > AVATAR_MAX_SIZE) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "头像文件大小不能超过 1MB");
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "头像文件大小不能超过 1MB");
         }
 
         // 校验文件格式
         String originalName = file.getOriginalFilename();
         if (originalName == null || originalName.isBlank()) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "文件名不能为空");
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件名不能为空");
         }
         String ext = "";
         int dotIdx = originalName.lastIndexOf('.');
@@ -169,7 +169,7 @@ public class AuthServiceImpl implements AuthService {
             ext = originalName.substring(dotIdx + 1).toLowerCase();
         }
         if (!ALLOWED_AVATAR_EXTENSIONS.contains(ext)) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED,
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
                     "不支持的文件格式，仅允许: " + String.join(", ", ALLOWED_AVATAR_EXTENSIONS));
         }
 
@@ -180,7 +180,7 @@ public class AuthServiceImpl implements AuthService {
 
         // 防止路径穿越
         if (!avatarPath.startsWith(Path.of(avatarDir).normalize())) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "非法的头像路径");
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "非法的头像路径");
         }
 
         try {
@@ -188,7 +188,7 @@ public class AuthServiceImpl implements AuthService {
             file.transferTo(avatarPath.toFile());
         } catch (IOException e) {
             log.error("头像保存失败: userId={}, path={}", userId, avatarPath, e);
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "头像保存失败: " + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "头像保存失败: " + e.getMessage());
         }
 
         // 构建 nginx 访问 URL 并存储
@@ -204,12 +204,12 @@ public class AuthServiceImpl implements AuthService {
     public void changePassword(String userId, String oldPassword, String newPassword) {
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new BusinessException(Code.NOT_FOUND, "用户不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
 
         // 验证旧密码
         if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
-            throw new BusinessException(Code.INVALID_CREDENTIALS, "旧密码错误");
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "旧密码错误");
         }
 
         // 更新为新密码

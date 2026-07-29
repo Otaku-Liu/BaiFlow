@@ -1,6 +1,6 @@
 package com.baiflow.file.service.impl;
 
-import com.baiflow.common.entity.ApiResponse.Code;
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.file.dto.request.CreateFolderRequest;
 import com.baiflow.file.dto.request.MoveRequest;
@@ -20,8 +20,11 @@ import com.baiflow.storage.entity.StorageRoot;
 import com.baiflow.storage.enums.StorageRootStatus;
 import com.baiflow.storage.mapper.UserStoragePermissionMapper;
 import com.baiflow.storage.service.StorageService;
+import com.baiflow.user.entity.User;
+import com.baiflow.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -45,14 +48,16 @@ import java.util.Map;
 
 /**
  * 文件服务实现 — 所有文件操作均强制遵循存储根目录边界约束和用户权限校验。
+ * <p>
+ * 非管理员用户仅能访问和操作自己的文件（按 ownerUserId 隔离），
+ * 管理员可查看所有文件并可为操作指定目标用户视角。
  */
+@Slf4j
 @Service
 public class FileServiceImpl implements FileService {
 
     private static final int ACCESS_TOKEN_BYTES = 32;
-    /**
-     * 隐私文件夹访问会话有效期（分钟）
-     */
+    /** 隐私文件夹访问会话有效期（分钟） */
     private static final int ACCESS_SESSION_MINUTES = 30;
 
     @Autowired
@@ -65,24 +70,41 @@ public class FileServiceImpl implements FileService {
     private PrivateFolderAccessMapper pfaMapper;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserMapper userMapper;
 
     @Override
     public IPage<FileItemInfo> listFiles(String rootId, String parentId, int page, int size,
-                                         String userId, boolean isAdmin, String privacyAccessToken) {
-        // 非管理员需校验存储访问权限
-        if (!isAdmin) {
-            verifyAccess(userId, rootId);
-        }
-
+                                         String userId, boolean isAdmin, String privacyAccessToken,
+                                         String viewUserId) {
         storageService.getByIdOrThrow(rootId);
 
-        // 进入文件夹前检查隐私保护（向上遍历父目录链）
+        // 非管理员：只能看自己的文件
+        String effectiveOwner = isAdmin && viewUserId != null ? viewUserId : userId;
+        if (!isAdmin || viewUserId != null) {
+            // 确保用户存在
+            User u = userMapper.selectById(effectiveOwner);
+            if (u == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+            }
+            // 自动创建该用户的主目录（如不存在）
+            getOrCreateHomeFolder(rootId, effectiveOwner, u.getUsername());
+        }
+
+        // 进入文件夹前检查隐私保护
         checkPrivacyAccess(parentId, userId, privacyAccessToken);
 
-        List<FileItem> items = fileItemMapper.selectChildren(
-                rootId, parentOrNull(parentId), FileItemStatus.ACTIVE.name());
+        List<FileItem> items;
+        if (!isAdmin || viewUserId != null) {
+            // 限定到指定用户的文件
+            items = fileItemMapper.selectChildrenByOwner(
+                    rootId, parentOrNull(parentId), effectiveOwner, FileItemStatus.ACTIVE.name());
+        } else {
+            // 管理员查看所有文件
+            items = fileItemMapper.selectChildren(
+                    rootId, parentOrNull(parentId), FileItemStatus.ACTIVE.name());
+        }
 
-        // 内存分页
         int total = items.size();
         int from = Math.min((page - 1) * size, total);
         int to = Math.min(from + size, total);
@@ -110,7 +132,7 @@ public class FileServiceImpl implements FileService {
 
         // 检查同名文件
         if (fileItemMapper.selectByPath(rootId, rel) != null) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "文件已存在：" + safe);
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件已存在：" + safe);
         }
 
         // 解析目标路径并执行路径穿越校验
@@ -122,7 +144,7 @@ public class FileServiceImpl implements FileService {
         try {
             Files.createDirectories(target.getParent());
         } catch (IOException e) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "无法创建父目录：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "无法创建父目录：" + e.getMessage());
         }
 
         // 写入文件并计算 SHA-256 哈希
@@ -131,7 +153,7 @@ public class FileServiceImpl implements FileService {
             Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
             sha = hash(target);
         } catch (IOException e) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "文件写入失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件写入失败：" + e.getMessage());
         }
 
         // 持久化元数据（磁盘写入成功后才写库）
@@ -157,15 +179,13 @@ public class FileServiceImpl implements FileService {
         // 检查元数据是否存在且为 FILE（不支持直接下载目录）
         FileItem f = fileItemMapper.selectById(fileId);
         if (f == null || f.getStatus() != FileItemStatus.ACTIVE) {
-            throw new BusinessException(Code.NOT_FOUND, "文件不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "文件不存在");
         }
         if (f.getItemType() != ItemType.FILE) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "无法下载文件夹");
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "无法下载文件夹");
         }
 
-        if (!isAdmin) {
-            verifyAccess(userId, f.getStorageRootId());
-        }
+        checkOwnership(f, userId, isAdmin);
 
         // 下载隐私文件夹内的文件需验证隐私密码
         checkPrivacyAccess(f.getParentId(), userId, privacyAccessToken);
@@ -176,7 +196,7 @@ public class FileServiceImpl implements FileService {
         storageService.verifyPathInRoot(root, fp);
 
         if (!Files.exists(fp)) {
-            throw new BusinessException(Code.NOT_FOUND, "磁盘文件不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "磁盘文件不存在");
         }
         return new FileSystemResource(fp);
     }
@@ -195,7 +215,7 @@ public class FileServiceImpl implements FileService {
         String rel = buildPath(req.parentId(), safe);
 
         if (fileItemMapper.selectByPath(req.storageRootId(), rel) != null) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "文件夹已存在：" + safe);
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件夹已存在：" + safe);
         }
 
         // 解析并校验路径，在磁盘上创建目录
@@ -204,7 +224,7 @@ public class FileServiceImpl implements FileService {
         try {
             Files.createDirectories(target);
         } catch (IOException e) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "无法创建文件夹：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "无法创建文件夹：" + e.getMessage());
         }
 
         // 持久化元数据
@@ -228,9 +248,7 @@ public class FileServiceImpl implements FileService {
     public FileItemInfo rename(String id, RenameRequest req, String userId, boolean isAdmin,
                                String privacyAccessToken) {
         FileItem f = checkActive(id);
-        if (!isAdmin) {
-            verifyAccess(userId, f.getStorageRootId());
-        }
+        checkOwnership(f, userId, isAdmin);
         // NAS 离线时禁止写入
         requireStorageAvailable(storageService.getByIdOrThrow(f.getStorageRootId()));
 
@@ -247,7 +265,7 @@ public class FileServiceImpl implements FileService {
         try {
             Files.move(old, np);
         } catch (IOException e) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "重命名失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "重命名失败：" + e.getMessage());
         }
 
         // 更新元数据
@@ -262,9 +280,7 @@ public class FileServiceImpl implements FileService {
     public FileItemInfo move(String id, MoveRequest req, String userId, boolean isAdmin,
                              String privacyAccessToken) {
         FileItem f = checkActive(id);
-        if (!isAdmin) {
-            verifyAccess(userId, f.getStorageRootId());
-        }
+        checkOwnership(f, userId, isAdmin);
         // NAS 离线时禁止写入
         requireStorageAvailable(storageService.getByIdOrThrow(f.getStorageRootId()));
 
@@ -284,7 +300,7 @@ public class FileServiceImpl implements FileService {
             Files.createDirectories(np.getParent());
             Files.move(old, np);
         } catch (IOException e) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "移动失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "移动失败：" + e.getMessage());
         }
 
         // 更新元数据中的存储根和父节点
@@ -299,9 +315,7 @@ public class FileServiceImpl implements FileService {
     @Transactional
     public void delete(String id, String userId, boolean isAdmin, String privacyAccessToken) {
         FileItem f = checkActive(id);
-        if (!isAdmin) {
-            verifyAccess(userId, f.getStorageRootId());
-        }
+        checkOwnership(f, userId, isAdmin);
         // NAS 离线时禁止写入
         requireStorageAvailable(storageService.getByIdOrThrow(f.getStorageRootId()));
 
@@ -348,7 +362,7 @@ public class FileServiceImpl implements FileService {
         FileItem f = checkActive(id);
         // 仅目录可设置为隐私模式
         if (f.getItemType() != ItemType.DIRECTORY) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "仅文件夹可设置为隐私模式");
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "仅文件夹可设置为隐私模式");
         }
 
         // BCrypt 哈希后存储密码
@@ -383,12 +397,12 @@ public class FileServiceImpl implements FileService {
         FileItem f = checkActive(id);
         // 验证目标文件夹确实是隐私模式
         if (f.getPrivacyMode() != PrivacyMode.PRIVATE) {
-            throw new BusinessException(Code.FILE_OPERATION_FAILED, "该文件夹未设置隐私保护");
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "该文件夹未设置隐私保护");
         }
 
         // 校验隐私密码
         if (!passwordEncoder.matches(req.password(), f.getPrivacyPasswordHash())) {
-            throw new BusinessException(Code.PRIVATE_PASSWORD_INVALID, "隐私密码错误");
+            throw new BusinessException(ErrorCode.PRIVATE_PASSWORD_INVALID, "隐私密码错误");
         }
 
         // 清理过期会话
@@ -424,7 +438,7 @@ public class FileServiceImpl implements FileService {
      */
     private void verifyAccess(String userId, String rootId) {
         if (permMapper.selectByUserAndRoot(userId, rootId) == null) {
-            throw new BusinessException(Code.FORBIDDEN, "无权访问此存储");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问此存储");
         }
     }
 
@@ -434,7 +448,7 @@ public class FileServiceImpl implements FileService {
      */
     private void requireStorageAvailable(StorageRoot root) {
         if (root.getStatus() == StorageRootStatus.OFFLINE) {
-            throw new BusinessException(Code.STORAGE_ROOT_OFFLINE,
+            throw new BusinessException(ErrorCode.STORAGE_ROOT_OFFLINE,
                     "存储根目录不可用（NAS 可能已离线）：" + root.getName());
         }
     }
@@ -486,7 +500,7 @@ public class FileServiceImpl implements FileService {
      */
     private void requireValidAccessToken(String fileItemId, String userId, String accessToken) {
         if (accessToken == null || accessToken.isBlank()) {
-            throw new BusinessException(Code.PRIVATE_PASSWORD_REQUIRED,
+            throw new BusinessException(ErrorCode.PRIVATE_PASSWORD_REQUIRED,
                     "此文件夹受隐私保护，请先验证隐私密码");
         }
 
@@ -499,7 +513,7 @@ public class FileServiceImpl implements FileService {
             }
         }
         if (!matched) {
-            throw new BusinessException(Code.PRIVATE_PASSWORD_INVALID,
+            throw new BusinessException(ErrorCode.PRIVATE_PASSWORD_INVALID,
                     "隐私访问令牌无效或已过期，请重新验证密码");
         }
     }
@@ -520,7 +534,7 @@ public class FileServiceImpl implements FileService {
         }
         FileItem p = fileItemMapper.selectById(parentId);
         if (p == null) {
-            throw new BusinessException(Code.NOT_FOUND, "父文件夹不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "父文件夹不存在");
         }
         return p.getRelativePath() + "/" + name;
     }
@@ -564,8 +578,63 @@ public class FileServiceImpl implements FileService {
     private FileItem checkActive(String id) {
         FileItem f = fileItemMapper.selectById(id);
         if (f == null || f.getStatus() != FileItemStatus.ACTIVE) {
-            throw new BusinessException(Code.NOT_FOUND, "文件项不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "文件项不存在");
         }
         return f;
+    }
+
+    /**
+     * 验证非管理员用户对文件的操作权限。
+     * 非管理员只能操作自己拥有的文件。
+     */
+    private void checkOwnership(FileItem item, String userId, boolean isAdmin) {
+        if (!isAdmin && !userId.equals(item.getOwnerUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此文件");
+        }
+    }
+
+    /**
+     * 获取或创建用户的个人主目录（如百度网盘的"我的文件"）。
+     * <p>
+     * 在主目录下以用户名创建一个文件夹，作为该用户在文件中心的入口。
+     * 已存在则不重复创建。
+     *
+     * @param rootId   存储根目录 ID
+     * @param userId   用户 ID
+     * @param username 用户名（用作主目录名称）
+     * @return 主目录的 FileItem ID
+     */
+    private String getOrCreateHomeFolder(String rootId, String userId, String username) {
+        String relativePath = username;
+        FileItem existing = fileItemMapper.selectByPath(rootId, relativePath);
+        if (existing != null && existing.getStatus() == FileItemStatus.ACTIVE) {
+            return existing.getId();
+        }
+
+        StorageRoot root = storageService.getByIdOrThrow(rootId);
+        Path homePath = storageService.resolveRootPath(root).resolve(relativePath).normalize();
+        storageService.verifyPathInRoot(root, homePath);
+
+        try {
+            Files.createDirectories(homePath);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
+                    "无法创建用户主目录：" + e.getMessage());
+        }
+
+        FileItem home = new FileItem();
+        home.setStorageRootId(rootId);
+        home.setParentId(null);
+        home.setOwnerUserId(userId);
+        home.setName(username);
+        home.setRelativePath(relativePath);
+        home.setItemType(ItemType.DIRECTORY);
+        home.setSizeBytes(0L);
+        home.setPrivacyMode(PrivacyMode.NORMAL);
+        home.setStatus(FileItemStatus.ACTIVE);
+        fileItemMapper.insert(home);
+
+        log.info("已为用户 {} 创建主目录: {} (root={})", username, relativePath, rootId);
+        return home.getId();
     }
 }

@@ -447,6 +447,11 @@ body {
   margin-left: 4px;
 }
 
+/* 全局：消除 Element Plus 按钮默认 margin 对 flex gap 的干扰 */
+.el-button + .el-button {
+  margin-left: 0;
+}
+
 /* 链接按钮 hover 态 */
 .el-button--text:hover,
 .el-button.is-link:hover {

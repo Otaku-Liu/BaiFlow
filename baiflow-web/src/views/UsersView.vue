@@ -9,7 +9,7 @@
           <el-option label="USER" value="USER" />
         </el-select>
         <el-select v-model="filterStatus" placeholder="状态" clearable style="width: 120px">
-          <el-option label="活跃" value="ACTIVE" />
+          <el-option label="正常" value="ACTIVE" />
           <el-option label="已禁用" value="DISABLED" />
           <el-option label="已锁定" value="LOCKED" />
         </el-select>
@@ -26,7 +26,7 @@
 
     <!-- 用户表格 -->
     <el-table :data="users" v-loading="loading" @selection-change="handleSelectionChange" stripe>
-      <el-table-column type="selection" width="45" />
+      <el-table-column type="selection" width="45" :selectable="isRowSelectable" />
       <el-table-column prop="username" label="用户名" min-width="120" />
       <el-table-column prop="displayName" label="展示名" min-width="120" />
       <el-table-column prop="role" label="角色" width="100">
@@ -40,14 +40,16 @@
         </template>
       </el-table-column>
       <el-table-column prop="lastLoginAt" label="最后登录" min-width="160">
-        <template #default="{ row }">{{ row.lastLoginAt || '-' }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.lastLoginAt) }}</template>
       </el-table-column>
-      <el-table-column prop="createdAt" label="创建时间" min-width="160" />
+      <el-table-column prop="createdAt" label="创建时间" min-width="160">
+        <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="showEditDialog(row)">编辑</el-button>
           <el-button size="small" @click="showResetPwdDialog(row)">重置密码</el-button>
-          <el-button v-if="row.id !== authStore.user?.id" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+          <el-button v-if="canDelete(row)" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -101,7 +103,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="editForm.status" style="width: 100%">
-            <el-option label="活跃" value="ACTIVE" />
+            <el-option label="正常" value="ACTIVE" />
             <el-option label="已禁用" value="DISABLED" />
             <el-option label="已锁定" value="LOCKED" />
           </el-select>
@@ -133,6 +135,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 import { listUsers, createUser, updateUser, batchDeleteUsers, resetPassword } from '../api/users'
+import { formatDateTime } from '../utils/format'
 
 const authStore = useAuthStore()
 
@@ -179,7 +182,19 @@ function statusTagType(status) {
   return { ACTIVE: 'success', DISABLED: 'warning', LOCKED: 'danger' }[status] || 'info'
 }
 function statusLabel(status) {
-  return { ACTIVE: '活跃', DISABLED: '已禁用', LOCKED: '已锁定' }[status] || status
+  return { ACTIVE: '正常', DISABLED: '已禁用', LOCKED: '已锁定' }[status] || status
+}
+
+/** 当前用户或内置 admin 不可选/不可删 */
+const BUILTIN_ADMIN = 'admin'
+function isProtected(row) {
+  return row.id === authStore.user?.id || row.username === BUILTIN_ADMIN
+}
+function isRowSelectable(row) {
+  return !isProtected(row)
+}
+function canDelete(row) {
+  return !isProtected(row)
 }
 
 async function fetchUsers() {
@@ -214,7 +229,8 @@ function handleReset() {
 }
 
 function handleSelectionChange(selection) {
-  selectedIds.value = selection.map(r => r.id)
+  // 过滤掉当前用户和内置 admin，防止意外选中
+  selectedIds.value = selection.filter(r => !isProtected(r)).map(r => r.id)
 }
 
 function showCreateDialog() {
@@ -322,24 +338,24 @@ onMounted(fetchUsers)
 <style scoped>
 .users-view { min-height: 400px; }
 
-.filter-bar { margin-bottom: 20px; }
+.filter-bar { margin-bottom: 16px; }
 
 .filter-row {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
 .action-row {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
 .pagination-wrap {
-  margin-top: 20px;
+  margin-top: 16px;
   display: flex;
   justify-content: flex-end;
 }

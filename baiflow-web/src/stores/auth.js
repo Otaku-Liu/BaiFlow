@@ -20,17 +20,31 @@ export const useAuthStore = defineStore('auth', {
       this.token = token
       this.user = user
       localStorage.setItem('baiflow_token', token)
+      if (user) {
+        localStorage.setItem('baiflow_user', JSON.stringify(user))
+      }
     },
 
     restoreSession() {
-      const saved = localStorage.getItem('baiflow_token')
-      if (saved) this.token = saved
+      const savedToken = localStorage.getItem('baiflow_token')
+      if (savedToken) {
+        this.token = savedToken
+        const savedUser = localStorage.getItem('baiflow_user')
+        if (savedUser) {
+          try {
+            this.user = JSON.parse(savedUser)
+          } catch {
+            localStorage.removeItem('baiflow_user')
+          }
+        }
+      }
     },
 
     clearSession() {
       this.token = ''
       this.user = null
       localStorage.removeItem('baiflow_token')
+      localStorage.removeItem('baiflow_user')
     }
   }
 })

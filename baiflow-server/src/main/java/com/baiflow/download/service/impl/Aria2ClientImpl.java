@@ -3,7 +3,7 @@ package com.baiflow.download.service.impl;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.baiflow.common.entity.ApiResponse.Code;
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.download.service.Aria2Client;
 import jakarta.annotation.PostConstruct;
@@ -154,7 +154,7 @@ public class Aria2ClientImpl implements Aria2Client {
                 JSONObject err = root.getJSONObject("error");
                 String errMsg = err != null ? err.getString("message") : "aria2 RPC 错误";
                 log.error("aria2 RPC 返回错误: method={}, message={}", method, errMsg);
-                throw new BusinessException(Code.DOWNLOAD_ENGINE_ERROR, "下载引擎错误：" + errMsg);
+                throw new BusinessException(ErrorCode.DOWNLOAD_ENGINE_ERROR, "下载引擎错误：" + errMsg);
             }
 
             return root;
@@ -163,7 +163,7 @@ public class Aria2ClientImpl implements Aria2Client {
             throw e;
         } catch (Exception e) {
             log.error("aria2 RPC 调用失败: method={}, error={}", method, e.getMessage());
-            throw new BusinessException(Code.DOWNLOAD_ENGINE_ERROR,
+            throw new BusinessException(ErrorCode.DOWNLOAD_ENGINE_ERROR,
                     "无法连接下载引擎：" + e.getMessage());
         }
     }

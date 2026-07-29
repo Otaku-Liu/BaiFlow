@@ -1,5 +1,6 @@
 package com.baiflow.share.controller;
 
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.share.dto.request.CreateShareRequest;
 import com.baiflow.share.dto.request.UpdateShareRequest;
@@ -57,7 +58,7 @@ public class ShareController {
                                                          @RequestParam(defaultValue = "20") int size,
                                                          Authentication auth) {
         if (!isAdmin(auth)) {
-            return ApiResponse.error(com.baiflow.common.entity.ApiResponse.Code.FORBIDDEN, "仅管理员可查看");
+            return ApiResponse.error(ErrorCode.FORBIDDEN, "仅管理员可查看");
         }
         return ApiResponse.success(shareService.getShareAnalytics(id, page, size));
     }

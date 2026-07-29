@@ -1,6 +1,6 @@
 package com.baiflow.user.service.impl;
 
-import com.baiflow.common.entity.ApiResponse.Code;
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.file.entity.FileItem;
 import com.baiflow.file.mapper.FileItemMapper;
@@ -47,7 +47,7 @@ public class UserServiceImpl implements UserService {
     public UserInfo createUser(CreateUserRequest req) {
         // 用户名重复检查
         if (userMapper.selectByUsername(req.username()) != null) {
-            throw new BusinessException(Code.USERNAME_EXISTS, "用户名已存在：" + req.username());
+            throw new BusinessException(ErrorCode.USERNAME_EXISTS, "用户名已存在：" + req.username());
         }
 
         User u = new User();
@@ -76,14 +76,14 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserInfo getUser(String id) {
         User u = userMapper.selectById(id);
-        if (u == null) { throw new BusinessException(Code.NOT_FOUND, "用户不存在"); }
+        if (u == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"); }
         return UserInfo.from(u);
     }
 
     @Override
     public UserInfo updateUser(String id, UpdateUserRequest req) {
         User u = userMapper.selectById(id);
-        if (u == null) { throw new BusinessException(Code.NOT_FOUND, "用户不存在"); }
+        if (u == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"); }
         // 仅更新实际传入的字段
         if (req.displayName() != null) { u.setDisplayName(req.displayName()); }
         if (req.role() != null) { u.setRole(req.role()); }
@@ -95,18 +95,21 @@ public class UserServiceImpl implements UserService {
     @Override
     public void resetPassword(String id, ResetPasswordRequest req) {
         User u = userMapper.selectById(id);
-        if (u == null) { throw new BusinessException(Code.NOT_FOUND, "用户不存在"); }
+        if (u == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"); }
         // 新密码重新 BCrypt 哈希，完全覆盖旧密码
         u.setPasswordHash(passwordEncoder.encode(req.newPassword()));
         userMapper.updateById(u);
     }
+
+    /** 系统内置管理员用户名，禁止被删除 */
+    private static final String BUILTIN_ADMIN_USERNAME = "admin";
 
     @Override
     @Transactional
     public void batchDelete(List<String> ids, String currentUserId) {
         // 不允许删除自己
         if (ids.contains(currentUserId)) {
-            throw new BusinessException(Code.FORBIDDEN, "不允许删除当前登录用户");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "不允许删除当前登录用户");
         }
 
         for (String userId : ids) {
@@ -114,6 +117,11 @@ public class UserServiceImpl implements UserService {
             if (u == null) {
                 log.warn("批量删除：用户 {} 不存在，跳过", userId);
                 continue;
+            }
+
+            // 不允许删除系统内置管理员
+            if (BUILTIN_ADMIN_USERNAME.equals(u.getUsername())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "不允许删除系统内置管理员账号");
             }
 
             // 删除该用户拥有的所有文件（磁盘 + 数据库）

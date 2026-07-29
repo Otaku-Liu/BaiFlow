@@ -2,9 +2,10 @@
   <div class="files-view">
     <!-- 顶部工具栏 -->
     <div class="toolbar">
-      <!-- Storage Root 选择器 -->
-      <el-select v-model="rootId" placeholder="选择存储根目录" @change="onRootChange" style="width:200px">
-        <el-option v-for="r in roots" :key="r.id" :label="r.name" :value="r.id" />
+      <!-- 管理员用户空间切换 -->
+      <el-select v-if="authStore.isAdmin && viewUsers.length > 0" v-model="viewUserId"
+        placeholder="查看用户空间" clearable @change="onViewUserChange" style="width:180px">
+        <el-option v-for="u in viewUsers" :key="u.id" :label="u.displayName || u.username" :value="u.id" />
       </el-select>
 
       <!-- 面包屑导航 -->
@@ -67,7 +68,7 @@
         <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? '文件夹' : (row.mimeType || '文件') }}</template>
       </el-table-column>
       <el-table-column label="修改时间" width="180">
-        <template #default="{ row }">{{ row.updatedAt || row.createdAt }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.updatedAt || row.createdAt) }}</template>
       </el-table-column>
       <el-table-column label="操作" width="300" fixed="right">
         <template #default="{ row }">
@@ -152,17 +153,23 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Folder, Document, Upload, FolderAdd, UploadFilled } from '@element-plus/icons-vue'
+import { useAuthStore } from '../stores/auth'
 import { useFileStore } from '../stores/file'
 import {
   listFiles, uploadFile, downloadFile, createFolder, renameFile, deleteFile,
   setPrivacy, removePrivacy, verifyPrivacy, listStorageRoots
 } from '../api/files'
+import { listUsers } from '../api/users'
+import { formatDateTime, formatSize } from '../utils/format'
 
+const authStore = useAuthStore()
 const fileStore = useFileStore()
 
 // ---- 状态 ----
 const roots = ref([])
 const rootId = ref('')
+const viewUsers = ref([])
+const viewUserId = ref('')
 const loading = ref(false)
 const showUploadDialog = ref(false)
 const showNewFolderDialog = ref(false)
@@ -187,31 +194,54 @@ const privacyError = ref('')
 
 // ---- 初始化 ----
 onMounted(async () => {
+  // 自动选择第一个可用存储根目录
   try {
     const { data } = await listStorageRoots()
-    if (data.code === 'OK') roots.value = data.data || []
+    if (data.code === 'OK' && data.data?.length > 0) {
+      roots.value = data.data
+      rootId.value = data.data[0].id
+      fileStore.setCurrentRoot(rootId.value)
+      loadFiles()
+    }
   } catch { /* 管理员权限不足或没有存储根目录 */ }
+
+  // 管理员加载用户列表（用于空间切换）
+  if (authStore.isAdmin) {
+    try {
+      const res = await listUsers({ page: 1, size: 100 })
+      if (res.data.code === 'OK') {
+        viewUsers.value = res.data.data?.records || []
+      }
+    } catch { /* ignore */ }
+  }
 })
 
-// ---- 文件操作 ----
-function onRootChange(id) {
-  fileStore.setCurrentRoot(id)
+// ---- 管理员用户空间切换 ----
+function onViewUserChange(id) {
+  viewUserId.value = id || ''
+  fileStore.breadcrumb = []
+  fileStore.page = 1
   loadFiles()
 }
 
+// ---- 文件操作 ----
 async function loadFiles() {
   if (!rootId.value) return
   loading.value = true
   try {
     const folderId = fileStore.currentFolderId
-    // 获取该文件夹（如有）的隐私令牌
     const token = fileStore.getPrivacyToken(folderId)
-    const { data } = await listFiles({
+    const params = {
       storageRootId: rootId.value,
-      parentId: folderId,
+      parentId: folderId || undefined,
       page: fileStore.page,
       size: fileStore.size
-    }, token)
+    }
+    // 管理员选择查看其他用户空间时传递 viewUserId
+    if (authStore.isAdmin && viewUserId.value) {
+      params.viewUserId = viewUserId.value
+    }
+    const { data } = await listFiles(params, token)
     if (data.code === 'OK') {
       fileStore.items = data.data.records || []
       fileStore.total = data.data.total || 0
@@ -485,15 +515,6 @@ function handleHttpError(e) {
   }
 }
 
-/** 文件大小格式化 */
-function formatSize(bytes) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let i = 0
-  let size = bytes
-  while (size >= 1024 && i < units.length - 1) { size /= 1024; i++ }
-  return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i]
-}
 </script>
 
 <style scoped>
@@ -502,9 +523,9 @@ function formatSize(bytes) {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding-bottom: 4px;
+  padding-bottom: 12px;
 }
 
 .breadcrumb {
@@ -518,7 +539,7 @@ function formatSize(bytes) {
 
 .toolbar-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .name-cell {

@@ -33,9 +33,11 @@
         <template #default="{ row }">{{ row.downloadCount }}{{ row.maxDownloads > 0 ? '/' + row.maxDownloads : '' }}</template>
       </el-table-column>
       <el-table-column label="过期时间" width="160">
-        <template #default="{ row }">{{ row.expiresAt || '永不过期' }}</template>
+        <template #default="{ row }">{{ row.expiresAt ? formatDateTime(row.expiresAt) : '永不过期' }}</template>
       </el-table-column>
-      <el-table-column label="创建时间" width="160" prop="createdAt" />
+      <el-table-column label="创建时间" width="160">
+        <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === 'ACTIVE'" type="danger" link size="small" @click="doRevoke(row)">撤销</el-button>
@@ -103,7 +105,9 @@
         <el-table-column prop="ipAddress" label="IP 地址" width="140" />
         <el-table-column prop="userAgent" label="User Agent" min-width="180" show-overflow-tooltip />
         <el-table-column prop="failureReason" label="失败原因" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="createdAt" label="时间" width="160" />
+        <el-table-column prop="createdAt" label="时间" width="160">
+          <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+        </el-table-column>
       </el-table>
       <el-empty v-if="!analyticsLoading && analyticsLogs.length === 0" description="暂无访问记录" />
     </el-drawer>
@@ -116,6 +120,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Share } from '@element-plus/icons-vue'
 import { createShare, listShares, revokeShare, buildShareUrl, getShareAnalytics } from '../api/shares'
 import { useAuthStore } from '../stores/auth'
+import { formatDateTime } from '../utils/format'
 
 const authStore = useAuthStore()
 const shares = ref([]); const loading = ref(false); const creating = ref(false)
@@ -202,8 +207,8 @@ function statusLabel(s) { return {ACTIVE:'有效',EXPIRED:'已过期',REVOKED:'�
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding-bottom: 4px;
+  gap: 10px;
+  padding-bottom: 12px;
 }
 
 .share-result { margin-top: 16px; }
