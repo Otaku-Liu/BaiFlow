@@ -9,16 +9,19 @@
       </el-select>
 
       <!-- 面包屑导航 -->
-      <el-breadcrumb separator="/" v-if="rootId" class="breadcrumb">
-        <el-breadcrumb-item>
-          <el-link type="primary" @click="navigateTo(null)">根目录</el-link>
-        </el-breadcrumb-item>
-        <el-breadcrumb-item v-for="(item, idx) in fileStore.breadcrumb" :key="item.id">
-          <el-link type="primary" @click="navigateTo(item)">{{ item.name }}</el-link>
-          <!-- 隐私文件夹标记 -->
-          <el-tag v-if="item.privacyMode === 'PRIVATE'" size="small" type="warning" style="margin-left:4px">隐私</el-tag>
-        </el-breadcrumb-item>
-      </el-breadcrumb>
+      <div v-if="rootId" class="breadcrumb-wrapper">
+        <span class="breadcrumb-label">当前路径：</span>
+        <el-breadcrumb separator="/" class="breadcrumb">
+          <el-breadcrumb-item>
+            <el-link type="primary" @click="navigateTo(null)">根目录</el-link>
+          </el-breadcrumb-item>
+          <el-breadcrumb-item v-for="(item, idx) in fileStore.breadcrumb" :key="item.id">
+            <el-link type="primary" @click="navigateTo(item)">{{ item.name }}</el-link>
+            <!-- 隐私文件夹标记 -->
+            <el-tag v-if="item.privacyMode === 'PRIVATE'" size="small" type="warning" style="margin-left:4px">隐私</el-tag>
+          </el-breadcrumb-item>
+        </el-breadcrumb>
+      </div>
 
       <div class="toolbar-actions">
         <el-button type="primary" @click="showUploadDialog = true" :disabled="!rootId">
@@ -202,15 +205,23 @@ onMounted(async () => {
       rootId.value = data.data[0].id
       fileStore.setCurrentRoot(rootId.value)
       loadFiles()
+    } else {
+      console.warn('没有可用的存储根目录，上传和新建文件夹按钮将保持禁用')
     }
-  } catch { /* 管理员权限不足或没有存储根目录 */ }
+  } catch (e) {
+    console.error('获取存储根目录失败:', e.response?.status, e.response?.data?.message || e.message)
+  }
 
-  // 管理员加载用户列表（用于空间切换）
+  // 管理员加载用户列表（用于空间切换），默认选中当前登录用户
   if (authStore.isAdmin) {
     try {
       const res = await listUsers({ page: 1, size: 100 })
       if (res.data.code === 'OK') {
         viewUsers.value = res.data.data?.records || []
+        // 默认选中当前登录用户，避免展示所有用户的文件
+        if (authStore.user?.id) {
+          viewUserId.value = authStore.user.id
+        }
       }
     } catch { /* ignore */ }
   }
@@ -528,8 +539,21 @@ function handleHttpError(e) {
   padding-bottom: 12px;
 }
 
-.breadcrumb {
+.breadcrumb-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 1;
+}
+
+.breadcrumb-label {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.breadcrumb {
   font-size: 14px;
 }
 

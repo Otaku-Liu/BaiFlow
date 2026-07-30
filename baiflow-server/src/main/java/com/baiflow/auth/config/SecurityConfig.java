@@ -1,6 +1,5 @@
 package com.baiflow.auth.config;
 
-import com.baiflow.auth.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,11 +13,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.List;
+import com.baiflow.auth.security.JwtAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -36,6 +32,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/storage-roots/active").authenticated()
                         .requestMatchers("/api/storage-roots/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/files/download/**").authenticated()
                         .requestMatchers("/api/files/**").authenticated()
