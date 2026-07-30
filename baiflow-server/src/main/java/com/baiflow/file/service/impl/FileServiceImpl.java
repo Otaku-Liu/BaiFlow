@@ -79,7 +79,7 @@ public class FileServiceImpl implements FileService {
                                          String viewUserId) {
         storageService.getByIdOrThrow(rootId);
 
-        // 非管理员：只能看自己的文件
+        // 非管理员：只能看自己的文件，且以主目录为根
         String effectiveOwner = isAdmin && viewUserId != null ? viewUserId : userId;
         if (!isAdmin || viewUserId != null) {
             // 确保用户存在
@@ -87,8 +87,11 @@ public class FileServiceImpl implements FileService {
             if (u == null) {
                 throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
             }
-            // 自动创建该用户的主目录（如不存在）
-            getOrCreateHomeFolder(rootId, effectiveOwner, u.getUsername());
+            // 自动创建该用户的主目录，并将用户的文件视图限定在主目录内
+            String homeId = getOrCreateHomeFolder(rootId, effectiveOwner, u.getUsername());
+            if (parentId == null || parentId.isBlank()) {
+                parentId = homeId;
+            }
         }
 
         // 进入文件夹前检查隐私保护
@@ -122,6 +125,9 @@ public class FileServiceImpl implements FileService {
         StorageRoot root = storageService.getByIdOrThrow(rootId);
         // NAS 离线时禁止写入
         requireStorageAvailable(root);
+
+        // 非管理员用户限定在主目录内操作
+        parentId = scopeNonAdminToHome(rootId, userId, parentId);
 
         // 上传到隐私文件夹内需先验证隐私密码
         checkPrivacyAccess(parentId, userId, privacyAccessToken);
@@ -208,11 +214,14 @@ public class FileServiceImpl implements FileService {
         // NAS 离线时禁止写入
         requireStorageAvailable(root);
 
+        // 非管理员用户限定在主目录内操作
+        String effectiveParentId = scopeNonAdminToHome(req.storageRootId(), userId, req.parentId());
+
         // 在隐私文件夹内创建子文件夹需先验证隐私密码
-        checkPrivacyAccess(req.parentId(), userId, privacyAccessToken);
+        checkPrivacyAccess(effectiveParentId, userId, privacyAccessToken);
 
         String safe = sanitize(req.name());
-        String rel = buildPath(req.parentId(), safe);
+        String rel = buildPath(effectiveParentId, safe);
 
         if (fileItemMapper.selectByPath(req.storageRootId(), rel) != null) {
             throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件夹已存在：" + safe);
@@ -230,7 +239,7 @@ public class FileServiceImpl implements FileService {
         // 持久化元数据
         FileItem f = new FileItem();
         f.setStorageRootId(req.storageRootId());
-        f.setParentId(blankNull(req.parentId()));
+        f.setParentId(blankNull(effectiveParentId));
         f.setOwnerUserId(userId);
         f.setName(safe);
         f.setRelativePath(rel);
@@ -431,6 +440,26 @@ public class FileServiceImpl implements FileService {
     // -------------------------------------------------------
     // 内部辅助方法
     // -------------------------------------------------------
+
+    /**
+     * 非管理员用户操作限定在主目录范围内——parentId 为空时重定向到该用户的主目录。
+     * <p>
+     * 管理员不受此限制，可在存储根目录任意位置操作。
+     *
+     * @return 有效 parentId（非管理员且原 parentId 为空时返回主目录 ID）
+     */
+    private String scopeNonAdminToHome(String rootId, String userId, String parentId) {
+        User u = userMapper.selectById(userId);
+        if (u != null && u.getRole() == com.baiflow.user.enums.UserRole.ADMIN) {
+            return parentId;
+        }
+        String username = u != null ? u.getUsername() : userId;
+        String homeId = getOrCreateHomeFolder(rootId, userId, username);
+        if (parentId == null || parentId.isBlank()) {
+            return homeId;
+        }
+        return parentId;
+    }
 
     /**
      * 校验用户对指定存储根目录的访问权限。

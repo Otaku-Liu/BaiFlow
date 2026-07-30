@@ -13,7 +13,7 @@
         <span class="breadcrumb-label">当前路径：</span>
         <el-breadcrumb separator="/" class="breadcrumb">
           <el-breadcrumb-item>
-            <el-link type="primary" @click="navigateTo(null)">根目录</el-link>
+            <el-link type="primary" @click="navigateTo(null)">{{ rootLabel }}</el-link>
           </el-breadcrumb-item>
           <el-breadcrumb-item v-for="(item, idx) in fileStore.breadcrumb" :key="item.id">
             <el-link type="primary" @click="navigateTo(item)">{{ item.name }}</el-link>
@@ -42,7 +42,7 @@
         <el-form-item label="隐私密码">
           <el-input v-model="privacyPendingPassword" type="password" placeholder="请输入隐私密码" show-password />
         </el-form-item>
-        <div style="text-align:right">
+        <div class="dialog-footer">
           <el-button @click="cancelPrivacyVerify">取消</el-button>
           <el-button type="primary" native-type="submit" :loading="privacyVerifying">验证</el-button>
         </div>
@@ -138,6 +138,9 @@
       </template>
     </el-dialog>
 
+    <!-- 通用确认弹窗（替换 ElMessageBox） -->
+    <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
+
     <!-- 设置隐私密码对话框 -->
     <el-dialog v-model="showSetPrivacyDialog" title="设置隐私密码" width="380px">
       <el-alert type="info" :closable="false" show-icon style="margin-bottom:16px">
@@ -153,8 +156,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Folder, Document, Upload, FolderAdd, UploadFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { useFileStore } from '../stores/file'
@@ -164,9 +167,21 @@ import {
 } from '../api/files'
 import { listUsers } from '../api/users'
 import { formatDateTime, formatSize } from '../utils/format'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
 const fileStore = useFileStore()
+const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
+
+/** 面包屑根节点显示名称：管理员视角为空时显示"根目录"，否则显示用户名或"我的文件" */
+const rootLabel = computed(() => {
+  if (!authStore.isAdmin) return '我的文件'
+  if (!viewUserId.value) return '根目录' // 管理员查看全部用户
+  if (viewUserId.value === authStore.user?.id) return '我的文件'
+  const u = viewUsers.value.find(u => u.id === viewUserId.value)
+  return u ? (u.displayName || u.username) : '我的文件'
+})
 
 // ---- 状态 ----
 const roots = ref([])
@@ -197,33 +212,42 @@ const privacyError = ref('')
 
 // ---- 初始化 ----
 onMounted(async () => {
-  // 自动选择第一个可用存储根目录
-  try {
-    const { data } = await listStorageRoots()
+  // 并行加载存储根目录和管理员用户列表
+  const [rootsResult, usersResult] = await Promise.allSettled([
+    listStorageRoots(),
+    authStore.isAdmin ? listUsers({ page: 1, size: 100 }) : Promise.resolve(null)
+  ])
+
+  // 处理存储根目录
+  if (rootsResult.status === 'fulfilled') {
+    const { data } = rootsResult.value
     if (data.code === 'OK' && data.data?.length > 0) {
       roots.value = data.data
       rootId.value = data.data[0].id
       fileStore.setCurrentRoot(rootId.value)
-      loadFiles()
     } else {
       console.warn('没有可用的存储根目录，上传和新建文件夹按钮将保持禁用')
     }
-  } catch (e) {
-    console.error('获取存储根目录失败:', e.response?.status, e.response?.data?.message || e.message)
+  } else {
+    console.error('获取存储根目录失败:', rootsResult.reason?.response?.status,
+      rootsResult.reason?.response?.data?.message || rootsResult.reason?.message)
   }
 
   // 管理员加载用户列表（用于空间切换），默认选中当前登录用户
-  if (authStore.isAdmin) {
-    try {
-      const res = await listUsers({ page: 1, size: 100 })
-      if (res.data.code === 'OK') {
-        viewUsers.value = res.data.data?.records || []
-        // 默认选中当前登录用户，避免展示所有用户的文件
-        if (authStore.user?.id) {
-          viewUserId.value = authStore.user.id
-        }
+  if (authStore.isAdmin && usersResult.status === 'fulfilled' && usersResult.value) {
+    const res = usersResult.value
+    if (res.data.code === 'OK') {
+      viewUsers.value = res.data.data?.records || []
+      // 默认选中当前登录用户，避免展示所有用户的文件
+      if (authStore.user?.id) {
+        viewUserId.value = authStore.user.id
       }
-    } catch { /* ignore */ }
+    }
+  }
+
+  // 两边都就绪后再加载文件列表，确保 viewUserId 已设置
+  if (rootId.value) {
+    loadFiles()
   }
 })
 
@@ -384,8 +408,11 @@ async function doRename() {
 /** 删除 */
 async function doDelete(row) {
   try {
-    await ElMessageBox.confirm(`确定要删除 "${row.name}" 吗？此操作不可撤销。`, '确认删除', {
-      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'
+    await confirm({
+      title: '确认删除',
+      message: `确定要删除 "${row.name}" 吗？此操作不可撤销。`,
+      confirmText: '删除',
+      type: 'warning'
     })
     const token = fileStore.currentPrivacyToken
     await deleteFile(row.id, token)
@@ -423,8 +450,11 @@ async function doSetPrivacy() {
 /** 取消隐私保护 */
 async function doRemovePrivacy(row) {
   try {
-    await ElMessageBox.confirm(`确定要取消 "${row.name}" 的隐私保护吗？`, '确认', {
-      type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消'
+    await confirm({
+      title: '确认',
+      message: `确定要取消 "${row.name}" 的隐私保护吗？`,
+      confirmText: '确认',
+      type: 'warning'
     })
     await removePrivacy(row.id)
     // 清除本地存储的访问令牌
@@ -563,6 +593,12 @@ function handleHttpError(e) {
 
 .toolbar-actions {
   display: flex;
+  gap: 10px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
   gap: 10px;
 }
 

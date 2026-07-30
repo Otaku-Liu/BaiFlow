@@ -94,6 +94,9 @@
       </template>
     </el-dialog>
 
+    <!-- 通用确认弹窗 -->
+    <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
+
     <!-- 分享分析抽屉 -->
     <el-drawer v-model="analyticsVisible" title="分享访问日志" size="600px">
       <el-table :data="analyticsLogs" v-loading="analyticsLoading" stripe>
@@ -116,13 +119,16 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { Share } from '@element-plus/icons-vue'
 import { createShare, listShares, revokeShare, buildShareUrl, getShareAnalytics } from '../api/shares'
 import { useAuthStore } from '../stores/auth'
 import { formatDateTime } from '../utils/format'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
+const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
 const shares = ref([]); const loading = ref(false); const creating = ref(false)
 const page = ref(1); const size = ref(20); const total = ref(0)
 const filterStatus = ref(''); const showCreateDialog = ref(false)
@@ -166,7 +172,7 @@ async function doCreateShare() {
 
 async function doRevoke(row) {
   try {
-    await ElMessageBox.confirm('确定撤销此分享链接？','确认撤销',{type:'warning',confirmButtonText:'撤销',cancelButtonText:'取消'})
+    await confirm({ title: '确认撤销', message: '确定撤销此分享链接？', confirmText: '撤销', type: 'warning' })
     await revokeShare(row.id)
     ElMessage.success('已撤销'); loadShares()
   } catch(e) { if(e!=='cancel') ElMessage.error('撤销失败') }

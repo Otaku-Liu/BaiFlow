@@ -44,8 +44,11 @@ Vue 3 Web 管理台          Android Java App
 - 访客通过分享 URL 访问，不登录管理台
 
 ### 文件中心
-- Storage Root 配置、目录浏览、文件上传/下载
+- Storage Root 配置、启动时自动初始化默认存储根目录
+- 目录浏览、文件上传/下载
 - 新建文件夹、重命名、移动、删除
+- 用户主目录隔离：每个用户拥有以用户名命名的个人主目录，文件视图自动限定在主目录内
+- 管理员可切换查看其他用户的主目录内容
 - 隐私文件夹（额外密码验证，密码只存 hash）
 
 ### 分享
@@ -107,6 +110,7 @@ Vue 3 Web 管理台          Android Java App
 - 文件操作限制在配置的 Storage Root 内，路径需归一化校验
 - 后端进程不用 root 运行
 - 不向客户端暴露服务器绝对路径
+- 启动时自动从 `baiflow.storage.default-root-path` 创建默认存储根目录（环境变量 `BAIFLOW_STORAGE_ROOT`）
 
 ### 分享安全
 - 分享 URL 使用不可预测 token，数据库只存 hash

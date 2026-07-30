@@ -61,6 +61,9 @@
         layout="total, prev, pager, next" @current-change="fetchUsers" />
     </div>
 
+    <!-- 通用确认弹窗 -->
+    <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
+
     <!-- 创建用户弹窗 -->
     <el-dialog v-model="createDialogVisible" title="创建用户" width="420px" :close-on-click-modal="false">
       <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="80px">
@@ -132,12 +135,15 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 import { listUsers, createUser, updateUser, batchDeleteUsers, resetPassword } from '../api/users'
 import { formatDateTime } from '../utils/format'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
+const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
 
 // 列表状态
 const loading = ref(false)
@@ -303,30 +309,36 @@ async function handleResetPassword() {
 
 async function handleDelete(row) {
   try {
-    await ElMessageBox.confirm(`确定要删除用户 "${row.displayName || row.username}" 吗？其拥有的文件将被永久删除，下载和分享记录将保留。`, '确认删除', { type: 'warning' })
-  } catch { return }
-  try {
+    await confirm({
+      title: '确认删除',
+      message: `确定要删除用户 "${row.displayName || row.username}" 吗？其拥有的文件将被永久删除，下载和分享记录将保留。`,
+      confirmText: '删除',
+      type: 'warning'
+    })
     await batchDeleteUsers(row.id)
     ElMessage.success('用户已删除')
     fetchUsers()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '删除失败')
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || '删除失败')
   }
 }
 
 async function handleBatchDelete() {
   if (selectedIds.value.length === 0) return
   try {
-    await ElMessageBox.confirm(`确定要删除选中的 ${selectedIds.value.length} 个用户吗？其拥有的文件将被永久删除。`, '批量删除确认', { type: 'warning' })
-  } catch { return }
-  batchDeleting.value = true
-  try {
+    await confirm({
+      title: '批量删除确认',
+      message: `确定要删除选中的 ${selectedIds.value.length} 个用户吗？其拥有的文件将被永久删除。`,
+      confirmText: '删除',
+      type: 'warning'
+    })
+    batchDeleting.value = true
     await batchDeleteUsers(selectedIds.value.join(','))
     ElMessage.success(`已删除 ${selectedIds.value.length} 个用户`)
     selectedIds.value = []
     fetchUsers()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '批量删除失败')
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || '批量删除失败')
   } finally {
     batchDeleting.value = false
   }

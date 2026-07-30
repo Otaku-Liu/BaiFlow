@@ -10,7 +10,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 |---|---|---|
 | 登录 | `/login` | 用户名密码登录 |
 | 主布局 | `/` | 侧边栏 + 顶栏 + 内容区，需登录 |
-| 文件中心 | `/` 内 | Storage Root 切换、面包屑、文件列表、上传/下载/重命名/删除、隐私文件夹 |
+| 文件中心 | `/` 内 | 管理员用户切换、面包屑（含当前路径标签）、文件列表、上传/下载/重命名/删除、隐私文件夹 |
 | 下载中心 | `/` 内 | aria2 下载任务管理 |
 | 分享管理 | `/` 内 | 分享链接创建/查看/撤销、访问日志（管理员） |
 | 用户管理 | `/` 内 | 管理员可见：用户列表、创建/编辑、批量删除、重置密码 |
@@ -20,16 +20,21 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 
 | Store | 职责 |
 |---|---|
-| `authStore` | token、用户信息、登录状态 |
-| `fileStore` | 当前 Storage Root、目录、文件列表、隐私令牌 |
-| `transferStore` | 传输/下载进度 |
-| `notificationStore` | 未读数、通知列表 |
+| `authStore` | token、用户信息、登录状态、`isAdmin` 判断 |
+| `fileStore` | 当前 Storage Root、面包屑路径、文件列表、隐私令牌 |
+
+## 组件与 Composables
+
+| 文件 | 用途 |
+|---|---|
+| `components/ConfirmDialog.vue` | 基于 `el-dialog` 的通用确认弹窗，替代 `ElMessageBox.confirm`，确保所有弹窗样式统一 |
+| `composables/useConfirmDialog.js` | 提供 `confirm()` promise 式 API，搭配 `ConfirmDialog` 使用 |
 
 ## API 调用
 
 - Axios 统一注入 Bearer token
 - 401 统一跳转登录页
-- 请求失败统一显示错误消息
+- 管理员文件列表传入 `viewUserId` 参数切换用户视角
 - 文件上传显示进度，文件下载使用浏览器下载能力
 
 ## 视觉风格 · Apple 风格 (iOS 11-14)
@@ -90,10 +95,20 @@ Finder 列表视图风格：无斑马纹、hover 行浅蓝底、行高 `44px`。
 | 字体 | Inter | Web 上最接近 SF Pro 的替代 |
 | 侧边栏 | 浅灰无边框（iPad 分栏） | 最匹配管理台场景 |
 
+## 弹窗组件统一
+
+所有确认弹窗（删除、撤销等）统一使用 `ConfirmDialog` 组件（`el-dialog`），不再使用 `ElMessageBox`。弹窗样式集中在 `styles.css` 的"弹窗与浮层"章节：
+
+- **`el-dialog`**：header `24px 24px 0` / body `20px 24px` / footer `0 24px 20px`，按钮 flex + gap 10px
+- **`el-message-box`**（如仍使用）：外层 `padding:0`，内部间距与 `el-dialog` 对齐
+- 输入框边框使用 `box-shadow: 0 0 0 1px var(--el-border-color) inset`，与下拉选择框统一
+- 弹窗底部按钮统一右对齐、10px 间距
+
 ## UI 原则
 
 - 管理台以信息密度和可扫描性为主
 - 文件列表优先表格
-- 危险操作二次确认
+- 危险操作二次确认（统一使用 `ConfirmDialog`）
+- 面包屑根节点根据用户上下文动态显示（"我的文件" / 用户名 / "根目录"）
 - 长任务显示状态和错误原因
 - 空状态说明下一步操作

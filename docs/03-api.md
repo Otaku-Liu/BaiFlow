@@ -39,8 +39,13 @@
 - `DELETE /api/users?ids=id1,id2`（批量删除）
 - `GET/PUT /api/users/{id}/permissions`
 
+### 存储根目录
+- `GET /api/storage-roots/active`（返回所有 ACTIVE 状态的存储根目录，供文件中心选择器使用）
+- `GET/POST /api/storage-roots` · `PATCH /api/storage-roots/{id}`（管理员）
+- `POST /api/storage-roots/{id}/check`（管理员检测 NAS 连通性）
+
 ### 文件
-- `GET /api/files?storageRootId=&parentId=&page=&size=`
+- `GET /api/files?storageRootId=&parentId=&page=&size=&viewUserId=`
 - `POST /api/files/upload`
 - `GET /api/files/download/{fileId}`
 - `POST /api/files/folders`
@@ -48,6 +53,8 @@
 - `DELETE /api/files/{id}`
 - `POST /api/files/{id}/privacy` · `DELETE /api/files/{id}/privacy`
 - `POST /api/files/{id}/privacy/verify`
+
+**`viewUserId` 参数**：管理员传入此参数可切换查看指定用户的文件视图。非管理员或未传入时，文件列表自动限定在当前用户的主目录（以用户名命名的文件夹）内。普通用户无法访问主目录上层，确保文件隔离。
 
 隐私文件夹访问需传 `X-Privacy-Access-Token` 头，令牌有效期 30 分钟。
 
@@ -79,5 +86,6 @@
 
 - 文件 ID 在服务端解析为受控路径，不返回 `root_path`
 - 上传文件名清洗非法字符
+- 普通用户文件视图自动限定在主目录内（`parentId` 为空时重定向到主目录）
 - 普通用户通过 user_storage_permission 校验范围
 - 公开分享接口记录访问日志

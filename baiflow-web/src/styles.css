@@ -198,25 +198,161 @@ body {
   box-shadow: var(--baiflow-shadow-sm);
 }
 
-/* 对话框圆角 */
+/* ================================================================
+   5.4 弹窗与浮层 — 统一 12px 间距体系
+   el-message-box 原生就是 12px，el-dialog 对齐到同一节奏
+   ================================================================ */
+
+/* ---- 对话框 (el-dialog) ---- */
 .el-dialog {
   border-radius: var(--baiflow-radius-lg);
   box-shadow: var(--baiflow-shadow-md);
+  animation: dialog-appear 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 消息提示 */
-.el-message {
-  border-radius: var(--baiflow-radius-md);
+.el-dialog__header {
+  padding: 24px 24px 0;
+}
+
+.el-dialog__title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--el-text-color-primary);
+}
+
+.el-dialog__body {
+  padding: 20px 24px;
+}
+
+.el-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 20px;
+}
+
+.el-dialog__headerbtn {
+  top: 24px;
+  right: 24px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+}
+
+.el-dialog__headerbtn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* ---- 确认框 (el-message-box) ---- */
+.el-message-box {
+  border-radius: var(--baiflow-radius-lg);
+  border: none;
+  box-shadow: var(--baiflow-shadow-md);
+  /* 覆盖 EP 默认 padding:12px，对齐 dialog 的 24/20 体系 */
+  padding: 0;
+}
+
+.el-message-box__header {
+  padding: 24px 24px 0;
+}
+
+.el-message-box__title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--el-text-color-primary);
+}
+
+.el-message-box__headerbtn {
+  top: 24px;
+  right: 24px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.el-message-box__headerbtn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.el-message-box__content {
+  padding: 20px 24px;
+}
+
+.el-message-box__status {
+  position: static;
+  font-size: 22px;
+}
+
+.el-message-box__message {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  padding-left: 0;
+}
+
+.el-message-box__btns {
+  gap: 10px;
+  padding: 0 24px 20px;
+}
+
+.el-message-box__btns .el-button {
+  border-radius: 8px;
+  font-weight: 500;
+  min-width: 72px;
+}
+
+/* ---- 抽屉 ---- */
+.el-drawer {
+  border-radius: var(--baiflow-radius-lg) 0 0 var(--baiflow-radius-lg);
+}
+
+/* ---- 弹出框 ---- */
+.el-popover {
+  border-radius: var(--baiflow-radius-lg);
+  border: none;
   box-shadow: var(--baiflow-shadow-md);
 }
 
-/* 下拉菜单 */
-.el-dropdown-menu,
-.el-select-dropdown,
-.el-popper {
-  border-radius: var(--baiflow-radius-md) !important;
-  box-shadow: var(--baiflow-shadow-md) !important;
-  border: none !important;
+/* ---- 消息提示 ---- */
+.el-message {
+  border-radius: var(--baiflow-radius-md);
+  box-shadow: var(--baiflow-shadow-md);
+  animation: message-slide 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---- Alert ---- */
+.el-alert {
+  border-radius: var(--baiflow-radius-md);
+}
+
+/* ---- 上传拖拽区 ---- */
+.el-upload-dragger {
+  border-radius: var(--baiflow-radius-lg);
+  border: 2px dashed var(--el-border-color);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.el-upload-dragger:hover {
+  border-color: var(--el-color-primary);
+  background-color: rgba(0, 122, 255, 0.02);
+}
+
+/* ---- 表单校验错误（弹窗内通用） ---- */
+.el-form-item.is-error .el-input__wrapper {
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.12);
+}
+
+.el-form-item__error {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--el-color-danger);
+  padding-top: 4px;
 }
 
 /* 标签 */
@@ -234,7 +370,8 @@ body {
 /* 输入框焦点：Apple 蓝光圈 */
 .el-input__wrapper {
   border-radius: var(--baiflow-radius-md);
-  box-shadow: none;
+  /* 默认显示边框，颜色与下拉选择框的边框一致 */
+  box-shadow: 0 0 0 1px var(--el-border-color) inset;
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
@@ -282,16 +419,6 @@ body {
   opacity: 0.6;
 }
 
-/* Alert 圆角 */
-.el-alert {
-  border-radius: var(--baiflow-radius-md);
-}
-
-/* 抽屉 */
-.el-drawer {
-  border-radius: var(--baiflow-radius-lg) 0 0 var(--baiflow-radius-lg);
-}
-
 /* 选中文本颜色 */
 ::selection {
   background: rgba(0, 122, 255, 0.2);
@@ -319,11 +446,6 @@ body {
   transition: background-color 0.12s ease;
 }
 
-/* 对话框动画 */
-.el-dialog {
-  animation: dialog-appear 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 @keyframes dialog-appear {
   from {
     opacity: 0;
@@ -333,11 +455,6 @@ body {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
-}
-
-/* 消息提示动画 */
-.el-message {
-  animation: message-slide 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes message-slide {
@@ -463,104 +580,10 @@ body {
   background-color: rgba(0, 122, 255, 0.04) !important;
 }
 
-/* 对话框头部 → Apple 风格 */
-.el-dialog__header {
-  padding: 24px 24px 0;
-}
-
-.el-dialog__title {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--el-text-color-primary);
-}
-
-.el-dialog__body {
-  padding: 20px 24px;
-}
-
-.el-dialog__footer {
-  padding: 0 24px 20px;
-}
-
-.el-dialog__headerbtn {
-  top: 24px;
-  right: 24px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.15s ease;
-}
-
-.el-dialog__headerbtn:hover {
-  background-color: rgba(0, 0, 0, 0.06);
-}
-
-/* 表单校验错误 */
-.el-form-item.is-error .el-input__wrapper {
-  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.12);
-}
-
-.el-form-item__error {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--el-color-danger);
-  padding-top: 4px;
-}
-
 /* 分割线 */
 .el-divider--horizontal {
   margin: 20px 0;
   border-top-color: var(--el-border-color-light);
-}
-
-/* 上传组件 */
-.el-upload-dragger {
-  border-radius: var(--baiflow-radius-lg);
-  border: 2px dashed var(--el-border-color);
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.el-upload-dragger:hover {
-  border-color: var(--el-color-primary);
-  background-color: rgba(0, 122, 255, 0.02);
-}
-
-/* 确认框 */
-.el-message-box {
-  border-radius: var(--baiflow-radius-lg);
-  border: none;
-  box-shadow: var(--baiflow-shadow-md);
-  padding-bottom: 20px;
-}
-
-.el-message-box__header {
-  padding: 24px 24px 0;
-}
-
-.el-message-box__title {
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.el-message-box__message {
-  color: var(--el-text-color-secondary);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.el-message-box__btns {
-  padding: 12px 24px 0;
-}
-
-.el-message-box__btns .el-button {
-  border-radius: 8px;
-  font-weight: 500;
-  min-width: 72px;
 }
 
 /* 下拉菜单项 */
@@ -576,13 +599,6 @@ body {
 .el-badge__content--danger {
   background-color: #FF3B30;
   border: 2px solid #fff;
-}
-
-/* 弹出框 */
-.el-popover {
-  border-radius: var(--baiflow-radius-lg);
-  border: none;
-  box-shadow: var(--baiflow-shadow-md);
 }
 
 /* Tabs */

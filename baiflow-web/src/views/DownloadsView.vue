@@ -79,6 +79,9 @@
       <el-button type="primary" @click="showCreateDialog = true">创建你的第一个下载任务</el-button>
     </el-empty>
 
+    <!-- 通用确认弹窗 -->
+    <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
+
     <!-- 创建下载任务对话框 -->
     <el-dialog v-model="showCreateDialog" title="新建下载任务" width="500px">
       <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-position="top">
@@ -104,13 +107,17 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import {
   createDownload, listDownloads, pauseDownload, resumeDownload, removeDownload
 } from '../api/downloads'
 import { listStorageRoots } from '../api/files'
 import { formatDateTime, formatSize, formatSpeed } from '../utils/format'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+
+const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
 
 // ---- 状态 ----
 const tasks = ref([])
@@ -206,8 +213,11 @@ async function doResume(row) {
 
 async function doDelete(row) {
   try {
-    await ElMessageBox.confirm(`确定要删除此下载任务吗？`, '确认删除', {
-      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'
+    await confirm({
+      title: '确认删除',
+      message: '确定要删除此下载任务吗？',
+      confirmText: '删除',
+      type: 'warning'
     })
     await removeDownload(row.id)
     ElMessage.success('已删除')
