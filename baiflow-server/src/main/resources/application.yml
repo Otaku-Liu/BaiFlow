@@ -15,7 +15,15 @@ spring:
       password: ${BAIFLOW_REDIS_PASSWORD:}
       database: ${BAIFLOW_REDIS_DATABASE:0}
   flyway:
-    enabled: false
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    clean-disabled: true
+    out-of-order: false
+    validate-on-migrate: true
+    encoding: UTF-8
+    placeholder-replacement: false
   jackson:
     time-zone: Asia/Shanghai
   servlet:

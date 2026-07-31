@@ -13,11 +13,25 @@ import java.time.LocalDateTime;
 public class ShareAccessLog {
     @TableId(type = IdType.ASSIGN_UUID)
     private String id;
+
+    /** 分享链接 ID */
     private String shareLinkId;
+
+    /** 操作类型：VIEW / DOWNLOAD / VERIFY_CODE / FAILED */
     private String action;
+
+    /** 访问者 IP 地址 */
     private String ipAddress;
+
+    /** 访问者 User-Agent */
     private String userAgent;
+
+    /** 是否成功（1=成功，0=失败） */
     private Boolean success;
+
+    /** 失败原因（success=0 时填写） */
     private String failureReason;
+
+    /** 创建时间 */
     private LocalDateTime createdAt;
 }
