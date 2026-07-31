@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * 确保旧密码持有者无法继续访问。
  */
 @Data
-@TableName("private_folder_access")
+@TableName("bf_private_folder_access")
 public class PrivateFolderAccess {
 
     /** 主键，UUID 自动生成 */

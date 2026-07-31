@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
  * 下载完成后自动在 {@code file_item} 表中创建对应的文件记录。
  */
 @Data
-@TableName("download_task")
+@TableName("bf_download_task")
 public class DownloadTask {
 
     /** 主键，UUID 自动生成 */

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /** 分享访问日志实体 */
 @Data
-@TableName("share_access_log")
+@TableName("bf_share_access_log")
 public class ShareAccessLog {
     @TableId(type = IdType.ASSIGN_UUID)
     private String id;

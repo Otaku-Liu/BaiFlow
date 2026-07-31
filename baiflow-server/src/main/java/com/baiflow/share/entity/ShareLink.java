@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 
 /** 分享链接实体 */
 @Data
-@TableName("share_link")
+@TableName("bf_share_link")
 public class ShareLink {
     @TableId(type = IdType.ASSIGN_UUID)
     private String id;

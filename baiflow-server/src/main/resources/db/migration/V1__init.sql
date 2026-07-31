@@ -5,25 +5,9 @@
 -- ============================================================
 
 -- -----------------------------------------------------------
--- 1. 系统引导配置表
+-- 1. 系统用户表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `system_bootstrap` (
-    `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
-    `bootstrap_key`  VARCHAR(64)  NOT NULL COMMENT '配置键',
-    `bootstrap_value` VARCHAR(255) NOT NULL COMMENT '配置值',
-    `created_at`     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_system_bootstrap_key` (`bootstrap_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统引导配置表';
-
-INSERT INTO `system_bootstrap` (`bootstrap_key`, `bootstrap_value`)
-VALUES ('phase', 'initialized')
-ON DUPLICATE KEY UPDATE `bootstrap_value` = VALUES(`bootstrap_value`);
-
--- -----------------------------------------------------------
--- 2. 系统用户表
--- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `user` (
+CREATE TABLE IF NOT EXISTS `bf_user` (
     `id`            VARCHAR(32)  NOT NULL COMMENT '用户主键，UUID',
     `username`      VARCHAR(64)  NOT NULL COMMENT '登录用户名，全局唯一',
     `password_hash` VARCHAR(255) NOT NULL COMMENT 'BCrypt 哈希后的密码，绝不存明文',
@@ -40,16 +24,16 @@ CREATE TABLE IF NOT EXISTS `user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表';
 
 -- 默认管理员账号（用户名 admin，密码 admin）
-INSERT INTO `user` (`id`, `username`, `password_hash`, `display_name`, `role`, `status`, `avatar_url`, `created_at`, `updated_at`)
+INSERT INTO `bf_user` (`id`, `username`, `password_hash`, `display_name`, `role`, `status`, `avatar_url`, `created_at`, `updated_at`)
 SELECT REPLACE(UUID(), '-', ''), 'admin',
        '$2a$10$J56W4KahX.odv.j2jNdzie00DVgxql0Lo4Fc3P6LUTz9iwIdEexQW',
        'Administrator', 'ADMIN', 'NORMAL', '', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE `username` = 'admin');
+WHERE NOT EXISTS (SELECT 1 FROM `bf_user` WHERE `username` = 'admin');
 
 -- -----------------------------------------------------------
--- 3. 存储根目录表
+-- 2. 存储根目录表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `storage_root` (
+CREATE TABLE IF NOT EXISTS `bf_storage_root` (
     `id`         VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
     `name`       VARCHAR(128) NOT NULL DEFAULT '' COMMENT '存储根目录的显示名称',
     `type`       VARCHAR(16)  NOT NULL DEFAULT 'LOCAL' COMMENT '类型：LOCAL（本地磁盘）/ NAS_MOUNT（NAS 挂载）',
@@ -63,9 +47,9 @@ CREATE TABLE IF NOT EXISTS `storage_root` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='存储根目录表（定义文件操作的安全边界）';
 
 -- -----------------------------------------------------------
--- 4. 文件项表（文件和目录元数据）
+-- 3. 文件项表（文件和目录元数据）
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `file_item` (
+CREATE TABLE IF NOT EXISTS `bf_file_item` (
     `id`                    VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
     `storage_root_id`       VARCHAR(32)   NOT NULL COMMENT '所属存储根目录 ID',
     `parent_id`             VARCHAR(32)   NULL COMMENT '父目录 ID（NULL 表示该存储根目录的根层级）',
@@ -89,9 +73,9 @@ CREATE TABLE IF NOT EXISTS `file_item` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件项表（存储文件和目录的元数据，文件本体落磁盘）';
 
 -- -----------------------------------------------------------
--- 5. 用户存储权限表
+-- 4. 用户存储权限表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `user_storage_permission` (
+CREATE TABLE IF NOT EXISTS `bf_user_storage_permission` (
     `id`              VARCHAR(32) NOT NULL COMMENT '主键，UUID',
     `user_id`         VARCHAR(32) NOT NULL COMMENT '被授权的用户 ID',
     `storage_root_id` VARCHAR(32) NOT NULL COMMENT '授权的存储根目录 ID',
@@ -105,9 +89,9 @@ CREATE TABLE IF NOT EXISTS `user_storage_permission` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户存储权限表（定义用户对存储根目录或文件/文件夹的访问级别）';
 
 -- -----------------------------------------------------------
--- 6. 隐私文件夹访问会话表
+-- 5. 隐私文件夹访问会话表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `private_folder_access` (
+CREATE TABLE IF NOT EXISTS `bf_private_folder_access` (
     `id`                VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
     `user_id`           VARCHAR(32)  NOT NULL COMMENT '访问用户 ID',
     `file_item_id`      VARCHAR(32)  NOT NULL COMMENT '隐私文件夹 ID',
@@ -120,9 +104,9 @@ CREATE TABLE IF NOT EXISTS `private_folder_access` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='隐私文件夹访问会话表（密码验证通过后的短期会话）';
 
 -- -----------------------------------------------------------
--- 7. 传输任务表
+-- 6. 传输任务表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `transfer_task` (
+CREATE TABLE IF NOT EXISTS `bf_transfer_task` (
     `id`            VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
     `created_by`    VARCHAR(32)   NOT NULL COMMENT '创建者用户 ID',
     `task_type`     VARCHAR(16)   NOT NULL DEFAULT 'UPLOAD' COMMENT '任务类型：UPLOAD / DOWNLOAD / DEVICE_SEND',
@@ -139,9 +123,9 @@ CREATE TABLE IF NOT EXISTS `transfer_task` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='传输任务表（上传、下载、设备流转）';
 
 -- -----------------------------------------------------------
--- 8. 用户通知表
+-- 7. 用户通知表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `notification` (
+CREATE TABLE IF NOT EXISTS `bf_notification` (
     `id`          VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
     `user_id`     VARCHAR(32)   NOT NULL COMMENT '目标用户 ID',
     `level`       VARCHAR(16)   NOT NULL DEFAULT 'INFO' COMMENT '通知级别：INFO / WARN / ERROR',
@@ -155,9 +139,9 @@ CREATE TABLE IF NOT EXISTS `notification` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户通知表';
 
 -- -----------------------------------------------------------
--- 9. 下载任务表（aria2 下载管理）
+-- 8. 下载任务表（aria2 下载管理）
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `download_task` (
+CREATE TABLE IF NOT EXISTS `bf_download_task` (
     `id`                     VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
     `created_by`             VARCHAR(32)   NOT NULL COMMENT '创建者用户 ID',
     `owner_username`         VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '创建者用户名快照（用户删除后保留）',
@@ -183,9 +167,9 @@ CREATE TABLE IF NOT EXISTS `download_task` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='下载任务表（aria2 下载管理）';
 
 -- -----------------------------------------------------------
--- 10. 分享链接表
+-- 9. 分享链接表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `share_link` (
+CREATE TABLE IF NOT EXISTS `bf_share_link` (
     `id`                       VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
     `target_file_item_id`      VARCHAR(32)  NOT NULL COMMENT '被分享的文件或文件夹 ID',
     `created_by`               VARCHAR(32)  NOT NULL COMMENT '创建者用户 ID',
@@ -210,9 +194,9 @@ CREATE TABLE IF NOT EXISTS `share_link` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分享链接表';
 
 -- -----------------------------------------------------------
--- 11. 分享访问日志表
+-- 10. 分享访问日志表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `share_access_log` (
+CREATE TABLE IF NOT EXISTS `bf_share_access_log` (
     `id`             VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
     `share_link_id`  VARCHAR(32)  NOT NULL COMMENT '分享链接 ID',
     `action`         VARCHAR(32)  NOT NULL DEFAULT 'VIEW' COMMENT '操作类型：VIEW / DOWNLOAD / VERIFY_CODE / FAILED',
@@ -226,9 +210,9 @@ CREATE TABLE IF NOT EXISTS `share_access_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分享访问日志表';
 
 -- -----------------------------------------------------------
--- 12. 操作审计日志表
+-- 11. 操作审计日志表
 -- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `audit_log` (
+CREATE TABLE IF NOT EXISTS `bf_audit_log` (
     `id`            VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
     `actor_user_id` VARCHAR(32)   NOT NULL DEFAULT '' COMMENT '操作者用户 ID（匿名操作为空字符串）',
     `action`        VARCHAR(64)   NOT NULL COMMENT '操作类型：LOGIN_SUCCESS / LOGIN_FAILED / FILE_DELETE / SHARE_CREATE / SHARE_ACCESS / SHARE_REVOKE 等',

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /** 操作审计日志实体 */
 @Data
-@TableName("audit_log")
+@TableName("bf_audit_log")
 public class AuditLog {
     @TableId(type = IdType.ASSIGN_UUID)
     private String id;

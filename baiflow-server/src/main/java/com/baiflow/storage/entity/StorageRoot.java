@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
  * 的磁盘路径范围内，禁止越界访问。
  */
 @Data
-@TableName("storage_root")
+@TableName("bf_storage_root")
 public class StorageRoot {
 
     /** 主键，UUID 自动生成 */

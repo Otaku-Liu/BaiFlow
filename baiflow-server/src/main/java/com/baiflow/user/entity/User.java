@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 系统用户实体。
  */
 @Data
-@TableName("user")
+@TableName("bf_user")
 public class User {
 
     /** 用户主键，UUID 自动生成 */

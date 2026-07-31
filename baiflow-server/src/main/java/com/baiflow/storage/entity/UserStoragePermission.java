@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * 指定 file_item_id 时表示对特定目录或文件的授权。
  */
 @Data
-@TableName("user_storage_permission")
+@TableName("bf_user_storage_permission")
 public class UserStoragePermission {
 
     /** 主键，UUID 自动生成 */

@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * 使用软删除策略：status 标记为 DELETED 时记录删除时间，磁盘清理可异步进行。
  */
 @Data
-@TableName("file_item")
+@TableName("bf_file_item")
 public class FileItem {
 
     /** 主键，UUID 自动生成 */

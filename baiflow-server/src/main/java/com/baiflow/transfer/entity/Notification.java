@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 通知实体 — 用户级别的系统通知。
  */
 @Data
-@TableName("notification")
+@TableName("bf_notification")
 public class Notification {
 
     /** 主键，UUID 自动生成 */

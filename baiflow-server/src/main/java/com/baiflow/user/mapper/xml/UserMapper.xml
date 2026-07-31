@@ -21,7 +21,7 @@
 
     <select id="selectByRole" resultType="com.baiflow.user.entity.User">
         SELECT <include refid="userColumns"/>
-        FROM `user`
+        FROM `bf_user`
         WHERE 1 = 1
         <include refid="userWhere"/>
         ORDER BY created_at DESC
@@ -29,7 +29,7 @@
 
     <select id="selectAllOrdered" resultType="com.baiflow.user.entity.User">
         SELECT <include refid="userColumns"/>
-        FROM `user`
+        FROM `bf_user`
         WHERE 1 = 1
         <include refid="userWhere"/>
         ORDER BY created_at DESC
@@ -37,7 +37,7 @@
 
     <select id="selectPage" resultType="com.baiflow.user.entity.User">
         SELECT <include refid="userColumns"/>
-        FROM `user`
+        FROM `bf_user`
         WHERE 1 = 1
         <include refid="userWhere"/>
         ORDER BY created_at DESC

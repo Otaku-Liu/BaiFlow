@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 传输任务实体 — 统一记录上传、下载、设备流转任务。
  */
 @Data
-@TableName("transfer_task")
+@TableName("bf_transfer_task")
 public class TransferTask {
 
     /** 主键，UUID 自动生成 */
