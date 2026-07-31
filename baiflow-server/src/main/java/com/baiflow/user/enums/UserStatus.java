@@ -1,3 +1,3 @@
 package com.baiflow.user.enums;
 
-public enum UserStatus { ACTIVE, DISABLED, LOCKED }
+public enum UserStatus { NORMAL, DISABLED, LOCKED }

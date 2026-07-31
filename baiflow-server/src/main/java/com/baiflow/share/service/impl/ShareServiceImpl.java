@@ -64,7 +64,7 @@ public class ShareServiceImpl implements ShareService {
     public ShareLinkInfo createShare(CreateShareRequest req, String userId) {
         // 校验用户存在且为活跃状态
         User user = userMapper.selectById(userId);
-        if (user == null || user.getStatus() != UserStatus.ACTIVE) {
+        if (user == null || user.getStatus() != UserStatus.NORMAL) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "用户不存在或已被禁用");
         }
 

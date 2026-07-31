@@ -16,6 +16,17 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import com.baiflow.auth.security.JwtAuthenticationFilter;
 
+/**
+ * Spring Security 配置。
+ *
+ * <p>默认所有 API 需要登录（JWT），仅以下例外：
+ * <ul>
+ *   <li>健康检查、登录、公开分享 — 无需登录</li>
+ *   <li>用户管理、存储根管理 — 仅 ADMIN</li>
+ * </ul>
+ *
+ * <p>无状态会话，禁用 CSRF，通过 {@link JwtAuthenticationFilter} 校验 token。
+ */
 @Configuration
 public class SecurityConfig {
 
@@ -28,20 +39,17 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // 无需登录
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        // 仅 ADMIN
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/storage-roots/active").authenticated()
                         .requestMatchers("/api/storage-roots/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/files/download/**").authenticated()
-                        .requestMatchers("/api/files/**").authenticated()
-                        .requestMatchers("/api/downloads/**").authenticated()
-                        .requestMatchers("/api/transfers/**").authenticated()
-                        .requestMatchers("/api/notifications/**").authenticated()
-                        .requestMatchers("/api/events/**").authenticated()
-                        .requestMatchers("/api/shares/**").authenticated()
+                        // 其余均需登录
                         .anyRequest().authenticated())
+                // ---- JWT 过滤器 ----
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

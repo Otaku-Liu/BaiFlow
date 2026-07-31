@@ -9,7 +9,7 @@
           <el-option label="USER" value="USER" />
         </el-select>
         <el-select v-model="filterStatus" placeholder="状态" clearable style="width: 120px">
-          <el-option label="正常" value="ACTIVE" />
+          <el-option label="正常" value="NORMAL" />
           <el-option label="已禁用" value="DISABLED" />
           <el-option label="已锁定" value="LOCKED" />
         </el-select>
@@ -170,7 +170,7 @@ const createRules = {
 const editDialogVisible = ref(false)
 const updating = ref(false)
 const editFormRef = ref(null)
-const editForm = reactive({ id: '', username: '', displayName: '', role: 'USER', status: 'ACTIVE' })
+const editForm = reactive({ id: '', username: '', displayName: '', role: 'USER', status: 'NORMAL' })
 
 // 重置密码弹窗
 const resetPwdDialogVisible = ref(false)
@@ -185,10 +185,10 @@ const resetPwdRules = {
 const batchDeleting = ref(false)
 
 function statusTagType(status) {
-  return { ACTIVE: 'success', DISABLED: 'warning', LOCKED: 'danger' }[status] || 'info'
+  return { 'NORMAL': 'success', 'DISABLED': 'warning', 'LOCKED': 'danger' }[status] || 'info'
 }
 function statusLabel(status) {
-  return { ACTIVE: '正常', DISABLED: '已禁用', LOCKED: '已锁定' }[status] || status
+  return { 'NORMAL': '正常', 'DISABLED': '已禁用', 'LOCKED': '已锁定' }[status] || status
 }
 
 /** 当前用户或内置 admin 不可选/不可删 */

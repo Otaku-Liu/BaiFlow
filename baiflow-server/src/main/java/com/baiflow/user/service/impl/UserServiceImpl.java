@@ -56,7 +56,7 @@ public class UserServiceImpl implements UserService {
         u.setPasswordHash(passwordEncoder.encode(req.password()));
         u.setDisplayName(req.displayName() != null ? req.displayName() : "");
         u.setRole(req.role());
-        u.setStatus(UserStatus.ACTIVE);
+        u.setStatus(UserStatus.NORMAL);
         userMapper.insert(u);
         return UserInfo.from(u);
     }

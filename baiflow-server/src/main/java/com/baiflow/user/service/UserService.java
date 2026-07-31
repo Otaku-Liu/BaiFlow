@@ -28,7 +28,7 @@ public interface UserService {
      * @param page        页码（从 1 开始）
      * @param size        每页数量
      * @param role        可选的角色筛选（ADMIN / USER / GUEST）
-     * @param status      可选的状态筛选（ACTIVE / DISABLED / LOCKED）
+     * @param status      可选的状态筛选（NORMAL / DISABLED / LOCKED）
      * @param displayName 可选的展示名模糊搜索
      * @return 分页用户列表
      */

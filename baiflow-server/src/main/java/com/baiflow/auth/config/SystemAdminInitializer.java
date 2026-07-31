@@ -61,7 +61,7 @@ public class SystemAdminInitializer implements CommandLineRunner {
         admin.setPasswordHash(passwordEncoder.encode(baiflowProperties.getInitAdmin().getPassword()));
         admin.setDisplayName("Administrator");
         admin.setRole(UserRole.ADMIN);
-        admin.setStatus(UserStatus.ACTIVE);
+        admin.setStatus(UserStatus.NORMAL);
         userMapper.insert(admin);
         log.info("已创建管理员用户 '{}' — 请立即修改默认密码", username);
     }
