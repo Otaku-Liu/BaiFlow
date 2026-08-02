@@ -11,14 +11,16 @@ export function listFiles({ storageRootId, parentId, page = 1, size = 50, viewUs
 }
 
 /** 上传文件 */
-export function uploadFile({ storageRootId, parentId, file }, privacyToken) {
+export function uploadFile({ storageRootId, parentId, file, viewUserId }, privacyToken) {
   const headers = { 'Content-Type': 'multipart/form-data' }
   if (privacyToken) headers['X-Privacy-Access-Token'] = privacyToken
   const form = new FormData()
   form.append('file', file)
   if (parentId) form.append('parentId', parentId)
+  const params = { storageRootId }
+  if (viewUserId) params.viewUserId = viewUserId
   return http.post('/files/upload', form, {
-    params: { storageRootId },
+    params,
     headers,
     onUploadProgress: (e) => {
       // 进度回调：可在组件中按需监听
@@ -38,10 +40,12 @@ export function downloadFile(fileId, privacyToken) {
 }
 
 /** 创建文件夹 */
-export function createFolder({ storageRootId, parentId, name }, privacyToken) {
+export function createFolder({ storageRootId, parentId, name, viewUserId }, privacyToken) {
   const headers = {}
   if (privacyToken) headers['X-Privacy-Access-Token'] = privacyToken
-  return http.post('/files/folders', { storageRootId, parentId, name }, { headers })
+  const params = {}
+  if (viewUserId) params.viewUserId = viewUserId
+  return http.post('/files/folders', { storageRootId, parentId, name }, { headers, params })
 }
 
 /** 重命名文件/文件夹 */

@@ -86,6 +86,7 @@ export default {
     newFolderPlaceholder: '请输入文件夹名称',
     uploadTitle: '上传文件',
     modifiedTime: '修改时间',
+    uploadTime: '上传时间',
     deleteConfirmTitle: '确认删除',
     deleteConfirmMsg: '确定要删除 "{name}" 吗？此操作不可撤销。',
     removePrivacyTitle: '确认',

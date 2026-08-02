@@ -57,13 +57,21 @@ public class GlobalExceptionHandler {
         return ApiResponse.internalError(message, traceId);
     }
 
-    /** 尝试用 i18n message key 解析，失败回退到 fallback */
+    /**
+     * 解析 i18n 消息。
+     * <p>优先使用异常自带的详细消息（fallback）；仅在 fallback 为空时根据
+     * 错误码从资源文件中查找翻译。这样可以保留代码中动态拼接的具体描述
+     * （如"文件夹已存在：xxx"），而非用 code 对应的通用文本覆盖。</p>
+     */
     private String resolveMessage(String code, String fallback) {
+        if (fallback != null && !fallback.isBlank()) {
+            return fallback;
+        }
         try {
             Locale locale = LocaleContextHolder.getLocale();
-            return messageSource.getMessage(code, null, fallback, locale);
+            return messageSource.getMessage(code, null, "Unexpected server error", locale);
         } catch (Exception ignored) {
-            return fallback;
+            return "Unexpected server error";
         }
     }
 

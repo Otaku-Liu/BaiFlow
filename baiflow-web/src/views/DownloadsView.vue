@@ -247,7 +247,7 @@ function statusLabel(status) {
 </script>
 
 <style scoped>
-.downloads-view { max-width: 1200px; }
+.downloads-view { width: 100%; }
 
 .toolbar {
   display: flex;

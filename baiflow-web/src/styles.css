@@ -348,7 +348,6 @@ body {
 .el-message {
   border-radius: var(--baiflow-radius-md);
   box-shadow: var(--baiflow-shadow-md);
-  animation: message-slide 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ---- Alert ---- */
@@ -479,17 +478,6 @@ body {
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
-  }
-}
-
-@keyframes message-slide {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 

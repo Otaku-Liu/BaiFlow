@@ -64,14 +64,14 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.size')" width="120" align="right">
+      <el-table-column :label="t('common.size')" align="right">
         <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? '-' : formatSize(row.sizeBytes) }}</template>
       </el-table-column>
-      <el-table-column :label="t('common.type')" width="100">
+      <el-table-column :label="t('common.type')" show-overflow-tooltip>
         <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? t('common.folder') : (row.mimeType || t('common.file')) }}</template>
       </el-table-column>
-      <el-table-column :label="t('files.modifiedTime')" width="180">
-        <template #default="{ row }">{{ formatDateTime(row.updatedAt || row.createdAt) }}</template>
+      <el-table-column :label="t('files.uploadTime')">
+        <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column :label="t('common.actions')" width="300" fixed="right">
         <template #default="{ row }">
@@ -322,11 +322,17 @@ async function doUpload() {
   try {
     const token = fileStore.currentPrivacyToken
     for (const f of pending) {
-      await uploadFile({
+      const { data } = await uploadFile({
         storageRootId: rootId.value,
         parentId: fileStore.currentFolderId,
-        file: f.raw
+        file: f.raw,
+        viewUserId: authStore.isAdmin && viewUserId.value ? viewUserId.value : undefined
       }, token)
+      if (data.code !== 'OK') {
+        ElMessage.error(data.message || t('files.uploadFailed'))
+        uploading.value = false
+        return
+      }
     }
     ElMessage.success(t('files.uploadSuccess'))
     showUploadDialog.value = false
@@ -362,15 +368,20 @@ async function doCreateFolder() {
   creating.value = true
   try {
     const token = fileStore.currentPrivacyToken
-    await createFolder({
+    const { data } = await createFolder({
       storageRootId: rootId.value,
       parentId: fileStore.currentFolderId,
-      name: newFolderName.value.trim()
+      name: newFolderName.value.trim(),
+      viewUserId: authStore.isAdmin && viewUserId.value ? viewUserId.value : undefined
     }, token)
-    ElMessage.success(t('files.folderCreated'))
-    showNewFolderDialog.value = false
-    newFolderName.value = ''
-    loadFiles()
+    if (data.code === 'OK') {
+      ElMessage.success(t('files.folderCreated'))
+      showNewFolderDialog.value = false
+      newFolderName.value = ''
+      loadFiles()
+    } else {
+      ElMessage.error(data.message || t('files.createFailed'))
+    }
   } catch (e) {
     ElMessage.error(e.response?.data?.message || t('files.createFailed'))
   } finally {
@@ -555,7 +566,15 @@ function handleHttpError(e) {
 </script>
 
 <style scoped>
-.files-view { max-width: 1200px; }
+.files-view { width: 100%; }
+
+/* 表格单元格：除名称列外不换行 */
+.files-view :deep(.el-table__body td) {
+  white-space: nowrap;
+}
+.files-view :deep(.el-table__body td:first-child) {
+  white-space: normal;
+}
 
 .toolbar {
   display: flex;

@@ -65,10 +65,13 @@ public class FileController {
                                              @RequestParam("file") MultipartFile file,
                                              @RequestHeader(value = "X-Privacy-Access-Token",
                                                      required = false) String privacyAccessToken,
+                                             @RequestParam(required = false) String viewUserId,
                                              Authentication auth) {
+        String userId = auth.getPrincipal().toString();
+        String effectiveUserId = isAdmin(auth) && viewUserId != null ? viewUserId : userId;
         return ApiResponse.success(
                 fileService.uploadFile(storageRootId, parentId, file,
-                        auth.getPrincipal().toString(), privacyAccessToken));
+                        userId, effectiveUserId, privacyAccessToken));
     }
 
     /**
@@ -98,9 +101,12 @@ public class FileController {
     public ApiResponse<FileItemInfo> createFolder(@Valid @RequestBody CreateFolderRequest req,
                                                    @RequestHeader(value = "X-Privacy-Access-Token",
                                                            required = false) String privacyAccessToken,
+                                                   @RequestParam(required = false) String viewUserId,
                                                    Authentication auth) {
+        String userId = auth.getPrincipal().toString();
+        String effectiveUserId = isAdmin(auth) && viewUserId != null ? viewUserId : userId;
         return ApiResponse.success(
-                fileService.createFolder(req, auth.getPrincipal().toString(), privacyAccessToken));
+                fileService.createFolder(req, userId, effectiveUserId, privacyAccessToken));
     }
 
     /**

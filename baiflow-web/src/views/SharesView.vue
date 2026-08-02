@@ -210,7 +210,7 @@ function statusLabel(s) { return {ACTIVE:t('shares.status.active'),EXPIRED:t('sh
 </script>
 
 <style scoped>
-.shares-view { max-width: 1200px; }
+.shares-view { width: 100%; }
 
 .toolbar {
   display: flex;

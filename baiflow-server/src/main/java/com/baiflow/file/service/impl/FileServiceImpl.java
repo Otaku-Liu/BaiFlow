@@ -121,13 +121,13 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional
     public FileItemInfo uploadFile(String rootId, String parentId, MultipartFile file,
-                                   String userId, String privacyAccessToken) {
+                                   String userId, String effectiveUserId, String privacyAccessToken) {
         StorageRoot root = storageService.getByIdOrThrow(rootId);
         // NAS 离线时禁止写入
         requireStorageAvailable(root);
 
-        // 非管理员用户限定在主目录内操作
-        parentId = scopeNonAdminToHome(rootId, userId, parentId);
+        // 所有用户（含 ADMIN 切换空间时）限定在 effectiveUserId 的主目录内操作
+        parentId = scopeToHome(rootId, effectiveUserId, parentId);
 
         // 上传到隐私文件夹内需先验证隐私密码
         checkPrivacyAccess(parentId, userId, privacyAccessToken);
@@ -166,7 +166,7 @@ public class FileServiceImpl implements FileService {
         FileItem f = new FileItem();
         f.setStorageRootId(rootId);
         f.setParentId(blankNull(parentId));
-        f.setOwnerUserId(userId);
+        f.setOwnerUserId(effectiveUserId);
         f.setName(safe);
         f.setRelativePath(rel);
         f.setItemType(ItemType.FILE);
@@ -209,13 +209,14 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional
-    public FileItemInfo createFolder(CreateFolderRequest req, String userId, String privacyAccessToken) {
+    public FileItemInfo createFolder(CreateFolderRequest req, String userId, String effectiveUserId,
+                                     String privacyAccessToken) {
         StorageRoot root = storageService.getByIdOrThrow(req.storageRootId());
         // NAS 离线时禁止写入
         requireStorageAvailable(root);
 
-        // 非管理员用户限定在主目录内操作
-        String effectiveParentId = scopeNonAdminToHome(req.storageRootId(), userId, req.parentId());
+        // 所有用户（含 ADMIN 切换空间时）限定在 effectiveUserId 的主目录内操作
+        String effectiveParentId = scopeToHome(req.storageRootId(), effectiveUserId, req.parentId());
 
         // 在隐私文件夹内创建子文件夹需先验证隐私密码
         checkPrivacyAccess(effectiveParentId, userId, privacyAccessToken);
@@ -240,7 +241,7 @@ public class FileServiceImpl implements FileService {
         FileItem f = new FileItem();
         f.setStorageRootId(req.storageRootId());
         f.setParentId(blankNull(effectiveParentId));
-        f.setOwnerUserId(userId);
+        f.setOwnerUserId(effectiveUserId);
         f.setName(safe);
         f.setRelativePath(rel);
         f.setItemType(ItemType.DIRECTORY);
@@ -448,11 +449,15 @@ public class FileServiceImpl implements FileService {
      *
      * @return 有效 parentId（非管理员且原 parentId 为空时返回主目录 ID）
      */
-    private String scopeNonAdminToHome(String rootId, String userId, String parentId) {
+    /**
+     * 将用户文件操作限定到其主目录内。
+     * <p>所有用户（包括 ADMIN）在 parentId 为空时默认定位到自己的 home 目录，
+     * 避免文件直接落在存储根层级。导航到具体子目录后则以实际 parentId 为准。</p>
+     *
+     * @return 有效 parentId（原 parentId 为空时返回当前用户的主目录 ID）
+     */
+    private String scopeToHome(String rootId, String userId, String parentId) {
         User u = userMapper.selectById(userId);
-        if (u != null && u.getRole() == com.baiflow.user.enums.UserRole.ADMIN) {
-            return parentId;
-        }
         String username = u != null ? u.getUsername() : userId;
         String homeId = getOrCreateHomeFolder(rootId, userId, username);
         if (parentId == null || parentId.isBlank()) {

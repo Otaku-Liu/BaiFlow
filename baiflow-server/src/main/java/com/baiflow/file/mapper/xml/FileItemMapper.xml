@@ -37,6 +37,7 @@
         SELECT <include refid="fileColumns"/>
         FROM bf_file_item
         WHERE storage_root_id = #{storageRootId} AND relative_path = #{relativePath}
+          AND status = 'ACTIVE'
         LIMIT 1
     </select>
 

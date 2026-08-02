@@ -61,7 +61,7 @@ public interface FileService {
      * @throws com.baiflow.common.exception.BusinessException FILE_OPERATION_FAILED 同名文件已存在或磁盘写入失败
      */
     FileItemInfo uploadFile(String storageRootId, String parentId, MultipartFile file,
-                            String userId, String privacyAccessToken);
+                            String userId, String effectiveUserId, String privacyAccessToken);
 
     /**
      * 根据文件 ID 解析文件并作为 {@link Resource} 返回以供流式下载。
@@ -85,11 +85,13 @@ public interface FileService {
      * 如果目标父文件夹链上有隐私文件夹，则要求提供有效的隐私访问令牌。
      *
      * @param req                存储根目录、父节点和文件夹名称
-     * @param userId             调用者 ID（成为所有者）
+     * @param userId             调用者 ID（认证用户）
+     * @param effectiveUserId    实际所有者 ID（ADMIN 切换用户空间时为被查看用户，否则同 userId）
      * @param privacyAccessToken 隐私访问令牌（可空）
      * @return 新文件夹的元数据
      */
-    FileItemInfo createFolder(CreateFolderRequest req, String userId, String privacyAccessToken);
+    FileItemInfo createFolder(CreateFolderRequest req, String userId, String effectiveUserId,
+                              String privacyAccessToken);
 
     /**
      * 重命名文件或文件夹，同步更新元数据和磁盘上的名称。

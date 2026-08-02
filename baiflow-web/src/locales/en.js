@@ -86,6 +86,7 @@ export default {
     newFolderPlaceholder: 'Enter folder name',
     uploadTitle: 'Upload Files',
     modifiedTime: 'Modified',
+    uploadTime: 'Uploaded',
     deleteConfirmTitle: 'Confirm Delete',
     deleteConfirmMsg: 'Delete "{name}"? This cannot be undone.',
     removePrivacyTitle: 'Confirm',
