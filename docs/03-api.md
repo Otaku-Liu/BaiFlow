@@ -3,7 +3,8 @@
 ## 基础约定
 
 - 前缀：`/api`
-- 鉴权：`Authorization: Bearer <token>`
+- 鉴权：`Authorization: Bearer <token>`（浏览器直接请求场景支持 `?token=` 查询参数 fallback）
+- 国际化：前端传 `Accept-Language: zh-CN` / `en` 头，后端错误消息自动切换
 - JSON 请求/响应，文件上传用 `multipart/form-data`
 - 时间：ISO-8601 字符串
 - 分页参数：`page`、`size`
@@ -46,9 +47,9 @@
 
 ### 文件
 - `GET /api/files?storageRootId=&parentId=&page=&size=&viewUserId=`
-- `POST /api/files/upload`
+- `POST /api/files/upload`（支持 `viewUserId` 参数）
 - `GET /api/files/download/{fileId}`
-- `POST /api/files/folders`
+- `POST /api/files/folders`（支持 `viewUserId` 参数）
 - `PATCH /api/files/{id}/rename` · `PATCH /api/files/{id}/move`
 - `DELETE /api/files/{id}`
 - `POST /api/files/{id}/privacy` · `DELETE /api/files/{id}/privacy`
@@ -68,6 +69,16 @@
 - `POST /api/public/shares/{token}/verify-private-password`
 - `GET /api/public/shares/{token}/files`
 - `GET /api/public/shares/{token}/download`
+
+### 文件预览与进度
+- `GET /api/files/{id}/preview` — inline 流式返回文件（支持 Range 请求，用于视频 seek / PDF 部分加载），Content-Type 按扩展名推断
+- `GET /api/files/{id}/progress` — 查询当前用户的播放/阅读进度
+- `PUT /api/files/{id}/progress` — 保存进度 `{ positionType, positionValue }`
+
+预览 URL 同时支持 `?token=` 查询参数鉴权（用于 `<img>` / `<video>` / `<iframe>` 等浏览器直接请求场景）。
+
+### 审计日志（管理员）
+- `GET /api/admin/audit-logs/login` — 分页查询登录日志，支持用户名模糊搜索、登录结果和日期范围筛选
 
 ### 下载
 - `POST/GET /api/downloads` · `GET /api/downloads/{id}`

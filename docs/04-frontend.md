@@ -10,11 +10,22 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 |---|---|---|
 | 登录 | `/login` | 用户名密码登录 |
 | 主布局 | `/` | 侧边栏 + 顶栏 + 内容区，需登录 |
-| 文件中心 | `/` 内 | 管理员用户切换、面包屑（含当前路径标签）、文件列表、上传/下载/重命名/删除、隐私文件夹 |
+| 文件中心 | `/` 内 | 管理员用户切换、面包屑、文件列表（双击/按钮预览）、上传/下载/重命名/删除、隐私文件夹 |
 | 下载中心 | `/` 内 | aria2 下载任务管理 |
 | 分享管理 | `/` 内 | 分享链接创建/查看/撤销、访问日志（管理员） |
 | 用户管理 | `/` 内 | 管理员可见：用户列表、创建/编辑、批量删除、重置密码 |
+| 操作日志 | `/` 内 | 管理员可见：子菜单入口，当前含登录日志 |
+| 登录日志 | `/` 内 | 管理员可见：分页表格，用户名模糊搜索、日期时间范围、登录结果筛选 |
 | 个人资料 | 弹窗 | 展示名、头像上传、修改密码 |
+| 预览抽屉 | Drawer | 按 MIME 类型自动路由渲染器：图片/视频/音频/PDF/文本/代码/XLSX |
+
+## 国际化 (i18n)
+
+- **vue-i18n**：所有 UI 文本通过 `t('namespace.key')` 引用，语言包位于 `src/locales/`
+- **Element Plus**：通过 `el-config-provider` 响应式切换组件语言
+- **顶部语言切换**：右上角下拉框（中文 / English），写入 `localStorage.baiflow_locale`
+- **Axios**：请求头自动带 `Accept-Language`，后端错误消息同步切换
+- 数据库数据（文件名、用户名等）不翻译，仅翻译列名、按钮、提示等 UI 文案
 
 ## 状态管理
 
@@ -28,7 +39,10 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | 文件 | 用途 |
 |---|---|
 | `components/ConfirmDialog.vue` | 基于 `el-dialog` 的通用确认弹窗，替代 `ElMessageBox.confirm`，确保所有弹窗样式统一 |
+| `components/PreviewDrawer.vue` | 文件预览抽屉，按 MIME 类型路由到 6 种渲染器（img/video/audio/iframe/pre/el-table） |
 | `composables/useConfirmDialog.js` | 提供 `confirm()` promise 式 API，搭配 `ConfirmDialog` 使用 |
+| `composables/usePlaybackProgress.js` | 播放/阅读进度管理：查询历史进度、Toast 续看提示、10s 自动保存、关闭时最终保存 |
+| `utils/mime.js` | 扩展名→MIME 映射表、MIME 主类型判定、预览支持判断、进度类型推断 |
 
 ## API 调用
 
@@ -72,7 +86,7 @@ Inter（Google Fonts），中文回退 PingFang SC。字号：`12px`（辅助）
 
 ### 侧边栏
 
-浅灰底 `#f2f2f7`，无边框分割线。选中项圆角蓝色高亮（`rgba(0,122,255,0.1)`）。响应式：`<768px` 变为左侧滑出抽屉 + 遮罩。
+浅灰底 `#f2f2f7`，无边框分割线。选中项圆角蓝色高亮（`rgba(0,122,255,0.1)`）。管理员的「操作日志」使用 `el-sub-menu` 展开子菜单。响应式：`<768px` 变为左侧滑出抽屉 + 遮罩。
 
 ### 表格
 

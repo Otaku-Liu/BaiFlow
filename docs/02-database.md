@@ -46,7 +46,14 @@
 `id, user_id, level(INFO/WARN/ERROR), title, content, read_status, created_at, read_at`
 
 ### audit_log — 操作审计
-`id, actor_user_id, action, target_type, target_id, ip_address, user_agent, created_at`
+`id, actor_user_id, action, target_type, target_id, ip_address, user_agent, detail, created_at`
+
+登录事件（`LOGIN_SUCCESS` / `LOGIN_FAILED`）在此记录，供登录日志查询。
+
+### playback_progress — 播放/阅读进度
+`id, user_id, file_item_id, position_type(SECONDS/PAGE/SCROLL_PERCENT), position_value, created_at, updated_at`
+
+每个用户对每个文件只存一条记录。`position_type` 区分视频秒数、PDF 页码、文本滚动百分比，支持跨设备断点续看。
 
 ## 主要索引
 
