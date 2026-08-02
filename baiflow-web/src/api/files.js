@@ -1,4 +1,5 @@
 import http from './http'
+import { useAuthStore } from '../stores/auth'
 
 /** 文件列表查询参数 */
 export function listFiles({ storageRootId, parentId, page = 1, size = 50, viewUserId }, privacyToken) {
@@ -89,4 +90,40 @@ export function verifyPrivacy(id, password) {
 /** 获取存储根目录列表（仅 ACTIVE） */
 export function listStorageRoots() {
   return http.get('/storage-roots/active')
+}
+
+/** 获取预览文件流（inline 模式），返回预览 URL 供 <img>/<video>/<iframe> 使用 */
+export function getPreviewUrl(id, privacyToken) {
+  const authStore = useAuthStore()
+  const params = new URLSearchParams()
+  if (authStore.token) params.append('token', authStore.token)
+  if (privacyToken) params.append('X-Privacy-Access-Token', privacyToken)
+  const base = '/api/files'
+  const query = params.toString()
+  return `${base}/${encodeURIComponent(id)}/preview${query ? '?' + query : ''}`
+}
+
+/** 通过 Axios 获取预览文件 Blob（带 auth 头），返回 Object URL */
+export async function fetchPreviewBlob(id, privacyToken) {
+  const headers = {}
+  if (privacyToken) headers['X-Privacy-Access-Token'] = privacyToken
+  const resp = await http.get(`/files/${id}/preview`, { headers, responseType: 'blob' })
+  return URL.createObjectURL(resp.data)
+}
+
+/** 获取文件内容文本（用于文本/代码预览） */
+export function fetchPreviewContent(id, privacyToken) {
+  const headers = {}
+  if (privacyToken) headers['X-Privacy-Access-Token'] = privacyToken
+  return http.get(`/files/${id}/preview`, { headers, responseType: 'text' })
+}
+
+/** 查询播放/阅读进度 */
+export function getProgress(id) {
+  return http.get(`/files/${id}/progress`)
+}
+
+/** 保存播放/阅读进度 */
+export function saveProgress(id, positionType, positionValue) {
+  return http.put(`/files/${id}/progress`, { positionType, positionValue })
 }

@@ -9,11 +9,13 @@ import com.baiflow.file.dto.request.SetPrivacyRequest;
 import com.baiflow.file.dto.request.VerifyPrivacyRequest;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.file.entity.FileItem;
+import com.baiflow.file.entity.PlaybackProgress;
 import com.baiflow.file.entity.PrivateFolderAccess;
 import com.baiflow.file.enums.FileItemStatus;
 import com.baiflow.file.enums.ItemType;
 import com.baiflow.file.enums.PrivacyMode;
 import com.baiflow.file.mapper.FileItemMapper;
+import com.baiflow.file.mapper.PlaybackProgressMapper;
 import com.baiflow.file.mapper.PrivateFolderAccessMapper;
 import com.baiflow.file.service.FileService;
 import com.baiflow.storage.entity.StorageRoot;
@@ -72,6 +74,8 @@ public class FileServiceImpl implements FileService {
     private PasswordEncoder passwordEncoder;
     @Autowired
     private UserMapper userMapper;
+    @Autowired
+    private PlaybackProgressMapper progressMapper;
 
     @Override
     public IPage<FileItemInfo> listFiles(String rootId, String parentId, int page, int size,
@@ -670,5 +674,42 @@ public class FileServiceImpl implements FileService {
 
         log.info("已为用户 {} 创建主目录: {} (root={})", username, relativePath, rootId);
         return home.getId();
+    }
+
+    // ---- 预览与进度 ----
+
+    @Override
+    public Resource previewFile(String fileId, String userId, boolean isAdmin, String privacyAccessToken) {
+        // 预览就是 download 的 inline 版本，逻辑完全相同
+        return downloadFile(fileId, userId, isAdmin, privacyAccessToken);
+    }
+
+    @Override
+    public Map<String, Object> getProgress(String fileId, String userId) {
+        PlaybackProgress p = progressMapper.selectByUserAndFile(userId, fileId);
+        if (p == null) return null;
+        return Map.of(
+                "fileId", p.getFileItemId(),
+                "positionType", p.getPositionType(),
+                "positionValue", p.getPositionValue(),
+                "updatedAt", p.getUpdatedAt() != null ? p.getUpdatedAt().toString() : ""
+        );
+    }
+
+    @Override
+    public void saveProgress(String fileId, String userId, String positionType, Double positionValue) {
+        PlaybackProgress existing = progressMapper.selectByUserAndFile(userId, fileId);
+        if (existing != null) {
+            existing.setPositionType(positionType != null ? positionType : "SECONDS");
+            existing.setPositionValue(positionValue != null ? positionValue : 0);
+            progressMapper.updateById(existing);
+        } else {
+            PlaybackProgress p = new PlaybackProgress();
+            p.setUserId(userId);
+            p.setFileItemId(fileId);
+            p.setPositionType(positionType != null ? positionType : "SECONDS");
+            p.setPositionValue(positionValue != null ? positionValue : 0);
+            progressMapper.insert(p);
+        }
     }
 }

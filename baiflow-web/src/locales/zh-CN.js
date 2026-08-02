@@ -235,6 +235,10 @@ export default {
       locked: '已锁定'
     }
   },
+  preview: {
+    preview: '预览',
+    unsupported: '暂不支持在线预览，请下载后查看'
+  },
   menu: {
     logs: '操作日志',
     loginLogs: '登录日志',

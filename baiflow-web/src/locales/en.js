@@ -235,6 +235,10 @@ export default {
       locked: 'Locked'
     }
   },
+  preview: {
+    preview: 'Preview',
+    unsupported: 'Preview not supported, please download to view'
+  },
   menu: {
     logs: 'Audit Logs',
     loginLogs: 'Login Logs',

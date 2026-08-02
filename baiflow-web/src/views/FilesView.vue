@@ -67,10 +67,7 @@
       <el-table-column :label="t('common.size')" align="right">
         <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? '-' : formatSize(row.sizeBytes) }}</template>
       </el-table-column>
-      <el-table-column :label="t('common.type')" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? t('common.folder') : (row.mimeType || t('common.file')) }}</template>
-      </el-table-column>
-      <el-table-column :label="t('files.uploadTime')">
+<el-table-column :label="t('files.uploadTime')">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column :label="t('common.actions')" width="300" fixed="right">
@@ -78,6 +75,9 @@
           <div class="action-btns">
             <el-button v-if="row.itemType === 'DIRECTORY'" type="primary" link size="small" @click="navigateTo(row)">
               {{ t('common.open') }}
+            </el-button>
+            <el-button v-if="row.itemType === 'FILE'" type="primary" link size="small" @click="showPreview(row)">
+              {{ t('preview.preview') }}
             </el-button>
             <el-button v-if="row.itemType === 'FILE'" type="primary" link size="small" @click="doDownload(row)">
               {{ t('common.download') }}
@@ -147,6 +147,13 @@
         <el-button type="primary" @click="doSetPrivacy" :loading="settingPrivacy">{{ t('files.confirmSetPrivacy') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 预览抽屉 -->
+    <PreviewDrawer
+      :file-item="previewFile"
+      :visible="previewVisible"
+      @close="previewVisible = false"
+    />
   </div>
 </template>
 
@@ -165,6 +172,8 @@ import { listUsers } from '../api/users'
 import { formatDateTime, formatSize } from '../utils/format'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import PreviewDrawer from '../components/PreviewDrawer.vue'
+import { mimeCategory, canPreview } from '../utils/mime'
 
 const authStore = useAuthStore()
 const fileStore = useFileStore()
@@ -206,6 +215,23 @@ const privacyPendingPassword = ref('')
 const privacyPendingFolderId = ref(null)
 const privacyPendingCallback = ref(null)
 const privacyError = ref('')
+
+// ---- 预览 ----
+const previewVisible = ref(false)
+const previewFile = ref(null)
+
+function showPreview(row) {
+  previewFile.value = row
+  previewVisible.value = true
+}
+
+function onRowDblClick(row) {
+  if (row.itemType === 'DIRECTORY') {
+    navigateTo(row)
+  } else if (canPreview(row.mimeType)) {
+    showPreview(row)
+  }
+}
 
 // ---- 初始化 ----
 onMounted(async () => {
@@ -303,11 +329,6 @@ function navigateTo(item) {
   }
   fileStore.page = 1
   loadFiles()
-}
-
-/** 双击行进入文件夹 */
-function onRowDblClick(row) {
-  if (row.itemType === 'DIRECTORY') navigateTo(row)
 }
 
 /** 上传 */

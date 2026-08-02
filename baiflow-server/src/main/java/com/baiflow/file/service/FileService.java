@@ -173,4 +173,16 @@ public interface FileService {
      * @throws com.baiflow.common.exception.BusinessException PRIVATE_PASSWORD_INVALID 密码错误
      */
     Map<String, Object> verifyPrivacy(String id, VerifyPrivacyRequest req, String userId);
+
+    /**
+     * 以 inline 模式返回文件资源（用于浏览器预览）。
+     * 逻辑同 {@link #downloadFile}，但控制器侧设置 Content-Disposition: inline。
+     */
+    Resource previewFile(String fileId, String userId, boolean isAdmin, String privacyAccessToken);
+
+    /** 查询用户对某文件的播放/阅读进度，无记录返回 null */
+    Map<String, Object> getProgress(String fileId, String userId);
+
+    /** 保存或更新播放/阅读进度 */
+    void saveProgress(String fileId, String userId, String positionType, Double positionValue);
 }

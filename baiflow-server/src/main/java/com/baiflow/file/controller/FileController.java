@@ -186,6 +186,74 @@ public class FileController {
                 fileService.verifyPrivacy(id, req, auth.getPrincipal().toString()));
     }
 
+    /**
+     * 以 inline 模式流式返回文件，供浏览器预览（图片/视频/PDF 等）。
+     * 支持 Range 请求头（视频拖拽 seek）。
+     */
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<Resource> preview(@PathVariable String id,
+                                            @RequestHeader(value = "X-Privacy-Access-Token",
+                                                    required = false) String privacyAccessToken,
+                                            Authentication auth) {
+        Resource r = fileService.previewFile(id, auth.getPrincipal().toString(),
+                isAdmin(auth), privacyAccessToken);
+        String fn = r.getFilename() != null ? r.getFilename() : "preview";
+        MediaType mediaType = resolveMediaType(fn);
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename(fn, StandardCharsets.UTF_8).build().toString())
+                .body(r);
+    }
+
+    /** 查询当前用户对某文件的播放/阅读进度 */
+    @GetMapping("/{id}/progress")
+    public ApiResponse<Map<String, Object>> getProgress(@PathVariable String id, Authentication auth) {
+        Map<String, Object> progress = fileService.getProgress(id, auth.getPrincipal().toString());
+        return ApiResponse.success(progress);
+    }
+
+    /** 保存播放/阅读进度 */
+    @PutMapping("/{id}/progress")
+    public ApiResponse<Map<String, Object>> saveProgress(@PathVariable String id,
+                                                          @RequestBody Map<String, Object> body,
+                                                          Authentication auth) {
+        String positionType = body.get("positionType") != null ? body.get("positionType").toString() : "SECONDS";
+        Double positionValue = body.get("positionValue") != null
+                ? Double.parseDouble(body.get("positionValue").toString()) : 0;
+        fileService.saveProgress(id, auth.getPrincipal().toString(), positionType, positionValue);
+        return ApiResponse.success(Map.of("result", "ok"));
+    }
+
+    /** 根据文件名扩展名推断 MediaType，避免浏览器因 unknown 类型触发下载 */
+    private MediaType resolveMediaType(String filename) {
+        if (filename == null) return MediaType.APPLICATION_OCTET_STREAM;
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".pdf"))  return MediaType.APPLICATION_PDF;
+        if (lower.endsWith(".png"))  return MediaType.IMAGE_PNG;
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return MediaType.IMAGE_JPEG;
+        if (lower.endsWith(".gif"))  return MediaType.IMAGE_GIF;
+        if (lower.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
+        if (lower.endsWith(".svg"))  return MediaType.parseMediaType("image/svg+xml");
+        if (lower.endsWith(".bmp"))  return MediaType.parseMediaType("image/bmp");
+        if (lower.endsWith(".ico"))  return MediaType.parseMediaType("image/x-icon");
+        if (lower.endsWith(".mp4"))  return MediaType.parseMediaType("video/mp4");
+        if (lower.endsWith(".webm")) return MediaType.parseMediaType("video/webm");
+        if (lower.endsWith(".ogv") || lower.endsWith(".ogg")) return MediaType.parseMediaType("video/ogg");
+        if (lower.endsWith(".mp3"))  return MediaType.parseMediaType("audio/mpeg");
+        if (lower.endsWith(".wav"))  return MediaType.parseMediaType("audio/wav");
+        if (lower.endsWith(".flac")) return MediaType.parseMediaType("audio/flac");
+        if (lower.endsWith(".m4a"))  return MediaType.parseMediaType("audio/mp4");
+        if (lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".json")
+                || lower.endsWith(".xml") || lower.endsWith(".csv") || lower.endsWith(".html")
+                || lower.endsWith(".css") || lower.endsWith(".js") || lower.endsWith(".ts")
+                || lower.endsWith(".py") || lower.endsWith(".java") || lower.endsWith(".log")
+                || lower.endsWith(".yaml") || lower.endsWith(".yml") || lower.endsWith(".sh")) {
+            return MediaType.TEXT_PLAIN;
+        }
+        return MediaType.APPLICATION_OCTET_STREAM;
+    }
+
     private boolean isAdmin(Authentication a) {
         return a.getAuthorities().stream().anyMatch(g -> g.getAuthority().equals("ROLE_ADMIN"));
     }
