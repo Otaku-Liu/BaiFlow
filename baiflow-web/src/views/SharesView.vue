@@ -2,95 +2,95 @@
   <div class="shares-view">
     <div class="toolbar">
       <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Share /></el-icon> 创建分享链接
+        <el-icon><Share /></el-icon> {{ t('shares.createLink') }}
       </el-button>
-      <el-select v-model="filterStatus" clearable @change="loadShares" placeholder="状态筛选" style="width:140px">
-        <el-option label="全部" value="" />
-        <el-option label="有效" value="ACTIVE" />
-        <el-option label="已过期" value="EXPIRED" />
-        <el-option label="已撤销" value="REVOKED" />
+      <el-select v-model="filterStatus" clearable @change="loadShares" :placeholder="t('shares.statusFilter')" style="width:140px">
+        <el-option :label="t('shares.status.all')" value="" />
+        <el-option :label="t('shares.status.active')" value="ACTIVE" />
+        <el-option :label="t('shares.status.expired')" value="EXPIRED" />
+        <el-option :label="t('shares.status.revoked')" value="REVOKED" />
       </el-select>
-      <el-button :loading="loading" @click="loadShares" style="margin-left:auto">刷新</el-button>
+      <el-button :loading="loading" @click="loadShares" style="margin-left:auto">{{ t('common.refresh') }}</el-button>
     </div>
 
     <el-table :data="shares" v-loading="loading" stripe style="margin-top:16px">
-      <el-table-column label="分享目标 ID" prop="targetFileItemId" min-width="180" />
-      <el-table-column label="类型" width="100">
-        <template #default="{ row }">{{ row.shareType === 'FOLDER' ? '文件夹' : '文件' }}</template>
+      <el-table-column :label="t('shares.shareTargetId')" prop="targetFileItemId" min-width="180" />
+      <el-table-column :label="t('common.type')" width="100">
+        <template #default="{ row }">{{ row.shareType === 'FOLDER' ? t('common.folder') : t('common.file') }}</template>
       </el-table-column>
-      <el-table-column label="访问模式" width="100">
-        <template #default="{ row }">{{ row.accessMode === 'DOWNLOAD' ? '可下载' : '仅浏览' }}</template>
+      <el-table-column :label="t('shares.accessMode')" width="100">
+        <template #default="{ row }">{{ row.accessMode === 'DOWNLOAD' ? t('shares.downloadable') : t('shares.viewable') }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="80">
+      <el-table-column :label="t('common.status')" width="80">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="访问/上限" width="100">
+      <el-table-column :label="t('shares.viewLimit')" width="100">
         <template #default="{ row }">{{ row.viewCount }}{{ row.maxViews > 0 ? '/' + row.maxViews : '' }}</template>
       </el-table-column>
-      <el-table-column label="下载/上限" width="100">
+      <el-table-column :label="t('shares.downloadLimit')" width="100">
         <template #default="{ row }">{{ row.downloadCount }}{{ row.maxDownloads > 0 ? '/' + row.maxDownloads : '' }}</template>
       </el-table-column>
-      <el-table-column label="过期时间" width="160">
-        <template #default="{ row }">{{ row.expiresAt ? formatDateTime(row.expiresAt) : '永不过期' }}</template>
+      <el-table-column :label="t('shares.expireTime')" width="160">
+        <template #default="{ row }">{{ row.expiresAt ? formatDateTime(row.expiresAt) : t('common.never') }}</template>
       </el-table-column>
-      <el-table-column label="创建时间" width="160">
+      <el-table-column :label="t('common.createdAt')" width="160">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column :label="t('common.actions')" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="row.status === 'ACTIVE'" type="danger" link size="small" @click="doRevoke(row)">撤销</el-button>
-          <el-button v-if="authStore.isAdmin" link size="small" @click="showAnalytics(row)">分析</el-button>
+          <el-button v-if="row.status === 'ACTIVE'" type="danger" link size="small" @click="doRevoke(row)">{{ t('common.revoke') }}</el-button>
+          <el-button v-if="authStore.isAdmin" link size="small" @click="showAnalytics(row)">{{ t('common.analyze') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <el-pagination v-if="total>0" style="margin-top:16px;justify-content:flex-end"
       v-model:current-page="page" :page-size="size" :total="total" layout="prev,pager,next" @current-change="loadShares" />
-    <el-empty v-if="!loading && shares.length===0" description="没有分享链接" />
+    <el-empty v-if="!loading && shares.length===0" :description="t('shares.noShares')" />
 
     <!-- 创建分享对话框 -->
-    <el-dialog v-model="showCreateDialog" title="创建分享链接" width="500px">
+    <el-dialog v-model="showCreateDialog" :title="t('shares.createDialogTitle')" width="500px">
       <el-form :model="createForm" ref="createFormRef" label-position="top">
-        <el-form-item label="目标文件/文件夹 ID" prop="targetFileItemId" required>
-          <el-input v-model="createForm.targetFileItemId" placeholder="输入文件或文件夹的 ID" />
+        <el-form-item :label="t('shares.targetFileId')" prop="targetFileItemId" required>
+          <el-input v-model="createForm.targetFileItemId" :placeholder="t('shares.targetFileIdPlaceholder')" />
         </el-form-item>
-        <el-form-item label="分享类型" required>
+        <el-form-item :label="t('shares.shareType')" required>
           <el-radio-group v-model="createForm.shareType">
-            <el-radio value="FILE">文件</el-radio>
-            <el-radio value="FOLDER">文件夹</el-radio>
+            <el-radio value="FILE">{{ t('common.file') }}</el-radio>
+            <el-radio value="FOLDER">{{ t('common.folder') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="访问模式" required>
+        <el-form-item :label="t('shares.accessMode')" required>
           <el-radio-group v-model="createForm.accessMode">
-            <el-radio value="VIEW">仅浏览</el-radio>
-            <el-radio value="DOWNLOAD">可下载</el-radio>
+            <el-radio value="VIEW">{{ t('shares.viewable') }}</el-radio>
+            <el-radio value="DOWNLOAD">{{ t('shares.downloadable') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="提取码（可选）">
-          <el-input v-model="createForm.extractionCode" placeholder="留空则不设提取码" />
+        <el-form-item :label="t('shares.extractionCode')">
+          <el-input v-model="createForm.extractionCode" :placeholder="t('shares.extractionCodePlaceholder')" />
         </el-form-item>
-        <el-form-item label="过期时间（可选）">
-          <el-date-picker v-model="createForm.expiresAt" type="datetime" placeholder="永不过期" style="width:100%" />
+        <el-form-item :label="t('shares.expireTimeOpt')">
+          <el-date-picker v-model="createForm.expiresAt" type="datetime" :placeholder="t('shares.expireTimePlaceholder')" style="width:100%" />
         </el-form-item>
-        <el-form-item label="最大访问次数（0=不限）">
+        <el-form-item :label="t('shares.maxViews')">
           <el-input-number v-model="createForm.maxViews" :min="0" :max="9999" />
         </el-form-item>
-        <el-form-item label="最大下载次数（0=不限）">
+        <el-form-item :label="t('shares.maxDownloads')">
           <el-input-number v-model="createForm.maxDownloads" :min="0" :max="9999" />
         </el-form-item>
       </el-form>
       <div v-if="shareResult" class="share-result">
         <el-alert type="success" :closable="false" show-icon>
-          <p>分享链接已创建！</p>
+          <p>{{ t('shares.shareCreated') }}</p>
           <p class="share-token">{{ shareResult }}</p>
-          <el-button size="small" @click="copyShareUrl">复制链接</el-button>
+          <el-button size="small" @click="copyShareUrl">{{ t('shares.copyLink') }}</el-button>
         </el-alert>
       </div>
       <template #footer>
-        <el-button @click="showCreateDialog = false; shareResult = ''">关闭</el-button>
-        <el-button type="primary" @click="doCreateShare" :loading="creating">创建分享</el-button>
+        <el-button @click="showCreateDialog = false; shareResult = ''">{{ t('common.close') }}</el-button>
+        <el-button type="primary" @click="doCreateShare" :loading="creating">{{ t('shares.createShare') }}</el-button>
       </template>
     </el-dialog>
 
@@ -98,27 +98,28 @@
     <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
 
     <!-- 分享分析抽屉 -->
-    <el-drawer v-model="analyticsVisible" title="分享访问日志" size="600px">
+    <el-drawer v-model="analyticsVisible" :title="t('shares.analyticsTitle')" size="600px">
       <el-table :data="analyticsLogs" v-loading="analyticsLoading" stripe>
-        <el-table-column prop="action" label="操作" width="120">
+        <el-table-column prop="action" :label="t('common.actions')" width="120">
           <template #default="{ row }">
             <el-tag :type="row.success ? 'success' : 'danger'" size="small">{{ row.action }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="ipAddress" label="IP 地址" width="140" />
-        <el-table-column prop="userAgent" label="User Agent" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="failureReason" label="失败原因" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="createdAt" label="时间" width="160">
+        <el-table-column prop="ipAddress" :label="t('common.ipAddress')" width="140" />
+        <el-table-column prop="userAgent" :label="t('common.userAgent')" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="failureReason" :label="t('shares.failureReason')" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="createdAt" :label="t('common.time')" width="160">
           <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!analyticsLoading && analyticsLogs.length === 0" description="暂无访问记录" />
+      <el-empty v-if="!analyticsLoading && analyticsLogs.length === 0" :description="t('shares.noAccessRecords')" />
     </el-drawer>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Share } from '@element-plus/icons-vue'
 import { createShare, listShares, revokeShare, buildShareUrl, getShareAnalytics } from '../api/shares'
@@ -128,6 +129,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
+const { t } = useI18n()
 const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
 const shares = ref([]); const loading = ref(false); const creating = ref(false)
 const page = ref(1); const size = ref(20); const total = ref(0)
@@ -146,11 +148,11 @@ async function loadShares() {
   try {
     const { data } = await listShares({ status: filterStatus.value||undefined, page: page.value, size: size.value })
     if (data.code==='OK') { shares.value = data.data.records||[]; total.value = data.data.total||0 }
-  } catch(e) { ElMessage.error('加载失败') } finally { loading.value = false }
+  } catch(e) { ElMessage.error(t('shares.loadFailed')) } finally { loading.value = false }
 }
 
 async function doCreateShare() {
-  if (!createForm.targetFileItemId) { ElMessage.warning('请输入目标文件/文件夹 ID'); return }
+  if (!createForm.targetFileItemId) { ElMessage.warning(t('shares.inputTargetId')); return }
   creating.value = true
   try {
     const expiresIso = createForm.expiresAt ? new Date(createForm.expiresAt).toISOString() : null
@@ -165,21 +167,21 @@ async function doCreateShare() {
       shareResult.value = url
       loadShares()
     } else {
-      ElMessage.error(data.message||'创建失败')
+      ElMessage.error(data.message||t('shares.createFailed'))
     }
-  } catch(e) { ElMessage.error('创建失败') } finally { creating.value = false }
+  } catch(e) { ElMessage.error(t('shares.createFailed')) } finally { creating.value = false }
 }
 
 async function doRevoke(row) {
   try {
-    await confirm({ title: '确认撤销', message: '确定撤销此分享链接？', confirmText: '撤销', type: 'warning' })
+    await confirm({ title: t('shares.revokeConfirmTitle'), message: t('shares.revokeConfirmMsg'), confirmText: t('common.revoke'), type: 'warning' })
     await revokeShare(row.id)
-    ElMessage.success('已撤销'); loadShares()
-  } catch(e) { if(e!=='cancel') ElMessage.error('撤销失败') }
+    ElMessage.success(t('shares.revoked')); loadShares()
+  } catch(e) { if(e!=='cancel') ElMessage.error(t('shares.revokeFailed')) }
 }
 
 function copyShareUrl() {
-  navigator.clipboard.writeText(shareResult.value).then(()=>ElMessage.success('已复制到剪贴板'))
+  navigator.clipboard.writeText(shareResult.value).then(()=>ElMessage.success(t('shares.copied')))
 }
 
 // 分析相关
@@ -197,14 +199,14 @@ async function showAnalytics(row) {
       analyticsLogs.value = data.data?.records || []
     }
   } catch (e) {
-    ElMessage.error('加载分析数据失败')
+    ElMessage.error(t('shares.analyticsFailed'))
   } finally {
     analyticsLoading.value = false
   }
 }
 
 function statusType(s) { return {ACTIVE:'success',EXPIRED:'info',REVOKED:'danger'}[s]||'info' }
-function statusLabel(s) { return {ACTIVE:'有效',EXPIRED:'已过期',REVOKED:'已撤销'}[s]||s }
+function statusLabel(s) { return {ACTIVE:t('shares.status.active'),EXPIRED:t('shares.status.expired'),REVOKED:t('shares.status.revoked')}[s]||s }
 </script>
 
 <style scoped>

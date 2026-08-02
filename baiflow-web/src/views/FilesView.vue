@@ -4,13 +4,13 @@
     <div class="toolbar">
       <!-- 管理员用户空间切换 -->
       <el-select v-if="authStore.isAdmin && viewUsers.length > 0" v-model="viewUserId"
-        placeholder="查看用户空间" clearable @change="onViewUserChange" style="width:180px">
+        :placeholder="t('files.viewUserSpace')" clearable @change="onViewUserChange" style="width:180px">
         <el-option v-for="u in viewUsers" :key="u.id" :label="u.displayName || u.username" :value="u.id" />
       </el-select>
 
       <!-- 面包屑导航 -->
       <div v-if="rootId" class="breadcrumb-wrapper">
-        <span class="breadcrumb-label">当前路径：</span>
+        <span class="breadcrumb-label">{{ t('files.currentPath') }}</span>
         <el-breadcrumb separator="/" class="breadcrumb">
           <el-breadcrumb-item>
             <el-link type="primary" @click="navigateTo(null)">{{ rootLabel }}</el-link>
@@ -18,33 +18,33 @@
           <el-breadcrumb-item v-for="(item, idx) in fileStore.breadcrumb" :key="item.id">
             <el-link type="primary" @click="navigateTo(item)">{{ item.name }}</el-link>
             <!-- 隐私文件夹标记 -->
-            <el-tag v-if="item.privacyMode === 'PRIVATE'" size="small" type="warning" style="margin-left:4px">隐私</el-tag>
+            <el-tag v-if="item.privacyMode === 'PRIVATE'" size="small" type="warning" style="margin-left:4px">{{ t('files.privacy') }}</el-tag>
           </el-breadcrumb-item>
         </el-breadcrumb>
       </div>
 
       <div class="toolbar-actions">
         <el-button type="primary" @click="showUploadDialog = true" :disabled="!rootId">
-          <el-icon><Upload /></el-icon> 上传文件
+          <el-icon><Upload /></el-icon> {{ t('files.uploadFile') }}
         </el-button>
         <el-button @click="showNewFolderDialog = true" :disabled="!rootId">
-          <el-icon><FolderAdd /></el-icon> 新建文件夹
+          <el-icon><FolderAdd /></el-icon> {{ t('files.newFolder') }}
         </el-button>
       </div>
     </div>
 
     <!-- 隐私密码验证弹窗 -->
-    <el-dialog v-model="showPrivacyVerify" title="隐私文件夹访问验证" width="400px" :close-on-click-modal="false" :close-on-press-escape="false">
+    <el-dialog v-model="showPrivacyVerify" :title="t('files.privacyVerifyTitle')" width="400px" :close-on-click-modal="false" :close-on-press-escape="false">
       <el-alert type="warning" :closable="false" show-icon style="margin-bottom:16px">
-        此文件夹受隐私保护，需要输入隐私密码才能访问。
+        {{ t('files.privacyVerifyMsg') }}
       </el-alert>
       <el-form @submit.prevent="doVerifyPrivacy">
-        <el-form-item label="隐私密码">
-          <el-input v-model="privacyPendingPassword" type="password" placeholder="请输入隐私密码" show-password />
+        <el-form-item :label="t('files.privacyPassword')">
+          <el-input v-model="privacyPendingPassword" type="password" :placeholder="t('files.privacyPasswordPlaceholder')" show-password />
         </el-form-item>
         <div class="dialog-footer">
-          <el-button @click="cancelPrivacyVerify">取消</el-button>
-          <el-button type="primary" native-type="submit" :loading="privacyVerifying">验证</el-button>
+          <el-button @click="cancelPrivacyVerify">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" native-type="submit" :loading="privacyVerifying">{{ t('files.verify') }}</el-button>
         </div>
       </el-form>
       <p v-if="privacyError" class="error-msg">{{ privacyError }}</p>
@@ -52,7 +52,7 @@
 
     <!-- 文件列表表格 -->
     <el-table :data="fileStore.items" v-loading="loading" stripe style="margin-top:16px" @row-dblclick="onRowDblClick">
-      <el-table-column label="名称" min-width="280">
+      <el-table-column :label="t('common.name')" min-width="280">
         <template #default="{ row }">
           <div class="name-cell">
             <el-icon :size="18">
@@ -60,39 +60,34 @@
               <Document v-else />
             </el-icon>
             <span style="margin-left:8px">{{ row.name }}</span>
-            <el-tag v-if="row.privacyMode === 'PRIVATE'" size="small" type="warning" style="margin-left:6px">隐私</el-tag>
+            <el-tag v-if="row.privacyMode === 'PRIVATE'" size="small" type="warning" style="margin-left:6px">{{ t('files.privacy') }}</el-tag>
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="大小" width="120" align="right">
+      <el-table-column :label="t('common.size')" width="120" align="right">
         <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? '-' : formatSize(row.sizeBytes) }}</template>
       </el-table-column>
-      <el-table-column label="类型" width="100">
-        <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? '文件夹' : (row.mimeType || '文件') }}</template>
+      <el-table-column :label="t('common.type')" width="100">
+        <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? t('common.folder') : (row.mimeType || t('common.file')) }}</template>
       </el-table-column>
-      <el-table-column label="修改时间" width="180">
+      <el-table-column :label="t('files.modifiedTime')" width="180">
         <template #default="{ row }">{{ formatDateTime(row.updatedAt || row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="300" fixed="right">
+      <el-table-column :label="t('common.actions')" width="300" fixed="right">
         <template #default="{ row }">
           <div class="action-btns">
-            <!-- 进入文件夹 -->
             <el-button v-if="row.itemType === 'DIRECTORY'" type="primary" link size="small" @click="navigateTo(row)">
-              打开
+              {{ t('common.open') }}
             </el-button>
-            <!-- 下载文件 -->
             <el-button v-if="row.itemType === 'FILE'" type="primary" link size="small" @click="doDownload(row)">
-              下载
+              {{ t('common.download') }}
             </el-button>
-            <!-- 重命名 -->
-            <el-button type="warning" link size="small" @click="showRename(row)">重命名</el-button>
-            <!-- 隐私设置 / 取消 -->
+            <el-button type="warning" link size="small" @click="showRename(row)">{{ t('common.rename') }}</el-button>
             <el-button v-if="row.itemType === 'DIRECTORY' && row.privacyMode !== 'PRIVATE'"
-              type="info" link size="small" @click="showSetPrivacy(row)">设置隐私</el-button>
+              type="info" link size="small" @click="showSetPrivacy(row)">{{ t('files.setPrivacy') }}</el-button>
             <el-button v-if="row.privacyMode === 'PRIVATE'"
-              type="info" link size="small" @click="doRemovePrivacy(row)">取消隐私</el-button>
-            <!-- 删除 -->
-            <el-button type="danger" link size="small" @click="doDelete(row)">删除</el-button>
+              type="info" link size="small" @click="doRemovePrivacy(row)">{{ t('files.removePrivacy') }}</el-button>
+            <el-button type="danger" link size="small" @click="doDelete(row)">{{ t('common.delete') }}</el-button>
           </div>
         </template>
       </el-table-column>
@@ -104,37 +99,37 @@
       layout="prev, pager, next" @current-change="loadFiles" />
 
     <!-- 空状态 -->
-    <el-empty v-if="!loading && rootId && fileStore.items.length === 0" description="此目录为空" />
+    <el-empty v-if="!loading && rootId && fileStore.items.length === 0" :description="t('files.emptyDirectory')" />
 
     <!-- 上传对话框 -->
-    <el-dialog v-model="showUploadDialog" title="上传文件" width="450px">
+    <el-dialog v-model="showUploadDialog" :title="t('files.uploadTitle')" width="450px">
       <el-upload ref="uploadRef" :auto-upload="false" :limit="5" drag
         :before-upload="() => false" :on-change="onFileSelected"
         :file-list="uploadFiles">
         <el-icon :size="48"><UploadFilled /></el-icon>
-        <div>拖拽文件到此处或点击选择</div>
+        <div>{{ t('files.dragOrClick') }}</div>
       </el-upload>
       <template #footer>
-        <el-button @click="showUploadDialog = false">取消</el-button>
-        <el-button type="primary" @click="doUpload" :loading="uploading">上传</el-button>
+        <el-button @click="showUploadDialog = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="doUpload" :loading="uploading">{{ t('common.upload') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 新建文件夹对话框 -->
-    <el-dialog v-model="showNewFolderDialog" title="新建文件夹" width="350px">
-      <el-input v-model="newFolderName" placeholder="请输入文件夹名称" @keyup.enter="doCreateFolder" />
+    <el-dialog v-model="showNewFolderDialog" :title="t('files.newFolderTitle')" width="350px">
+      <el-input v-model="newFolderName" :placeholder="t('files.newFolderPlaceholder')" @keyup.enter="doCreateFolder" />
       <template #footer>
-        <el-button @click="showNewFolderDialog = false">取消</el-button>
-        <el-button type="primary" @click="doCreateFolder" :loading="creating">创建</el-button>
+        <el-button @click="showNewFolderDialog = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="doCreateFolder" :loading="creating">{{ t('common.create') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 重命名对话框 -->
-    <el-dialog v-model="showRenameDialog" title="重命名" width="350px">
-      <el-input v-model="renameName" placeholder="请输入新名称" @keyup.enter="doRename" />
+    <el-dialog v-model="showRenameDialog" :title="t('files.renameTitle')" width="350px">
+      <el-input v-model="renameName" :placeholder="t('files.renamePlaceholder')" @keyup.enter="doRename" />
       <template #footer>
-        <el-button @click="showRenameDialog = false">取消</el-button>
-        <el-button type="primary" @click="doRename" :loading="renaming">确认</el-button>
+        <el-button @click="showRenameDialog = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="doRename" :loading="renaming">{{ t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
@@ -142,14 +137,14 @@
     <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
 
     <!-- 设置隐私密码对话框 -->
-    <el-dialog v-model="showSetPrivacyDialog" title="设置隐私密码" width="380px">
+    <el-dialog v-model="showSetPrivacyDialog" :title="t('files.setPrivacyTitle')" width="380px">
       <el-alert type="info" :closable="false" show-icon style="margin-bottom:16px">
-        设置后任何人访问此文件夹都需要输入此密码，包括管理员。
+        {{ t('files.setPrivacyMsg') }}
       </el-alert>
-      <el-input v-model="privacyPassword" type="password" placeholder="请输入隐私密码（至少4位）" show-password />
+      <el-input v-model="privacyPassword" type="password" :placeholder="t('files.setPrivacyPlaceholder')" show-password />
       <template #footer>
-        <el-button @click="showSetPrivacyDialog = false">取消</el-button>
-        <el-button type="primary" @click="doSetPrivacy" :loading="settingPrivacy">确认设置</el-button>
+        <el-button @click="showSetPrivacyDialog = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="doSetPrivacy" :loading="settingPrivacy">{{ t('files.confirmSetPrivacy') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -158,6 +153,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Folder, Document, Upload, FolderAdd, UploadFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { useFileStore } from '../stores/file'
@@ -172,15 +168,16 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
 const fileStore = useFileStore()
+const { t } = useI18n()
 const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
 
 /** 面包屑根节点显示名称：管理员视角为空时显示"根目录"，否则显示用户名或"我的文件" */
 const rootLabel = computed(() => {
-  if (!authStore.isAdmin) return '我的文件'
-  if (!viewUserId.value) return '根目录' // 管理员查看全部用户
-  if (viewUserId.value === authStore.user?.id) return '我的文件'
+  if (!authStore.isAdmin) return t('files.myFiles')
+  if (!viewUserId.value) return t('files.rootDirectory')
+  if (viewUserId.value === authStore.user?.id) return t('files.myFiles')
   const u = viewUsers.value.find(u => u.id === viewUserId.value)
-  return u ? (u.displayName || u.username) : '我的文件'
+  return u ? (u.displayName || u.username) : t('files.myFiles')
 })
 
 // ---- 状态 ----
@@ -320,7 +317,7 @@ function onFileSelected(file) {
 
 async function doUpload() {
   const pending = uploadFiles.value.filter(f => f.raw)
-  if (pending.length === 0) { ElMessage.warning('请选择文件'); return }
+  if (pending.length === 0) { ElMessage.warning(t('files.selectFile')); return }
   uploading.value = true
   try {
     const token = fileStore.currentPrivacyToken
@@ -331,12 +328,12 @@ async function doUpload() {
         file: f.raw
       }, token)
     }
-    ElMessage.success('上传成功')
+    ElMessage.success(t('files.uploadSuccess'))
     showUploadDialog.value = false
     uploadFiles.value = []
     loadFiles()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '上传失败')
+    ElMessage.error(e.response?.data?.message || t('files.uploadFailed'))
   } finally {
     uploading.value = false
   }
@@ -346,7 +343,6 @@ async function doUpload() {
 async function doDownload(row) {
   try {
     const token = fileStore.getPrivacyToken(fileStore.currentFolderId)
-    // 检查父链隐私
     await checkParentPrivacy(row.id, token, async (effectiveToken) => {
       const resp = await downloadFile(row.id, effectiveToken)
       const blob = resp.data
@@ -356,13 +352,13 @@ async function doDownload(row) {
       URL.revokeObjectURL(url)
     })
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || e.message || '下载失败')
+    ElMessage.error(e.response?.data?.message || e.message || t('files.operationFailed'))
   }
 }
 
 /** 新建文件夹 */
 async function doCreateFolder() {
-  if (!newFolderName.value.trim()) { ElMessage.warning('请输入文件夹名称'); return }
+  if (!newFolderName.value.trim()) { ElMessage.warning(t('files.inputFolderName')); return }
   creating.value = true
   try {
     const token = fileStore.currentPrivacyToken
@@ -371,12 +367,12 @@ async function doCreateFolder() {
       parentId: fileStore.currentFolderId,
       name: newFolderName.value.trim()
     }, token)
-    ElMessage.success('文件夹创建成功')
+    ElMessage.success(t('files.folderCreated'))
     showNewFolderDialog.value = false
     newFolderName.value = ''
     loadFiles()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '创建失败')
+    ElMessage.error(e.response?.data?.message || t('files.createFailed'))
   } finally {
     creating.value = false
   }
@@ -390,16 +386,16 @@ function showRename(row) {
 }
 
 async function doRename() {
-  if (!renameName.value.trim()) { ElMessage.warning('请输入新名称'); return }
+  if (!renameName.value.trim()) { ElMessage.warning(t('files.inputNewName')); return }
   renaming.value = true
   try {
     const token = fileStore.currentPrivacyToken
     await renameFile(renameTarget.value.id, renameName.value.trim(), token)
-    ElMessage.success('重命名成功')
+    ElMessage.success(t('files.renameSuccess'))
     showRenameDialog.value = false
     loadFiles()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '重命名失败')
+    ElMessage.error(e.response?.data?.message || t('files.renameFailed'))
   } finally {
     renaming.value = false
   }
@@ -409,17 +405,17 @@ async function doRename() {
 async function doDelete(row) {
   try {
     await confirm({
-      title: '确认删除',
-      message: `确定要删除 "${row.name}" 吗？此操作不可撤销。`,
-      confirmText: '删除',
+      title: t('files.deleteConfirmTitle'),
+      message: t('files.deleteConfirmMsg', { name: row.name }),
+      confirmText: t('common.delete'),
       type: 'warning'
     })
     const token = fileStore.currentPrivacyToken
     await deleteFile(row.id, token)
-    ElMessage.success('已删除')
+    ElMessage.success(t('files.deleted'))
     loadFiles()
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || '删除失败')
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('files.deleteFailed'))
   }
 }
 
@@ -432,16 +428,16 @@ function showSetPrivacy(row) {
 
 async function doSetPrivacy() {
   if (!privacyPassword.value || privacyPassword.value.length < 4) {
-    ElMessage.warning('隐私密码至少需要4位'); return
+    ElMessage.warning(t('files.privacyPwdMinLength')); return
   }
   settingPrivacy.value = true
   try {
     await setPrivacy(privacyTarget.value.id, privacyPassword.value)
-    ElMessage.success('隐私密码已设置')
+    ElMessage.success(t('files.privacySet'))
     showSetPrivacyDialog.value = false
     loadFiles()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '设置失败')
+    ElMessage.error(e.response?.data?.message || t('files.privacySetFailed'))
   } finally {
     settingPrivacy.value = false
   }
@@ -451,18 +447,18 @@ async function doSetPrivacy() {
 async function doRemovePrivacy(row) {
   try {
     await confirm({
-      title: '确认',
-      message: `确定要取消 "${row.name}" 的隐私保护吗？`,
-      confirmText: '确认',
+      title: t('files.removePrivacyTitle'),
+      message: t('files.removePrivacyMsg', { name: row.name }),
+      confirmText: t('common.confirm'),
       type: 'warning'
     })
     await removePrivacy(row.id)
     // 清除本地存储的访问令牌
     fileStore.clearPrivacyToken(row.id)
-    ElMessage.success('隐私保护已取消')
+    ElMessage.success(t('files.privacyRemoved'))
     loadFiles()
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || '操作失败')
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('files.operationFailed'))
   }
 }
 
@@ -488,7 +484,7 @@ async function checkParentPrivacy(fileItemId, currentToken, callback) {
       privacyPendingCallback.value = () => {
         const newToken = fileStore.getPrivacyToken(privacyPendingFolderId.value)
         callback(newToken).catch(err => {
-          ElMessage.error(err.response?.data?.message || '操作失败')
+          ElMessage.error(err.response?.data?.message || t('files.operationFailed'))
         })
       }
       privacyPendingPassword.value = ''
@@ -502,7 +498,7 @@ async function checkParentPrivacy(fileItemId, currentToken, callback) {
 
 /** 验证隐私密码 */
 async function doVerifyPrivacy() {
-  if (!privacyPendingPassword.value) { privacyError.value = '请输入隐私密码'; return }
+  if (!privacyPendingPassword.value) { privacyError.value = t('files.privacyPwdRequired'); return }
   privacyVerifying.value = true
   privacyError.value = ''
   try {
@@ -510,7 +506,7 @@ async function doVerifyPrivacy() {
     if (data.code === 'OK') {
       // 保存访问令牌
       fileStore.savePrivacyToken(privacyPendingFolderId.value, data.data.accessToken)
-      ElMessage.success('验证成功')
+      ElMessage.success(t('files.verifySuccess'))
       showPrivacyVerify.value = false
       // 重试之前失败的操作
       if (privacyPendingCallback.value) {
@@ -540,7 +536,7 @@ function handleApiError(data) {
     privacyError.value = data.message || ''
     privacyPendingCallback.value = () => loadFiles()
   } else {
-    ElMessage.error(data.message || '操作失败')
+    ElMessage.error(data.message || t('files.operationFailed'))
   }
 }
 
@@ -552,7 +548,7 @@ function handleHttpError(e) {
     privacyError.value = e.response?.data?.message || ''
     privacyPendingCallback.value = () => loadFiles()
   } else {
-    ElMessage.error(e.response?.data?.message || '请求失败')
+    ElMessage.error(e.response?.data?.message || t('files.requestFailed'))
   }
 }
 

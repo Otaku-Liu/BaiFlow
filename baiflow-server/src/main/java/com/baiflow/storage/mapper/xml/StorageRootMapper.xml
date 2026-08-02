@@ -3,7 +3,7 @@
 <mapper namespace="com.baiflow.storage.mapper.StorageRootMapper">
     <select id="selectAllOrdered" resultType="com.baiflow.storage.entity.StorageRoot">
         SELECT id, name, type, root_path, status, readonly, created_at, updated_at
-        FROM storage_root
+        FROM bf_storage_root
         <where>
             <if test="status != null and status != ''">status = #{status}</if>
         </where>
@@ -12,7 +12,7 @@
 
     <select id="selectByType" resultType="com.baiflow.storage.entity.StorageRoot">
         SELECT id, name, type, root_path, status, readonly, created_at, updated_at
-        FROM storage_root
+        FROM bf_storage_root
         WHERE type = #{type}
         ORDER BY created_at DESC
     </select>

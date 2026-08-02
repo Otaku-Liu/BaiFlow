@@ -8,7 +8,7 @@
 
     <select id="selectValidByUserAndFolder" resultType="com.baiflow.file.entity.PrivateFolderAccess">
         SELECT <include refid="pfaColumns"/>
-        FROM private_folder_access
+        FROM bf_private_folder_access
         WHERE user_id = #{userId}
           AND file_item_id = #{fileItemId}
           AND expires_at > NOW()
@@ -16,11 +16,11 @@
     </select>
 
     <delete id="deleteByFileItemId">
-        DELETE FROM private_folder_access WHERE file_item_id = #{fileItemId}
+        DELETE FROM bf_private_folder_access WHERE file_item_id = #{fileItemId}
     </delete>
 
     <delete id="deleteExpired">
-        DELETE FROM private_folder_access WHERE expires_at &lt;= NOW()
+        DELETE FROM bf_private_folder_access WHERE expires_at &lt;= NOW()
     </delete>
 
 </mapper>

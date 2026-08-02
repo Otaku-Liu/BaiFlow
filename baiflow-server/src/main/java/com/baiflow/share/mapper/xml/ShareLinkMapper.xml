@@ -11,7 +11,7 @@
 
     <select id="selectByCreator" resultType="com.baiflow.share.entity.ShareLink">
         SELECT <include refid="slColumns"/>
-        FROM share_link
+        FROM bf_share_link
         WHERE created_by = #{createdBy}
         <if test="status != null and status != ''">
             AND status = #{status}
@@ -22,7 +22,7 @@
 
     <select id="countByCreator" resultType="int">
         SELECT COUNT(*)
-        FROM share_link
+        FROM bf_share_link
         WHERE created_by = #{createdBy}
         <if test="status != null and status != ''">
             AND status = #{status}
@@ -31,7 +31,7 @@
 
     <select id="selectAll" resultType="com.baiflow.share.entity.ShareLink">
         SELECT <include refid="slColumns"/>
-        FROM share_link
+        FROM bf_share_link
         <where>
             <if test="status != null and status != ''">
                 status = #{status}
@@ -43,7 +43,7 @@
 
     <select id="countAll" resultType="int">
         SELECT COUNT(*)
-        FROM share_link
+        FROM bf_share_link
         <where>
             <if test="status != null and status != ''">
                 status = #{status}

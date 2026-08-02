@@ -188,6 +188,31 @@ body {
 }
 
 /* ================================================================
+   4.5. 共享数据表格布局 — 各页面引用 .baiflow-data-table 统一
+        filter-bar / table / pagination 的外围间距与排列
+   ================================================================ */
+.baiflow-data-table {
+  min-height: 400px;
+}
+
+.baiflow-data-table .filter-bar {
+  margin-bottom: 16px;
+}
+
+.baiflow-data-table .filter-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.baiflow-data-table .pagination-wrap {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ================================================================
    5. 全局组件微调
    ================================================================ */
 

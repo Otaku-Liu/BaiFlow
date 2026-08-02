@@ -3,24 +3,24 @@
     <!-- 顶部工具栏 -->
     <div class="toolbar">
       <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon> 新建下载任务
+        <el-icon><Plus /></el-icon> {{ t('downloads.newTask') }}
       </el-button>
-      <el-select v-model="filterStatus" placeholder="全部状态" clearable @change="loadTasks" style="width:160px">
-        <el-option label="全部" value="" />
-        <el-option label="等待中" value="WAITING" />
-        <el-option label="下载中" value="RUNNING" />
-        <el-option label="已暂停" value="PAUSED" />
-        <el-option label="已完成" value="COMPLETED" />
-        <el-option label="失败" value="FAILED" />
+      <el-select v-model="filterStatus" :placeholder="t('downloads.allStatus')" clearable @change="loadTasks" style="width:160px">
+        <el-option :label="t('downloads.status.all')" value="" />
+        <el-option :label="t('downloads.status.waiting')" value="WAITING" />
+        <el-option :label="t('downloads.status.running')" value="RUNNING" />
+        <el-option :label="t('downloads.status.paused')" value="PAUSED" />
+        <el-option :label="t('downloads.status.completed')" value="COMPLETED" />
+        <el-option :label="t('downloads.status.failed')" value="FAILED" />
       </el-select>
       <el-button :loading="loading" @click="loadTasks" style="margin-left:auto">
-        <el-icon><Refresh /></el-icon> 刷新
+        <el-icon><Refresh /></el-icon> {{ t('common.refresh') }}
       </el-button>
     </div>
 
     <!-- 任务列表 -->
     <el-table :data="tasks" v-loading="loading" stripe style="margin-top:16px">
-      <el-table-column label="文件名/URL" min-width="220">
+      <el-table-column :label="t('downloads.fileNameUrl')" min-width="220">
         <template #default="{ row }">
           <div>
             <div class="task-name">{{ row.fileName || row.sourceUrl }}</div>
@@ -28,12 +28,12 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="100">
+      <el-table-column :label="t('common.status')" width="100">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="进度" width="160">
+      <el-table-column :label="t('downloads.progress')" width="160">
         <template #default="{ row }">
           <div v-if="row.status === 'RUNNING' || row.status === 'PAUSED' || row.status === 'WAITING'">
             <el-progress :percentage="row.progress || 0" :status="row.status === 'FAILED' ? 'exception' : undefined" />
@@ -46,23 +46,23 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="大小" width="100" align="right">
+      <el-table-column :label="t('common.size')" width="100" align="right">
         <template #default="{ row }">{{ row.totalBytes ? formatSize(row.totalBytes) : '-' }}</template>
       </el-table-column>
-      <el-table-column label="创建时间" width="160">
+      <el-table-column :label="t('common.createdAt')" width="160">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column :label="t('common.actions')" width="200" fixed="right">
         <template #default="{ row }">
           <div class="action-btns">
             <el-button v-if="row.status === 'RUNNING'" type="warning" link size="small" @click="doPause(row)">
-              暂停
+              {{ t('common.pause') }}
             </el-button>
             <el-button v-if="row.status === 'PAUSED'" type="success" link size="small" @click="doResume(row)">
-              恢复
+              {{ t('common.resume') }}
             </el-button>
             <el-button type="danger" link size="small" @click="doDelete(row)">
-              删除
+              {{ t('common.delete') }}
             </el-button>
           </div>
         </template>
@@ -75,39 +75,40 @@
       layout="prev, pager, next" @current-change="loadTasks" />
 
     <!-- 空状态 -->
-    <el-empty v-if="!loading && tasks.length === 0" description="没有下载任务">
-      <el-button type="primary" @click="showCreateDialog = true">创建你的第一个下载任务</el-button>
+    <el-empty v-if="!loading && tasks.length === 0" :description="t('downloads.noTasks')">
+      <el-button type="primary" @click="showCreateDialog = true">{{ t('downloads.createFirstTask') }}</el-button>
     </el-empty>
 
     <!-- 通用确认弹窗 -->
     <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
 
     <!-- 创建下载任务对话框 -->
-    <el-dialog v-model="showCreateDialog" title="新建下载任务" width="500px">
+    <el-dialog v-model="showCreateDialog" :title="t('downloads.newTask')" width="500px">
       <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-position="top">
-        <el-form-item label="下载 URL" prop="sourceUrl">
-          <el-input v-model="createForm.sourceUrl" placeholder="https://example.com/file.zip 或磁力链接" />
+        <el-form-item :label="t('downloads.downloadUrl')" prop="sourceUrl">
+          <el-input v-model="createForm.sourceUrl" :placeholder="t('downloads.downloadUrlPlaceholder')" />
         </el-form-item>
-        <el-form-item label="目标存储根目录" prop="targetStorageRootId">
-          <el-select v-model="createForm.targetStorageRootId" placeholder="选择存储根目录" style="width:100%">
+        <el-form-item :label="t('downloads.targetRoot')" prop="targetStorageRootId">
+          <el-select v-model="createForm.targetStorageRootId" :placeholder="t('downloads.targetRootPlaceholder')" style="width:100%">
             <el-option v-for="r in roots" :key="r.id" :label="r.name" :value="r.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="存放子路径（可选）">
-          <el-input v-model="createForm.targetRelativePath" placeholder="留空则放根目录，如 downloads/" />
+        <el-form-item :label="t('downloads.targetPath')">
+          <el-input v-model="createForm.targetRelativePath" :placeholder="t('downloads.targetPathPlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="doCreateDownload" :loading="creating">开始下载</el-button>
+        <el-button @click="showCreateDialog = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="doCreateDownload" :loading="creating">{{ t('downloads.startDownload') }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import {
   createDownload, listDownloads, pauseDownload, resumeDownload, removeDownload
@@ -117,6 +118,7 @@ import { formatDateTime, formatSize, formatSpeed } from '../utils/format'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
+const { t } = useI18n()
 const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
 
 // ---- 状态 ----
@@ -137,10 +139,10 @@ const createForm = reactive({
   targetRelativePath: ''
 })
 
-const createRules = {
-  sourceUrl: [{ required: true, message: '请输入下载 URL', trigger: 'blur' }],
-  targetStorageRootId: [{ required: true, message: '请选择存储根目录', trigger: 'change' }]
-}
+const createRules = computed(() => ({
+  sourceUrl: [{ required: true, message: t('downloads.urlRequired'), trigger: 'blur' }],
+  targetStorageRootId: [{ required: true, message: t('downloads.rootRequired'), trigger: 'change' }]
+}))
 
 // ---- 初始化 ----
 onMounted(async () => {
@@ -164,10 +166,10 @@ async function loadTasks() {
       tasks.value = data.data.records || []
       total.value = data.data.total || 0
     } else {
-      ElMessage.error(data.message || '加载失败')
+      ElMessage.error(data.message || t('downloads.loadFailed'))
     }
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '请求失败')
+    ElMessage.error(e.response?.data?.message || t('downloads.requestFailed'))
   } finally {
     loading.value = false
   }
@@ -179,13 +181,13 @@ async function doCreateDownload() {
   creating.value = true
   try {
     await createDownload(createForm)
-    ElMessage.success('下载任务已创建')
+    ElMessage.success(t('downloads.taskCreated'))
     showCreateDialog.value = false
     createForm.sourceUrl = ''
     createForm.targetRelativePath = ''
     loadTasks()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '创建下载任务失败')
+    ElMessage.error(e.response?.data?.message || t('downloads.createTaskFailed'))
   } finally {
     creating.value = false
   }
@@ -194,36 +196,36 @@ async function doCreateDownload() {
 async function doPause(row) {
   try {
     await pauseDownload(row.id)
-    ElMessage.success('已暂停')
+    ElMessage.success(t('downloads.paused'))
     loadTasks()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '暂停失败')
+    ElMessage.error(e.response?.data?.message || t('downloads.pauseFailed'))
   }
 }
 
 async function doResume(row) {
   try {
     await resumeDownload(row.id)
-    ElMessage.success('已恢复')
+    ElMessage.success(t('downloads.resumed'))
     loadTasks()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '恢复失败')
+    ElMessage.error(e.response?.data?.message || t('downloads.resumeFailed'))
   }
 }
 
 async function doDelete(row) {
   try {
     await confirm({
-      title: '确认删除',
-      message: '确定要删除此下载任务吗？',
-      confirmText: '删除',
+      title: t('downloads.deleteConfirmTitle'),
+      message: t('downloads.deleteConfirmMsg'),
+      confirmText: t('common.delete'),
       type: 'warning'
     })
     await removeDownload(row.id)
-    ElMessage.success('已删除')
+    ElMessage.success(t('downloads.status.deleted'))
     loadTasks()
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || '删除失败')
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('common.delete') + ' ' + t('downloads.loadFailed'))
   }
 }
 
@@ -234,7 +236,11 @@ function statusType(status) {
 }
 
 function statusLabel(status) {
-  const map = { WAITING: '等待中', RUNNING: '下载中', PAUSED: '已暂停', COMPLETED: '已完成', FAILED: '失败', DELETED: '已删除' }
+  const map = {
+    WAITING: t('downloads.status.waiting'), RUNNING: t('downloads.status.running'),
+    PAUSED: t('downloads.status.paused'), COMPLETED: t('downloads.status.completed'),
+    FAILED: t('downloads.status.failed'), DELETED: t('downloads.status.deleted')
+  }
   return map[status] || status
 }
 

@@ -4,12 +4,14 @@ import 'element-plus/dist/index.css'
 import App from './App.vue'
 import router from './router'
 import pinia from './stores'
+import i18n from './locales'
 import { useAuthStore } from './stores/auth'
 import './styles.css'
 
 const app = createApp(App)
 app.use(pinia)
 app.use(router)
+app.use(i18n)
 app.use(ElementPlus)
 
 // 启动时恢复 token

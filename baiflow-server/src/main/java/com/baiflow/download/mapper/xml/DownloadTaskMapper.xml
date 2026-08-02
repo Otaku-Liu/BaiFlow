@@ -11,7 +11,7 @@
 
     <select id="selectByUser" resultType="com.baiflow.download.entity.DownloadTask">
         SELECT <include refid="dtColumns"/>
-        FROM download_task
+        FROM bf_download_task
         WHERE created_by = #{userId}
         <if test="status != null and status != ''">AND status = #{status}</if>
         ORDER BY created_at DESC
@@ -19,20 +19,20 @@
     </select>
 
     <select id="countByUser" resultType="int">
-        SELECT COUNT(*) FROM download_task
+        SELECT COUNT(*) FROM bf_download_task
         WHERE created_by = #{userId}
         <if test="status != null and status != ''">AND status = #{status}</if>
     </select>
 
     <select id="selectActive" resultType="com.baiflow.download.entity.DownloadTask">
         SELECT <include refid="dtColumns"/>
-        FROM download_task
+        FROM bf_download_task
         WHERE status IN ('WAITING', 'RUNNING', 'PAUSED')
     </select>
 
     <select id="selectByAria2Gid" resultType="com.baiflow.download.entity.DownloadTask">
         SELECT <include refid="dtColumns"/>
-        FROM download_task
+        FROM bf_download_task
         WHERE aria2_gid = #{aria2Gid}
         LIMIT 1
     </select>

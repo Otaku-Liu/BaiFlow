@@ -10,6 +10,18 @@
           <h3>BaiFlow</h3>
         </div>
         <div class="header-right">
+          <el-dropdown class="locale-switcher" @command="handleLocaleChange">
+            <span class="locale-trigger">
+              {{ locale === 'zh-CN' ? '中文' : 'English' }}
+              <el-icon class="locale-arrow"><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="zh-CN">中文</el-dropdown-item>
+                <el-dropdown-item command="en">English</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <span class="user-info" @click="profileDialogVisible = true">
             {{ authStore.user?.displayName || authStore.user?.username }}
           </span>
@@ -43,6 +55,15 @@
               <el-icon><User /></el-icon>
               <span>用户管理</span>
             </el-menu-item>
+            <el-sub-menu v-if="authStore.isAdmin" index="logs">
+              <template #title>
+                <el-icon><Document /></el-icon>
+                <span>操作日志</span>
+              </template>
+              <el-menu-item index="login-logs">
+                <span>登录日志</span>
+              </el-menu-item>
+            </el-sub-menu>
           </el-menu>
         </el-aside>
 
@@ -53,6 +74,7 @@
             <DownloadsView v-else-if="activeMenu === 'downloads'" key="downloads" />
             <SharesView v-else-if="activeMenu === 'shares'" key="shares" />
             <UsersView v-else-if="activeMenu === 'users'" key="users" />
+            <LoginLogsView v-else-if="activeMenu === 'login-logs'" key="login-logs" />
           </transition>
         </el-main>
       </el-container>
@@ -104,16 +126,19 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { FolderOpened, Download, Share, User, Fold, Expand } from '@element-plus/icons-vue'
+import { FolderOpened, Download, Share, User, Fold, Expand, Document, ArrowDown } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { updateProfile, uploadAvatar, changePassword } from '../api/auth'
 import FilesView from './FilesView.vue'
 import DownloadsView from './DownloadsView.vue'
 import SharesView from './SharesView.vue'
 import UsersView from './UsersView.vue'
+import LoginLogsView from './LoginLogsView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { locale } = useI18n()
 const activeMenu = ref('files')
 
 // ---- 响应式侧边栏 ----
@@ -169,6 +194,11 @@ function handleMenuSelect(index) {
 function handleLogout() {
   authStore.clearSession()
   router.push('/login')
+}
+
+function handleLocaleChange(lang) {
+  locale.value = lang
+  localStorage.setItem('baiflow_locale', lang)
 }
 
 async function handleSaveProfile() {
@@ -281,6 +311,33 @@ async function handleChangePassword() {
   gap: 16px;
 }
 
+.locale-switcher {
+  margin-right: 4px;
+}
+
+.locale-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.locale-trigger:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--el-text-color-primary);
+}
+
+.locale-arrow {
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+
 .user-info {
   color: var(--el-text-color-secondary);
   font-size: 14px;
@@ -339,6 +396,42 @@ async function handleChangePassword() {
 .app-aside :deep(.el-menu-item .el-icon) {
   font-size: 18px;
   margin-right: 10px;
+}
+
+/* 子菜单覆写 */
+.app-aside :deep(.el-sub-menu) {
+  margin-bottom: 2px;
+}
+
+.app-aside :deep(.el-sub-menu__title) {
+  border-radius: 8px;
+  height: 40px;
+  line-height: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  padding-left: 16px !important;
+  transition: background-color 0.15s ease;
+}
+
+.app-aside :deep(.el-sub-menu__title:hover) {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.app-aside :deep(.el-sub-menu.is-active .el-sub-menu__title) {
+  color: #007AFF;
+  font-weight: 600;
+}
+
+.app-aside :deep(.el-sub-menu .el-menu) {
+  padding-left: 8px;
+}
+
+.app-aside :deep(.el-sub-menu .el-menu-item) {
+  padding-left: 24px !important;
+  font-size: 13px;
+  height: 36px;
+  line-height: 36px;
 }
 
 /* ---- 移动端遮罩 ---- */

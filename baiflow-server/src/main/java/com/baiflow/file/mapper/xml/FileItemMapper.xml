@@ -10,7 +10,7 @@
 
     <select id="selectChildren" resultType="com.baiflow.file.entity.FileItem">
         SELECT <include refid="fileColumns"/>
-        FROM file_item
+        FROM bf_file_item
         WHERE storage_root_id = #{storageRootId}
         <choose>
             <when test="parentId != null">AND parent_id = #{parentId}</when>
@@ -22,7 +22,7 @@
 
     <select id="selectChildrenByOwner" resultType="com.baiflow.file.entity.FileItem">
         SELECT <include refid="fileColumns"/>
-        FROM file_item
+        FROM bf_file_item
         WHERE storage_root_id = #{storageRootId}
         <choose>
             <when test="parentId != null">AND parent_id = #{parentId}</when>
@@ -35,7 +35,7 @@
 
     <select id="selectByPath" resultType="com.baiflow.file.entity.FileItem">
         SELECT <include refid="fileColumns"/>
-        FROM file_item
+        FROM bf_file_item
         WHERE storage_root_id = #{storageRootId} AND relative_path = #{relativePath}
         LIMIT 1
     </select>

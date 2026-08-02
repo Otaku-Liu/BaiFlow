@@ -2,7 +2,7 @@
   <el-dialog
     :model-value="visible"
     @update:model-value="$emit('cancel')"
-    :title="title"
+    :title="displayTitle"
     width="400px"
     :close-on-click-modal="false"
     @close="$emit('cancel')"
@@ -20,9 +20,9 @@
       <span class="confirm-message">{{ message }}</span>
     </div>
     <template #footer>
-      <el-button @click="$emit('cancel')">{{ cancelText }}</el-button>
+      <el-button @click="$emit('cancel')">{{ displayCancelText }}</el-button>
       <el-button :type="confirmButtonType" @click="$emit('confirm')">
-        {{ confirmText }}
+        {{ displayConfirmText }}
       </el-button>
     </template>
   </el-dialog>
@@ -30,18 +30,25 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { WarningFilled, CircleCloseFilled, InfoFilled } from '@element-plus/icons-vue'
+
+const { t } = useI18n()
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  title: { type: String, default: '确认' },
+  title: { type: String, default: '' },
   message: { type: String, default: '' },
-  confirmText: { type: String, default: '确认' },
-  cancelText: { type: String, default: '取消' },
+  confirmText: { type: String, default: '' },
+  cancelText: { type: String, default: '' },
   type: { type: String, default: 'warning' }
 })
 
 defineEmits(['confirm', 'cancel'])
+
+const displayTitle = computed(() => props.title || t('common.confirm'))
+const displayConfirmText = computed(() => props.confirmText || t('common.confirm'))
+const displayCancelText = computed(() => props.cancelText || t('common.cancel'))
 
 const confirmButtonType = computed(() => {
   return props.type === 'danger' ? 'danger' : 'primary'

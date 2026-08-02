@@ -9,7 +9,7 @@
 
     <select id="selectByUser" resultType="com.baiflow.transfer.entity.TransferTask">
         SELECT <include refid="taskColumns"/>
-        FROM transfer_task
+        FROM bf_transfer_task
         WHERE created_by = #{createdBy}
         <if test="taskType != null and taskType != ''">
             AND task_type = #{taskType}
