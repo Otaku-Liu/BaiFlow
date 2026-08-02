@@ -25,7 +25,7 @@
           <span class="user-info" @click="profileDialogVisible = true">
             {{ authStore.user?.displayName || authStore.user?.username }}
           </span>
-          <el-button type="danger" text @click="handleLogout">退出</el-button>
+          <el-button type="danger" text @click="handleLogout">{{ t('common.logout') }}</el-button>
         </div>
       </el-header>
       <el-container class="body-container">
@@ -41,27 +41,27 @@
           <el-menu :default-active="activeMenu" @select="handleMenuSelect">
             <el-menu-item index="files">
               <el-icon><FolderOpened /></el-icon>
-              <span>文件中心</span>
+              <span>{{ t('menu.files') }}</span>
             </el-menu-item>
             <el-menu-item index="downloads">
               <el-icon><Download /></el-icon>
-              <span>下载中心</span>
+              <span>{{ t('menu.downloads') }}</span>
             </el-menu-item>
             <el-menu-item index="shares">
               <el-icon><Share /></el-icon>
-              <span>分享管理</span>
+              <span>{{ t('menu.shares') }}</span>
             </el-menu-item>
             <el-menu-item v-if="authStore.isAdmin" index="users">
               <el-icon><User /></el-icon>
-              <span>用户管理</span>
+              <span>{{ t('menu.users') }}</span>
             </el-menu-item>
             <el-sub-menu v-if="authStore.isAdmin" index="logs">
               <template #title>
                 <el-icon><Document /></el-icon>
-                <span>操作日志</span>
+                <span>{{ t('menu.logs') }}</span>
               </template>
               <el-menu-item index="login-logs">
-                <span>登录日志</span>
+                <span>{{ t('menu.loginLogs') }}</span>
               </el-menu-item>
             </el-sub-menu>
           </el-menu>
@@ -82,7 +82,7 @@
 
     <!-- 个人资料弹窗 -->
     <el-dialog v-model="profileDialogVisible" title="个人资料" width="440px" :close-on-click-modal="false">
-      <el-form label-width="80px">
+      <el-form label-width="auto" :key="locale">
         <el-form-item label="用户名">
           <el-input :model-value="authStore.user?.username" disabled />
         </el-form-item>
@@ -105,7 +105,7 @@
         </el-form-item>
       </el-form>
       <el-divider />
-      <el-form label-width="80px">
+      <el-form label-width="auto" :key="locale">
         <el-form-item label="旧密码">
           <el-input v-model="oldPassword" type="password" placeholder="输入旧密码" show-password />
         </el-form-item>
@@ -138,7 +138,7 @@ import LoginLogsView from './LoginLogsView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const { locale } = useI18n()
+const { t, locale } = useI18n()
 const activeMenu = ref('files')
 
 // ---- 响应式侧边栏 ----

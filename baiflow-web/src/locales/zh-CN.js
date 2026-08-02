@@ -41,7 +41,8 @@ export default {
     optional: '可选',
     unlimited: '不限',
     pleaseInput: '请输入',
-    pleaseSelect: '请选择'
+    pleaseSelect: '请选择',
+    logout: '退出'
   },
   loginLog: {
     title: '登录日志',
@@ -208,7 +209,7 @@ export default {
     resetPwdDialogTitle: '重置密码',
     loginUsername: '登录用户名',
     initialPassword: '初始密码',
-    displayNameOpt: '显示名称（可选）',
+    displayNameOpt: '显示名称',
     newPassword: '新密码',
     newPasswordPlaceholder: '输入新密码',
     confirmReset: '确认重置',

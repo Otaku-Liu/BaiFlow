@@ -41,7 +41,8 @@ export default {
     optional: 'Optional',
     unlimited: 'Unlimited',
     pleaseInput: 'Please enter',
-    pleaseSelect: 'Please select'
+    pleaseSelect: 'Please select',
+    logout: 'Logout'
   },
   loginLog: {
     title: 'Login Logs',
@@ -208,7 +209,7 @@ export default {
     resetPwdDialogTitle: 'Reset Password',
     loginUsername: 'Login Username',
     initialPassword: 'Initial Password',
-    displayNameOpt: 'Display Name (optional)',
+    displayNameOpt: 'Display Name',
     newPassword: 'New Password',
     newPasswordPlaceholder: 'Enter new password',
     confirmReset: 'Confirm Reset',

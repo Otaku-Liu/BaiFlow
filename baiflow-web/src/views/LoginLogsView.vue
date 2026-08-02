@@ -39,9 +39,9 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="ipAddress" :label="t('loginLog.ipAddress')" min-width="140" />
-      <el-table-column prop="userAgent" :label="t('loginLog.userAgent')" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="detail" :label="t('loginLog.detail')" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="ipAddress" :label="t('common.ipAddress')" min-width="140" />
+      <el-table-column prop="userAgent" :label="t('common.userAgent')" min-width="200" show-overflow-tooltip />
+      <el-table-column prop="detail" :label="t('common.detail')" min-width="140" show-overflow-tooltip />
       <el-table-column :label="t('loginLog.loginTime')" min-width="160">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>

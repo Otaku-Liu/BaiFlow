@@ -66,7 +66,7 @@
 
     <!-- 创建用户弹窗 -->
     <el-dialog v-model="createDialogVisible" :title="t('users.createDialogTitle')" width="420px" :close-on-click-modal="false">
-      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="80px">
+      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="auto" :key="locale">
         <el-form-item :label="t('users.loginUsername')" prop="username">
           <el-input v-model="createForm.username" :placeholder="t('users.loginUsername')" />
         </el-form-item>
@@ -91,7 +91,7 @@
 
     <!-- 编辑用户弹窗 -->
     <el-dialog v-model="editDialogVisible" :title="t('users.editDialogTitle')" width="420px" :close-on-click-modal="false">
-      <el-form ref="editFormRef" :model="editForm" label-width="80px">
+      <el-form ref="editFormRef" :model="editForm" label-width="auto" :key="locale">
         <el-form-item :label="t('users.loginUsername')">
           <el-input :model-value="editForm.username" disabled />
         </el-form-item>
@@ -120,7 +120,7 @@
 
     <!-- 重置密码弹窗 -->
     <el-dialog v-model="resetPwdDialogVisible" :title="t('users.resetPwdDialogTitle')" width="400px" :close-on-click-modal="false">
-      <el-form ref="resetPwdFormRef" :model="resetPwdForm" :rules="resetPwdRules" label-width="80px">
+      <el-form ref="resetPwdFormRef" :model="resetPwdForm" :rules="resetPwdRules" label-width="auto" :key="locale">
         <el-form-item :label="t('users.newPassword')" prop="newPassword">
           <el-input v-model="resetPwdForm.newPassword" type="password" :placeholder="t('users.newPasswordPlaceholder')" show-password />
         </el-form-item>
@@ -144,7 +144,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
 
 // 列表状态
