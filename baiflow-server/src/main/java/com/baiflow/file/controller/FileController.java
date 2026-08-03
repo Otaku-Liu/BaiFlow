@@ -244,6 +244,15 @@ public class FileController {
         if (lower.endsWith(".wav"))  return MediaType.parseMediaType("audio/wav");
         if (lower.endsWith(".flac")) return MediaType.parseMediaType("audio/flac");
         if (lower.endsWith(".m4a"))  return MediaType.parseMediaType("audio/mp4");
+        if (lower.endsWith(".docx") || lower.endsWith(".doc"))
+            return MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        if (lower.endsWith(".xlsx") || lower.endsWith(".xls"))
+            return MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        if (lower.endsWith(".pptx") || lower.endsWith(".ppt"))
+            return MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.presentationml.presentation");
+        if (lower.endsWith(".odt")) return MediaType.parseMediaType("application/vnd.oasis.opendocument.text");
+        if (lower.endsWith(".ods")) return MediaType.parseMediaType("application/vnd.oasis.opendocument.spreadsheet");
+        if (lower.endsWith(".odp")) return MediaType.parseMediaType("application/vnd.oasis.opendocument.presentation");
         if (lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".json")
                 || lower.endsWith(".xml") || lower.endsWith(".csv") || lower.endsWith(".html")
                 || lower.endsWith(".css") || lower.endsWith(".js") || lower.endsWith(".ts")

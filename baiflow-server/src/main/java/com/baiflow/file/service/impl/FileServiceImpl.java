@@ -17,6 +17,7 @@ import com.baiflow.file.enums.PrivacyMode;
 import com.baiflow.file.mapper.FileItemMapper;
 import com.baiflow.file.mapper.PlaybackProgressMapper;
 import com.baiflow.file.mapper.PrivateFolderAccessMapper;
+import com.baiflow.file.service.FileConvertService;
 import com.baiflow.file.service.FileService;
 import com.baiflow.storage.entity.StorageRoot;
 import com.baiflow.storage.enums.StorageRootStatus;
@@ -76,6 +77,8 @@ public class FileServiceImpl implements FileService {
     private UserMapper userMapper;
     @Autowired
     private PlaybackProgressMapper progressMapper;
+    @Autowired
+    private FileConvertService convertService;
 
     @Override
     public IPage<FileItemInfo> listFiles(String rootId, String parentId, int page, int size,
@@ -680,8 +683,18 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public Resource previewFile(String fileId, String userId, boolean isAdmin, String privacyAccessToken) {
-        // 预览就是 download 的 inline 版本，逻辑完全相同
-        return downloadFile(fileId, userId, isAdmin, privacyAccessToken);
+        // 复用 downloadFile 的校验逻辑（存在性、类型、权限、路径穿越）
+        Resource original = downloadFile(fileId, userId, isAdmin, privacyAccessToken);
+
+        // Office 文件自动转换为 PDF 后返回
+        FileItem file = fileItemMapper.selectById(fileId);
+        if (file != null && convertService.needsConversion(file)) {
+            Path pdfPath = convertService.convertToPdf(file);
+            if (pdfPath != null && Files.exists(pdfPath)) {
+                return new FileSystemResource(pdfPath);
+            }
+        }
+        return original;
     }
 
     @Override

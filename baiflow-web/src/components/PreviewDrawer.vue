@@ -54,23 +54,14 @@
         <iframe :src="blobUrl" style="width:100%;height:75vh;border:none" />
       </div>
 
+      <!-- Markdown -->
+      <div v-else-if="category === 'markdown'" class="preview-markdown" ref="scrollRef" @scroll="onScroll">
+        <div v-html="mdHtml" class="markdown-body" />
+      </div>
+
       <!-- 文本/代码 -->
       <div v-else-if="category === 'text'" class="preview-text" ref="scrollRef" @scroll="onScroll">
         <pre>{{ textContent }}</pre>
-      </div>
-
-      <!-- XLSX -->
-      <div v-else-if="category === 'xlsx'" class="preview-xlsx">
-        <el-table :data="xlsxData" border stripe max-height="70vh" style="width:100%">
-          <el-table-column
-            v-for="(col, ci) in xlsxCols"
-            :key="ci"
-            :label="col"
-            :prop="col"
-            min-width="120"
-            show-overflow-tooltip
-          />
-        </el-table>
       </div>
 
       <!-- ZIP 目录树 -->
@@ -98,7 +89,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loading, Headset } from '@element-plus/icons-vue'
-import http from '../api/http'
+import { Converter } from 'showdown'
 import { fetchPreviewBlob, fetchPreviewContent } from '../api/files'
 import { usePlaybackProgress } from '../composables/usePlaybackProgress'
 import { mimeFromName, mimeCategory, progressTypeForCategory } from '../utils/mime'
@@ -115,8 +106,7 @@ const emit = defineEmits(['close'])
 const mediaRef = ref(null)
 const scrollRef = ref(null)
 const textContent = ref('')
-const xlsxCols = ref([])
-const xlsxData = ref([])
+const mdHtml = ref('')
 const blobUrl = ref('')
 const blobLoading = ref(false)
 
@@ -185,29 +175,34 @@ async function loadTextContent() {
   }
 }
 
-// ---- XLSX 加载 ----
-async function loadXlsx() {
-  if (category.value !== 'xlsx') return
+// ---- Markdown 加载 ----
+async function loadMarkdown() {
+  if (category.value !== 'markdown') return
   try {
-    const XLSX = await import('xlsx')
-    // 通过 Axios 获取 blob，再转 ArrayBuffer
     const { data } = await fetchPreviewContent(props.fileItem.id)
-    const blobResp = await http.get(`/files/${props.fileItem.id}/preview`, { responseType: 'blob' })
-    const buf = await blobResp.data.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array' })
-    const sheetName = wb.SheetNames[0]
-    const sheet = wb.Sheets[sheetName]
-    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 })
-    if (json.length > 0) {
-      xlsxCols.value = json[0].map((_, i) => `col_${i}`)
-      xlsxData.value = json.slice(1, 501).map(row => {
-        const obj = {}
-        row.forEach((cell, i) => { obj[`col_${i}`] = cell ?? '' })
-        return obj
+    const raw = typeof data === 'string' ? data : ''
+    const converter = new Converter({ tables: true, strikethrough: true, tasklists: true })
+    mdHtml.value = converter.makeHtml(raw)
+    await nextTick()
+    if (progress && scrollRef.value) {
+      await progress.promptResume((pos) => {
+        if (scrollRef.value) {
+          scrollRef.value.scrollTop = pos * scrollRef.value.scrollHeight
+        }
+      })
+      let scrollTimer = null
+      scrollRef.value.addEventListener('scroll', () => {
+        if (scrollTimer) clearTimeout(scrollTimer)
+        scrollTimer = setTimeout(() => {
+          if (scrollRef.value) {
+            const pct = scrollRef.value.scrollTop / scrollRef.value.scrollHeight
+            if (pct > 0) progress.saveNow(pct)
+          }
+        }, 2000)
       })
     }
   } catch {
-    xlsxData.value = []
+    mdHtml.value = '<p>Failed to load content</p>'
   }
 }
 
@@ -252,15 +247,13 @@ function doDownload() {
 watch(() => props.visible, async (v) => {
   if (!v || !props.fileItem) return
   textContent.value = ''
-  xlsxCols.value = []
-  xlsxData.value = []
   blobUrl.value = ''
   blobLoading.value = false
   if (['image', 'video', 'audio', 'pdf'].includes(category.value)) {
     await loadBlob()
   }
+  if (category.value === 'markdown') await loadMarkdown()
   if (category.value === 'text') await loadTextContent()
-  if (category.value === 'xlsx') await loadXlsx()
 })
 </script>
 
@@ -287,6 +280,28 @@ watch(() => props.visible, async (v) => {
 
 .preview-pdf { min-height: 75vh; }
 
+.preview-markdown {
+  max-height: 75vh; overflow: auto;
+  padding: 24px; background: #fff; border-radius: 8px;
+}
+
+.markdown-body { font-size: 14px; line-height: 1.7; color: #1d1d1f; }
+.markdown-body :deep(h1) { font-size: 1.6em; border-bottom: 1px solid #e5e5ea; padding-bottom: 8px; margin: 24px 0 16px; }
+.markdown-body :deep(h2) { font-size: 1.3em; border-bottom: 1px solid #e5e5ea; padding-bottom: 6px; margin: 20px 0 12px; }
+.markdown-body :deep(h3) { font-size: 1.1em; margin: 16px 0 8px; }
+.markdown-body :deep(p) { margin: 0 0 12px; }
+.markdown-body :deep(code) { background: #f5f5f7; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+.markdown-body :deep(pre) { background: #f5f5f7; padding: 16px; border-radius: 8px; overflow: auto; }
+.markdown-body :deep(pre code) { background: none; padding: 0; }
+.markdown-body :deep(blockquote) { border-left: 3px solid #007AFF; padding-left: 14px; color: #86868b; margin: 12px 0; }
+.markdown-body :deep(ul), .markdown-body :deep(ol) { padding-left: 24px; margin: 8px 0; }
+.markdown-body :deep(li) { margin: 4px 0; }
+.markdown-body :deep(table) { border-collapse: collapse; width: 100%; margin: 12px 0; }
+.markdown-body :deep(th), .markdown-body :deep(td) { border: 1px solid #e5e5ea; padding: 8px 12px; text-align: left; }
+.markdown-body :deep(th) { background: #fafafa; font-weight: 600; }
+.markdown-body :deep(img) { max-width: 100%; }
+.markdown-body :deep(a) { color: #007AFF; }
+
 .preview-text {
   max-height: 75vh; overflow: auto;
   background: var(--el-fill-color-lighter); border-radius: 8px; padding: 16px;
@@ -296,8 +311,6 @@ watch(() => props.visible, async (v) => {
   white-space: pre-wrap; word-break: break-word;
   font-family: "SF Mono", "JetBrains Mono", "Fira Code", monospace;
 }
-
-.preview-xlsx { overflow: auto; }
 
 .preview-unsupported { padding-top: 60px; text-align: center; }
 

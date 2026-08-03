@@ -10,14 +10,14 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 |---|---|---|
 | 登录 | `/login` | 用户名密码登录 |
 | 主布局 | `/` | 侧边栏 + 顶栏 + 内容区，需登录 |
-| 文件中心 | `/` 内 | 管理员用户切换、面包屑、文件列表（双击/按钮预览）、上传/下载/重命名/删除、隐私文件夹 |
+| 文件中心 | `/` 内 | 管理员用户切换、面包屑（上传时间）、文件列表（双击/按钮预览，无类型列）、上传/下载/重命名/删除、隐私文件夹 |
 | 下载中心 | `/` 内 | aria2 下载任务管理 |
 | 分享管理 | `/` 内 | 分享链接创建/查看/撤销、访问日志（管理员） |
 | 用户管理 | `/` 内 | 管理员可见：用户列表、创建/编辑、批量删除、重置密码 |
-| 操作日志 | `/` 内 | 管理员可见：子菜单入口，当前含登录日志 |
+| 操作日志 | `/` 内 | 管理员可见：`el-sub-menu` 子菜单入口 |
 | 登录日志 | `/` 内 | 管理员可见：分页表格，用户名模糊搜索、日期时间范围、登录结果筛选 |
 | 个人资料 | 弹窗 | 展示名、头像上传、修改密码 |
-| 预览抽屉 | Drawer | 按 MIME 类型自动路由渲染器：图片/视频/音频/PDF/文本/代码/XLSX |
+| 预览抽屉 | Drawer | 按 MIME 路由：图片(`<img>`)、视频(`<video>`+进度)、音频(`<audio>`+进度)、PDF(`<iframe>`含 Office 转 PDF)、Markdown(showdown→HTML)、文本/代码(`<pre>`)、其他(降级下载) |
 
 ## 国际化 (i18n)
 
@@ -39,10 +39,13 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | 文件 | 用途 |
 |---|---|
 | `components/ConfirmDialog.vue` | 基于 `el-dialog` 的通用确认弹窗，替代 `ElMessageBox.confirm`，确保所有弹窗样式统一 |
-| `components/PreviewDrawer.vue` | 文件预览抽屉，按 MIME 类型路由到 6 种渲染器（img/video/audio/iframe/pre/el-table） |
+| `components/PreviewDrawer.vue` | 文件预览抽屉，按 MIME 类型路由到 5 种渲染器（img/video/audio/iframe/pre） |
 | `composables/useConfirmDialog.js` | 提供 `confirm()` promise 式 API，搭配 `ConfirmDialog` 使用 |
 | `composables/usePlaybackProgress.js` | 播放/阅读进度管理：查询历史进度、Toast 续看提示、10s 自动保存、关闭时最终保存 |
-| `utils/mime.js` | 扩展名→MIME 映射表、MIME 主类型判定、预览支持判断、进度类型推断 |
+| `utils/mime.js` | 扩展名→MIME 映射表、MIME 主类型判定（image/video/audio/pdf/markdown/text/unknown）、预览支持判断、进度类型推断（SECONDS/PAGE/SCROLL_PERCENT） |
+| `utils/format.js` | `formatDateTime`、`formatSize`、`formatSpeed` |
+
+Markdown 预览使用 showdown 库将源码转 HTML 渲染。
 
 ## API 调用
 

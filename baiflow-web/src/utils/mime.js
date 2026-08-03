@@ -56,7 +56,12 @@ export function mimeCategory(mime) {
   if (mime.startsWith('video/')) return 'video'
   if (mime.startsWith('audio/')) return 'audio'
   if (mime === 'application/pdf') return 'pdf'
-  if (mime.includes('spreadsheetml') || mime.includes('ms-excel')) return 'xlsx'
+  // Office 文档由后端 LibreOffice 转 PDF 后预览
+  if (mime.includes('msword') || mime.includes('wordprocessingml')
+      || mime.includes('ms-powerpoint') || mime.includes('presentationml')
+      || mime.includes('ms-excel') || mime.includes('spreadsheetml')
+      || mime.includes('opendocument')) return 'pdf'
+  if (mime === 'text/markdown') return 'markdown'
   if (mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml') return 'text'
   if (mime === 'application/zip') return 'zip'
   return 'unknown'

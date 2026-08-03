@@ -71,11 +71,13 @@
 - `GET /api/public/shares/{token}/download`
 
 ### 文件预览与进度
-- `GET /api/files/{id}/preview` — inline 流式返回文件（支持 Range 请求，用于视频 seek / PDF 部分加载），Content-Type 按扩展名推断
-- `GET /api/files/{id}/progress` — 查询当前用户的播放/阅读进度
+- `GET /api/files/{id}/preview` — inline 流式返回文件（支持 Range 请求），Content-Type 按扩展名推断。前端通过 Axios 获取 blob 后创建 Object URL 加载
+- `GET /api/files/{id}/progress` — 查询当前用户的播放/阅读进度 `{ positionType, positionValue, updatedAt }`
 - `PUT /api/files/{id}/progress` — 保存进度 `{ positionType, positionValue }`
 
-预览 URL 同时支持 `?token=` 查询参数鉴权（用于 `<img>` / `<video>` / `<iframe>` 等浏览器直接请求场景）。
+预览 URL 同时支持 `?token=` 查询参数鉴权。
+
+**Office 文档**（docx/xlsx/pptx）通过后端 LibreOffice 自动转为 PDF 后预览。
 
 ### 审计日志（管理员）
 - `GET /api/admin/audit-logs/login` — 分页查询登录日志，支持用户名模糊搜索、登录结果和日期范围筛选

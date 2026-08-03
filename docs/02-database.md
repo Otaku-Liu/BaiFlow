@@ -24,6 +24,8 @@
 ### file_item — 文件/目录元数据
 `id, storage_root_id, parent_id, owner_user_id, name, relative_path, item_type(FILE/DIRECTORY), size_bytes, mime_type, hash_sha256, privacy_mode(NORMAL/PRIVATE), privacy_password_hash, status(ACTIVE/DELETED), created_at, updated_at, deleted_at`
 
+`mime_type` 字段前端不展示（文件名自带扩展名），后端用于预览 MIME 路由和 Content-Type 返回。
+
 ### private_folder_access — 隐私访问会话
 `id, user_id, file_item_id, access_token_hash, expires_at, created_at`
 

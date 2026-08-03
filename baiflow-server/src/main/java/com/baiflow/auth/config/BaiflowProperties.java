@@ -33,11 +33,9 @@ public class BaiflowProperties {
 
     @Data
     public static class Aria2 {
-        /** aria2 JSON-RPC 接口地址 */
         private String url = "http://127.0.0.1:6800/jsonrpc";
-        /** aria2 RPC 密钥 */
         private String secret = "";
-        /** 下载状态同步间隔（毫秒） */
         private long syncIntervalMs = 5000;
     }
+
 }
