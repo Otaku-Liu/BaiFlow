@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.baiflow.note.mapper.NoteProgressMapper">
+
+    <select id="selectByUserAndNote" resultType="com.baiflow.note.entity.NoteProgress">
+        SELECT id, user_id, note_id, position_type, position_value, created_at, updated_at
+        FROM bf_note_progress
+        WHERE user_id = #{userId} AND note_id = #{noteId}
+        LIMIT 1
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO bf_note_progress
+            (id, user_id, note_id, position_type, position_value, created_at, updated_at)
+        VALUES
+            (#{id}, #{userId}, #{noteId}, #{positionType}, #{positionValue}, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+            position_type = VALUES(position_type),
+            position_value = VALUES(position_value),
+            updated_at    = NOW()
+    </insert>
+
+</mapper>

@@ -79,6 +79,17 @@
 
 **Office 文档**（docx/xlsx/pptx）通过后端 LibreOffice 自动转为 PDF 后预览。
 
+### 随手记（笔记）
+- `GET /api/notes?page=&size=&keyword=&viewUserId=` — 分页列出笔记（不含正文，按更新时间倒序）；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换
+- `POST /api/notes` — 新建 `{ title, content }`（content 为 Markdown）
+- `GET /api/notes/{id}` — 详情（含 Markdown 正文）
+- `PATCH /api/notes/{id}` — 更新 `{ title, content }`，服务端刷新 `updated_at`
+- `DELETE /api/notes/{id}` — 软删除（status=DELETED）
+- `GET /api/notes/{id}/progress` — 查询当前用户对笔记的阅读进度 `{ positionType, positionValue, updatedAt }`
+- `PUT /api/notes/{id}/progress` — 保存阅读进度 `{ positionValue }`（滚动百分比 0~1）
+
+笔记独立于文件系统，不受存储根目录/隐私文件夹约束。Android 离线增量同步（`updatedAfter`）随客户端离线阶段落地。
+
 ### 审计日志（管理员）
 - `GET /api/admin/audit-logs/login` — 分页查询登录日志，支持用户名模糊搜索、登录结果和日期范围筛选
 
@@ -93,7 +104,9 @@
 - `GET /api/transfers` · `GET /api/transfers/{id}`
 - `GET /api/notifications` · `PATCH /api/notifications/{id}/read`
 - `POST /api/devices/register` · `GET /api/devices` · `PATCH /api/devices/{id}`
-- `GET /api/events`（SSE）：TRANSFER_PROGRESS / DOWNLOAD_COMPLETED / DOWNLOAD_FAILED / NOTIFICATION_CREATED
+- `GET /api/events`（SSE，需登录）：事件类型 `NOTE_UPDATED`（已实现）/ `TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED`（后四者待各模块接入）
+
+SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GET /api/events?token=<jwt>` 查询参数（后端 `JwtAuthenticationFilter` 已支持 `?token=` fallback）。`NOTE_UPDATED` 只推送给笔记所有者。
 
 ## 安全要求
 

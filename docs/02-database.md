@@ -57,6 +57,16 @@
 
 每个用户对每个文件只存一条记录。`position_type` 区分视频秒数、PDF 页码、文本滚动百分比，支持跨设备断点续看。
 
+### note — 随手记笔记
+`id, user_id, title, content(LONGTEXT, Markdown), status(ACTIVE/DELETED 软删除), created_at, updated_at, deleted_at`
+
+笔记独立于文件系统，正文直接落库。`updated_at` 由服务端显式刷新，作为跨端同步"后写覆盖"的时间基准。`status` 软删除标记随增量拉取同步。
+
+### note_progress — 笔记阅读进度
+`id, user_id, note_id, position_type(SCROLL_PERCENT), position_value, created_at, updated_at`
+
+每个用户对每篇笔记只存一条记录，`(user_id, note_id)` 唯一。复用 playback 的 SCROLL_PERCENT 思路，支持跨设备续读长笔记。
+
 ## 主要索引
 
 - `user(username)` UNIQUE

@@ -244,7 +244,26 @@ export default {
     loginLogs: '登录日志',
     files: '文件中心',
     downloads: '下载中心',
+    notes: '随手记',
     shares: '分享管理',
     users: '用户管理'
+  },
+  notes: {
+    searchPlaceholder: '搜索笔记',
+    newNote: '新建',
+    titlePlaceholder: '标题',
+    contentPlaceholder: '写下点什么…（支持 Markdown）',
+    preview: '预览',
+    edit: '编辑',
+    delete: '删除',
+    untitled: '无标题',
+    empty: '暂无笔记，点「新建」开始记录',
+    selectHint: '选择左侧笔记，或新建一篇',
+    deleteConfirm: '确定删除这篇笔记吗？',
+    resumeTo: '上次读到 {pct}%，是否继续阅读？',
+    synced: '这篇笔记已在其他设备更新',
+    saveFailed: '保存失败',
+    loadFailed: '加载失败',
+    deleteFailed: '删除失败'
   }
 }

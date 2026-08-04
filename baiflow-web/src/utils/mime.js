@@ -56,11 +56,7 @@ export function mimeCategory(mime) {
   if (mime.startsWith('video/')) return 'video'
   if (mime.startsWith('audio/')) return 'audio'
   if (mime === 'application/pdf') return 'pdf'
-  // Office 文档由后端 LibreOffice 转 PDF 后预览
-  if (mime.includes('msword') || mime.includes('wordprocessingml')
-      || mime.includes('ms-powerpoint') || mime.includes('presentationml')
-      || mime.includes('ms-excel') || mime.includes('spreadsheetml')
-      || mime.includes('opendocument')) return 'pdf'
+  // Office 文档（doc/docx/xls/xlsx/ppt/pptx/odt/ods/odp）暂不支持在线预览，归为 unknown → 降级为下载
   if (mime === 'text/markdown') return 'markdown'
   if (mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml') return 'text'
   if (mime === 'application/zip') return 'zip'

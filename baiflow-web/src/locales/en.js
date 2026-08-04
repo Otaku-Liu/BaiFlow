@@ -244,7 +244,26 @@ export default {
     loginLogs: 'Login Logs',
     files: 'Files',
     downloads: 'Downloads',
+    notes: 'Notes',
     shares: 'Shares',
     users: 'Users'
+  },
+  notes: {
+    searchPlaceholder: 'Search notes',
+    newNote: 'New',
+    titlePlaceholder: 'Title',
+    contentPlaceholder: 'Write something… (Markdown supported)',
+    preview: 'Preview',
+    edit: 'Edit',
+    delete: 'Delete',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Click New to start.',
+    selectHint: 'Select a note on the left, or create one.',
+    deleteConfirm: 'Delete this note?',
+    resumeTo: 'Last read at {pct}%. Continue reading?',
+    synced: 'This note was updated on another device',
+    saveFailed: 'Save failed',
+    loadFailed: 'Load failed',
+    deleteFailed: 'Delete failed'
   }
 }

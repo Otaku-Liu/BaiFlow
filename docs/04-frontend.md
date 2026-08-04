@@ -12,6 +12,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | 主布局 | `/` | 侧边栏 + 顶栏 + 内容区，需登录 |
 | 文件中心 | `/` 内 | 管理员用户切换、面包屑（上传时间）、文件列表（双击/按钮预览，无类型列）、上传/下载/重命名/删除、隐私文件夹 |
 | 下载中心 | `/` 内 | aria2 下载任务管理 |
+| 随手记 | `/` 内 | 笔记列表 + Milkdown 编辑器（WYSIWYG 所见即所得）、搜索、SSE 实时同步、跨设备续读进度 |
 | 分享管理 | `/` 内 | 分享链接创建/查看/撤销、访问日志（管理员） |
 | 用户管理 | `/` 内 | 管理员可见：用户列表、创建/编辑、批量删除、重置密码 |
 | 操作日志 | `/` 内 | 管理员可见：`el-sub-menu` 子菜单入口 |
@@ -40,8 +41,11 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 |---|---|
 | `components/ConfirmDialog.vue` | 基于 `el-dialog` 的通用确认弹窗，替代 `ElMessageBox.confirm`，确保所有弹窗样式统一 |
 | `components/PreviewDrawer.vue` | 文件预览抽屉，按 MIME 类型路由到 5 种渲染器（img/video/audio/iframe/pre） |
+| `views/NotesView.vue` | 随手记页：左侧笔记列表 + 右侧 Milkdown 编辑器（WYSIWYG，ProseMirror 底层，输出 Markdown 源；自建命令工具栏：H/B/I/行内代码/代码块/列表/引用/分割线）、1.5s 防抖自动保存、编辑区滚动保存 SCROLL_PERCENT、SSE 收 NOTE_UPDATED 自动刷新 |
 | `composables/useConfirmDialog.js` | 提供 `confirm()` promise 式 API，搭配 `ConfirmDialog` 使用 |
 | `composables/usePlaybackProgress.js` | 播放/阅读进度管理：查询历史进度、Toast 续看提示、10s 自动保存、关闭时最终保存 |
+| `composables/useSse.js` | SSE 长连接封装：`EventSource` 连 `/api/events?token=<jwt>`，按事件名注册回调，组件卸载关闭 |
+| `api/notes.js` | 笔记 CRUD + 阅读进度 API 封装 |
 | `utils/mime.js` | 扩展名→MIME 映射表、MIME 主类型判定（image/video/audio/pdf/markdown/text/unknown）、预览支持判断、进度类型推断（SECONDS/PAGE/SCROLL_PERCENT） |
 | `utils/format.js` | `formatDateTime`、`formatSize`、`formatSpeed` |
 

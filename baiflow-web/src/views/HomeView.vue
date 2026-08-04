@@ -43,6 +43,10 @@
               <el-icon><FolderOpened /></el-icon>
               <span>{{ t('menu.files') }}</span>
             </el-menu-item>
+            <el-menu-item index="notes">
+              <el-icon><Memo /></el-icon>
+              <span>{{ t('menu.notes') }}</span>
+            </el-menu-item>
             <el-menu-item index="downloads">
               <el-icon><Download /></el-icon>
               <span>{{ t('menu.downloads') }}</span>
@@ -72,6 +76,7 @@
           <transition name="view-fade" mode="out-in">
             <FilesView v-if="activeMenu === 'files'" key="files" />
             <DownloadsView v-else-if="activeMenu === 'downloads'" key="downloads" />
+            <NotesView v-else-if="activeMenu === 'notes'" key="notes" />
             <SharesView v-else-if="activeMenu === 'shares'" key="shares" />
             <UsersView v-else-if="activeMenu === 'users'" key="users" />
             <LoginLogsView v-else-if="activeMenu === 'login-logs'" key="login-logs" />
@@ -126,12 +131,13 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { FolderOpened, Download, Share, User, Fold, Expand, Document, ArrowDown } from '@element-plus/icons-vue'
+import { FolderOpened, Download, Share, User, Fold, Expand, Document, ArrowDown, Memo } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { updateProfile, uploadAvatar, changePassword } from '../api/auth'
 import FilesView from './FilesView.vue'
 import DownloadsView from './DownloadsView.vue'
+import NotesView from './NotesView.vue'
 import SharesView from './SharesView.vue'
 import UsersView from './UsersView.vue'
 import LoginLogsView from './LoginLogsView.vue'

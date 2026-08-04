@@ -31,10 +31,15 @@ Vue 3 Web 管理台          Android Java App
 
 ## 模块边界
 
-- **baiflow-server**：核心业务、权限、数据库、文件操作、下载任务、对外 API。文件路径只在服务端存在。
+- **baiflow-server**：核心业务、权限、数据库、文件操作、下载任务、随手记笔记、SSE 事件、对外 API。文件路径只在服务端存在。
 - **baiflow-web**：Web 管理台，只通过 REST API 通信。
-- **baiflow-android**：移动端文件查看、上传、下载。
+- **baiflow-android**：移动端文件查看、上传、下载（随手记在线/离线阶段规划见 `docs/07-quick-notes.md`）。
 - **deploy**：Docker Compose、Nginx、环境变量。
+
+### SSE 事件（`com.baiflow.event`）
+- `GET /api/events`（text/event-stream）长连接推送，需登录（EventSource 用 `?token=` 查询参数鉴权）
+- `SseService` 维护"用户 → 连接"注册表，定时心跳保活并清理失效连接
+- 已实现事件：`NOTE_UPDATED`；`TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 为已定义待接入
 
 ## MVP 功能
 
