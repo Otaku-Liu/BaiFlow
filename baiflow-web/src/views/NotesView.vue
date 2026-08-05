@@ -25,28 +25,16 @@
       </el-scrollbar>
     </aside>
 
-    <!-- 编辑器（Milkdown 容器始终渲染，保证创建时存在） -->
+    <!-- 编辑器（Vditor 容器始终渲染，保证 onMounted 时能初始化） -->
     <section class="note-editor">
       <div class="editor-header">
         <el-input v-model="title" :placeholder="t('notes.titlePlaceholder')" class="title-input" @input="onTitleInput" :disabled="!currentId && !isCreating" />
         <el-button size="small" type="danger" text :disabled="!currentId" @click="onDelete">{{ t('notes.delete') }}</el-button>
       </div>
-      <!-- 格式工具栏（Milkdown 无内置按钮，自建命令触发） -->
-      <div v-if="currentId || isCreating" class="editor-toolbar">
-        <el-button size="small" text title="标题 H2" @click="runCommand(wrapInHeadingCommand.key, 2)">H</el-button>
-        <el-button size="small" text title="加粗" @click="runCommand(toggleStrongCommand.key)"><b>B</b></el-button>
-        <el-button size="small" text title="斜体" @click="runCommand(toggleEmphasisCommand.key)"><i>I</i></el-button>
-        <el-button size="small" text title="行内代码" @click="runCommand(toggleInlineCodeCommand.key)">`code`</el-button>
-        <el-button size="small" text title="代码块" @click="runCommand(createCodeBlockCommand.key)">```</el-button>
-        <el-button size="small" text title="无序列表" @click="runCommand(wrapInBulletListCommand.key)">• 列表</el-button>
-        <el-button size="small" text title="有序列表" @click="runCommand(wrapInOrderedListCommand.key)">1. 列表</el-button>
-        <el-button size="small" text title="引用" @click="runCommand(wrapInBlockquoteCommand.key)">引用</el-button>
-        <el-button size="small" text title="分割线" @click="runCommand(insertHrCommand.key)">—</el-button>
-      </div>
-      <!-- Milkdown 编辑器：WYSIWYG 所见即所得 -->
+      <!-- Vditor 编辑器：IR 即时渲染，编辑即见渲染效果 -->
       <div class="editor-body">
-        <div ref="mdEl" class="md-wrap" />
-        <!-- 未选中时的空状态覆盖层（不卸载编辑器容器） -->
+        <div ref="vditorEl" class="vditor-wrap" />
+        <!-- 未选中时的空状态覆盖层（不卸载 Vditor 容器） -->
         <div v-if="!currentId && !isCreating" class="editor-empty">
           <el-empty :description="t('notes.selectHint')" :image-size="120" />
         </div>
@@ -62,12 +50,8 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
-import { Editor, rootCtx, defaultValueCtx, config, commandsCtx } from '@milkdown/kit/core'
-import { commonmark, toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand,
-  wrapInHeadingCommand, wrapInBulletListCommand, wrapInOrderedListCommand,
-  wrapInBlockquoteCommand, insertHrCommand, createCodeBlockCommand } from '@milkdown/kit/preset/commonmark'
-import { history } from '@milkdown/kit/plugin/history'
-import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
+import Vditor from 'vditor'
+import 'vditor/dist/index.css'
 import { listNotes, createNote, getNote, updateNote, deleteNote } from '../api/notes'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useSse } from '../composables/useSse'
@@ -87,19 +71,24 @@ const isCreating = ref(false)
 
 // ---- 编辑状态 ----
 const title = ref('')
-const content = ref('')       // 当前 Markdown（由编辑器监听回调更新）
-const mdEl = ref(null)
-let editor = null
-let editorSeq = 0
+const vditorEl = ref(null)
+let vditor = null
+let vditorReady = false
+let pendingContent = null
 let ownSaveAt = 0
 let saveTimer = null
 let searchTimer = null
 
 const { maybeResume, saveFromScroll } = useNoteProgress(currentId, confirm)
 
-/** Milkdown 编辑器滚动容器（阅读进度用） */
+/** Vditor 的滚动容器（阅读进度用，IR 模式在 .vditor-content / .vditor-ir） */
 function getScrollEl() {
-  return mdEl.value?.querySelector('.milkdown') || mdEl.value
+  if (!vditorEl.value) return null
+  const content = vditorEl.value.querySelector('.vditor-content')
+  if (content && content.scrollHeight > content.clientHeight) return content
+  const ir = vditorEl.value.querySelector('.vditor-ir')
+  if (ir && ir.scrollHeight > ir.clientHeight) return ir
+  return content
 }
 
 // ---- 列表 ----
@@ -120,49 +109,52 @@ function onSearch() {
   searchTimer = setTimeout(loadList, 300)
 }
 
-// ---- Milkdown 编辑器 ----
-/** 销毁旧编辑器并用指定内容创建新编辑器（每次切笔记重建，简单可靠） */
-async function createEditor(md) {
-  const seq = ++editorSeq
-  if (editor) { editor.destroy(); editor = null }
-  const created = await Editor.make()
-    .config((ctx) => {
-      ctx.set(rootCtx, mdEl.value)
-      ctx.set(defaultValueCtx, md || '')
-    })
-    .use(commonmark)
-    .use(history)
-    .use(listener)
-    // 监听器注册放在 listener 插件之后，保证 listenerCtx 已注入
-    .use(config((ctx) => {
-      ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
-        content.value = markdown
-        onContentInput()
-      })
-    }))
-    .create()
-  // 若期间又被重建，销毁过期实例
-  if (seq !== editorSeq) { created.destroy(); return }
-  editor = created
-  attachScroll()
-}
-
-function setEditorContent(md) {
-  content.value = md || ''
-  return createEditor(md || '')
-}
-
-function attachScroll() {
-  const el = getScrollEl()
-  if (el) el.addEventListener('scroll', () => saveFromScroll(getScrollEl))
-}
-
-/** 触发 Milkdown 命令（工具栏按钮）：如 wrapInHeadingCommand.key + 级别 */
-function runCommand(cmdKey, payload) {
-  if (!editor) return
-  editor.action((ctx) => {
-    ctx.get(commandsCtx).call(cmdKey, payload)
+// ---- Vditor 编辑器 ----
+function initVditor() {
+  if (!vditorEl.value) return
+  vditor = new Vditor(vditorEl.value, {
+    mode: 'ir',                       // 即时渲染：编辑时直接看到渲染效果，且保留标准工具栏
+    height: '100%',
+    placeholder: t('notes.contentPlaceholder'),
+    cache: { enable: false },         // 内容以服务端为准，不用本地缓存
+    upload: { enable: false },        // 笔记为纯文本，禁图片上传
+    counter: 0,
+    toolbar: [
+      'headings', 'bold', 'italic', 'strike', '|',
+      'list', 'ordered-list', 'quote', '|',
+      {
+        name: 'code-block',
+        tip: '代码块',
+        className: 'right',
+        icon: '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>',
+        click: () => vditor.insertValue('```\n\n```\n', true)
+      },
+      'inline-code', '|',
+      'link', 'table', '|',
+      'undo', 'redo', '|', 'preview', 'fullscreen'
+    ],
+    input: () => onContentInput(),
+    after: () => {
+      vditorReady = true
+      if (pendingContent != null) {
+        vditor.setValue(pendingContent)
+        pendingContent = null
+      }
+      // 绑定滚动进度
+      const content = vditorEl.value?.querySelector('.vditor-content')
+      const ir = vditorEl.value?.querySelector('.vditor-ir')
+      if (content) content.addEventListener('scroll', () => saveFromScroll(getScrollEl))
+      if (ir) ir.addEventListener('scroll', () => saveFromScroll(getScrollEl))
+    }
   })
+}
+
+function setVditorContent(md) {
+  if (vditorReady && vditor) {
+    vditor.setValue(md || '')
+  } else {
+    pendingContent = md || ''
+  }
 }
 
 // ---- 保存 ----
@@ -170,7 +162,7 @@ async function saveNow() {
   if (!currentId.value && !isCreating.value) return
   // 记录本次保存时间：SSE 收到自己写入的回声事件时（短窗口内）不重载
   ownSaveAt = Date.now()
-  const body = { title: title.value, content: content.value }
+  const body = { title: title.value, content: vditor?.getValue() || '' }
   try {
     if (isCreating.value) {
       const { data } = await createNote(body)
@@ -203,7 +195,7 @@ function newNote() {
   currentId.value = null
   isCreating.value = true
   title.value = ''
-  setEditorContent('')
+  setVditorContent('')
 }
 
 async function openNote(note) {
@@ -216,7 +208,7 @@ async function openNote(note) {
     const detail = data?.data
     if (!detail) return
     title.value = detail.title || ''
-    await setEditorContent(detail.content || '')
+    setVditorContent(detail.content || '')
     await maybeResume(getScrollEl)
   } catch (e) {
     ElMessage.error(e.response?.data?.message || t('notes.loadFailed'))
@@ -238,7 +230,7 @@ async function onDelete() {
     await deleteNote(currentId.value)
     currentId.value = null
     title.value = ''
-    setEditorContent('')
+    setVditorContent('')
     loadList()
   } catch (e) {
     ElMessage.error(e.response?.data?.message || t('notes.deleteFailed'))
@@ -258,7 +250,7 @@ useSse({
         const detail = data?.data
         if (detail) {
           title.value = detail.title || ''
-          setEditorContent(detail.content || '')
+          setVditorContent(detail.content || '')
           ElMessage.info(t('notes.synced'))
         }
       })
@@ -277,13 +269,12 @@ function flushSave() {
 
 onMounted(() => {
   loadList()
-  createEditor('')
+  initVditor()
 })
 
 onBeforeUnmount(() => {
   flushSave()
-  editor?.destroy()
-  editor = null
+  vditor?.destroy()
 })
 </script>
 
@@ -370,48 +361,9 @@ onBeforeUnmount(() => {
 .title-input { flex: 1; }
 .title-input :deep(.el-input__inner) { font-size: 16px; font-weight: 600; }
 
-.editor-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--el-border-color-light);
-  flex-wrap: wrap;
-}
-.editor-toolbar .el-button { font-size: 13px; font-weight: 500; }
-
 .editor-body { flex: 1; display: flex; overflow: hidden; }
 
-.md-wrap {
-  flex: 1;
-  overflow: hidden;
-}
-/* Milkdown 编辑器：铺满并内部滚动（阅读进度滚动源）+ 基础排版（自绘，未用主题包） */
-.md-wrap :deep(.milkdown) {
-  height: 100%;
-  overflow-y: auto;
-  padding: 16px 24px;
-  font-size: 15px;
-  line-height: 1.7;
-  color: #1d1d1f;
-  outline: none;
-}
-.md-wrap :deep(.milkdown .ProseMirror) { outline: none; }
-.md-wrap :deep(.milkdown h1) { font-size: 1.6em; border-bottom: 1px solid #e5e5ea; padding-bottom: 8px; margin: 24px 0 16px; }
-.md-wrap :deep(.milkdown h2) { font-size: 1.3em; border-bottom: 1px solid #e5e5ea; padding-bottom: 6px; margin: 20px 0 12px; }
-.md-wrap :deep(.milkdown h3) { font-size: 1.1em; margin: 16px 0 8px; }
-.md-wrap :deep(.milkdown p) { margin: 0 0 12px; }
-.md-wrap :deep(.milkdown code) { background: #f5f5f7; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-family: "SF Mono", "JetBrains Mono", monospace; }
-.md-wrap :deep(.milkdown pre) { background: #f5f5f7; padding: 16px; border-radius: 8px; overflow: auto; }
-.md-wrap :deep(.milkdown pre code) { background: none; padding: 0; }
-.md-wrap :deep(.milkdown blockquote) { border-left: 3px solid #007AFF; padding-left: 14px; color: #86868b; margin: 12px 0; }
-.md-wrap :deep(.milkdown ul), .md-wrap :deep(.milkdown ol) { padding-left: 24px; margin: 8px 0; }
-.md-wrap :deep(.milkdown li) { margin: 4px 0; }
-.md-wrap :deep(.milkdown table) { border-collapse: collapse; width: 100%; margin: 12px 0; }
-.md-wrap :deep(.milkdown th), .md-wrap :deep(.milkdown td) { border: 1px solid #e5e5ea; padding: 8px 12px; text-align: left; }
-.md-wrap :deep(.milkdown th) { background: #fafafa; font-weight: 600; }
-.md-wrap :deep(.milkdown img) { max-width: 100%; }
-.md-wrap :deep(.milkdown a) { color: #007AFF; }
+.vditor-wrap { flex: 1; }
 
 .editor-empty {
   position: absolute;

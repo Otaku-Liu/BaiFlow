@@ -12,6 +12,7 @@ public class SessionManager {
     private static final String PREF_NAME = "baiflow_session";
     private static final String KEY_TOKEN = "token";
     private static final String KEY_SERVER_URL = "server_url";
+    private static final String KEY_USER_ID = "user_id";
     private static final String KEY_USERNAME = "username";
     private static final String KEY_DISPLAY_NAME = "display_name";
     private static final String KEY_ROLE = "role";
@@ -46,13 +47,15 @@ public class SessionManager {
     }
 
     // ---- User ----
-    public void saveUser(String username, String displayName, String role) {
+    public void saveUser(String id, String username, String displayName, String role) {
         prefs.edit()
+                .putString(KEY_USER_ID, id)
                 .putString(KEY_USERNAME, username)
                 .putString(KEY_DISPLAY_NAME, displayName)
                 .putString(KEY_ROLE, role)
                 .apply();
     }
+    public String getUserId() { return prefs.getString(KEY_USER_ID, null); }
     public String getUsername() { return prefs.getString(KEY_USERNAME, null); }
     public String getDisplayName() { return prefs.getString(KEY_DISPLAY_NAME, null); }
     public String getRole() { return prefs.getString(KEY_ROLE, null); }

@@ -15,7 +15,8 @@ import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.FileItem;
-import com.baiflow.android.ui.FileListActivity;
+import com.baiflow.android.ui.MainActivity;
+import com.baiflow.android.util.FormatUtil;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -99,7 +100,7 @@ public class DownloadService extends Service {
                 if (now - lastUpdate >= 500) {
                     int progress = totalBytes > 0 ? (int) (downloaded * 100 / totalBytes) : 0;
                     updateNotification(fileName,
-                            formatSize(downloaded) + " / " + (totalBytes > 0 ? formatSize(totalBytes) : "未知"),
+                            FormatUtil.formatSize(downloaded) + " / " + (totalBytes > 0 ? FormatUtil.formatSize(totalBytes) : "未知"),
                             Math.min(progress, 100));
                     lastUpdate = now;
                 }
@@ -119,7 +120,7 @@ public class DownloadService extends Service {
     }
 
     private Notification buildNotification(String fileName, String status, int progress) {
-        Intent intent = new Intent(this, FileListActivity.class);
+        Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pending = PendingIntent.getActivity(this, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
@@ -149,10 +150,4 @@ public class DownloadService extends Service {
     @Override
     public IBinder onBind(Intent intent) { return null; }
 
-    private String formatSize(long bytes) {
-        if (bytes < 1024) { return bytes + " B"; }
-        if (bytes < 1024 * 1024) { return String.format("%.1f KB", bytes / 1024.0); }
-        if (bytes < 1024 * 1024 * 1024) { return String.format("%.1f MB", bytes / (1024.0 * 1024)); }
-        return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
-    }
 }

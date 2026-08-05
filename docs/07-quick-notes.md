@@ -15,7 +15,7 @@
 | 功能定位 | 便签/笔记（标题 + Markdown 正文） |
 | 手机端 | Android App |
 | 数据存储 | 独立笔记表 `bf_note`，正文存 DB（不进文件中心） |
-| 内容格式 | Markdown（Web 用 showdown 渲染；Android 纯文本编辑存 md 源） |
+| 内容格式 | Markdown（Web 用 Vditor 编辑器渲染；Android 纯文本编辑存 md 源） |
 | 内容同步 | SSE 推送 `NOTE_UPDATED` + 打开时拉取 |
 | 阅读进度 | 新表 `bf_note_progress`（复用 SCROLL_PERCENT 思路） |
 | Android 离线 | Room 本地缓存 + WorkManager 后台同步 |
@@ -25,9 +25,8 @@
 
 ## 3. 关键事实与前置缺口
 
-- **SSE `/api/events` 尚未实现**：`docs/03-api.md` 规划了 `GET /api/events`（TRANSFER_PROGRESS / DOWNLOAD_COMPLETED 等），但服务端代码中不存在 SseEmitter / 事件通道。本功能若走 SSE 推送，**需先在 Phase 1 补齐 SSE 基础设施**（SseEmitter + 事件发布/订阅 + `/api/events` 端点）——这也服务于传输进度、通知等已有规划。
-  - **备选**：若暂不建 SSE，可退化为 Web 端定时轮询拉取（改动更小，实时性差些）。已选 SSE，轮询仅作兜底。
-- 数据库迁移当前到 `V2__playback_progress.sql`，笔记建表用 `V3__quick_notes.sql`。
+- **SSE `/api/events`**：原为缺口（`docs/03-api.md` 规划了 `GET /api/events`，但服务端无 SseEmitter / 事件通道），**Phase 1 已补齐**（`com.baiflow.event`：`SseService` 用户连接注册表 + `EventController` + 30s 心跳清理）。`NOTE_UPDATED` 已接入；`TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 为已定义、待各模块接入。
+- 数据库迁移：`V2__progress_and_quick_notes.sql`（含 `bf_playback_progress` / `bf_note` / `bf_note_progress` 三张表，全部表与字段均带注释）。
 
 ## 4. 数据库
 
@@ -92,7 +91,7 @@ CREATE TABLE IF NOT EXISTS bf_note_progress (
 
 | # | 文件 | 操作 | 说明 |
 |---|---|---|---|
-| 1 | `db/migration/V3__quick_notes.sql` | **新建** | 建 `bf_note` + `bf_note_progress` |
+| 1 | `db/migration/V2__progress_and_quick_notes.sql` | **修改** | 建 `bf_note` + `bf_note_progress`，与 `bf_playback_progress` 同文件管理，全部表/字段带注释 |
 | 2 | `Note.java` + `NoteMapper` | **新建** | 笔记实体与 Mapper |
 | 3 | `NoteService` / `NoteServiceImpl` | **新建** | CRUD、搜索、进度读写、`updatedAfter` 增量 |
 | 4 | `NoteController` | **新建** | `/api/notes` REST + 进度端点 |
@@ -103,7 +102,7 @@ CREATE TABLE IF NOT EXISTS bf_note_progress (
 
 | # | 文件 | 操作 | 说明 |
 |---|---|---|---|
-| 7 | `views/NotesView.vue` | **新建** | 左侧列表 + 右侧 Milkdown 编辑器（WYSIWYG，ProseMirror 底层，输出 Markdown 源；编辑器经 listener 插件监听变更自动保存；原 showdown 预览切换已由 Milkdown 取代） |
+| 7 | `views/NotesView.vue` | **新建** | 左侧列表 + 右侧 Vditor 编辑器（IR 即时渲染，输出 Markdown 源，工具栏含自定义代码块按钮；原 showdown 预览切换已由 Vditor 取代） |
 | 8 | `api/notes.js` | **新建** | CRUD + 进度 API 封装 |
 | 9 | 路由 + 侧边栏 | 修改 | 加「随手记」入口 |
 | 10 | SSE 监听 + 进度 | 修改 | 收 `NOTE_UPDATED` 刷新当前笔记；滚动防抖保存 SCROLL_PERCENT |

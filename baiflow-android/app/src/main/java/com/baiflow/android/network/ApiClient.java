@@ -28,6 +28,12 @@ public class ApiClient {
     private ApiService apiService;
     private String currentBaseUrl;
 
+    /** 连通性探测专用客户端（短超时），供服务器配置页检测 /api/health */
+    private final OkHttpClient healthClient = new OkHttpClient.Builder()
+            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .build();
+
     private ApiClient(SessionManager session) {
         this.session = session;
     }
@@ -149,7 +155,15 @@ public class ApiClient {
                 @Query("parentId") String parentId,
                 @Query("page") int page,
                 @Query("size") int size,
+                @Query("viewUserId") String viewUserId,
                 @Header("X-Privacy-Access-Token") String privacyToken
+        );
+
+        // --- 用户（管理员） ---
+        @GET("users")
+        Call<ApiResponse<PagedResult<UserInfo>>> listUsers(
+                @Query("page") int page,
+                @Query("size") int size
         );
 
         @POST("files/folders")
@@ -164,6 +178,7 @@ public class ApiClient {
                 @Part("storageRootId") RequestBody storageRootId,
                 @Part("parentId") RequestBody parentId,
                 @Part MultipartBody.Part file,
+                @Query("viewUserId") String viewUserId,
                 @Header("X-Privacy-Access-Token") String privacyToken
         );
 
@@ -212,8 +227,36 @@ public class ApiClient {
     }
 
     public Call<ApiResponse<PagedResult<FileItem>>> listFiles(String storageRootId, String parentId,
-                                                                int page, int size, String privacyToken) {
-        return getService().listFiles(storageRootId, parentId, page, size, privacyToken);
+                                                                int page, int size, String viewUserId,
+                                                                String privacyToken) {
+        return getService().listFiles(storageRootId, parentId, page, size, viewUserId, privacyToken);
+    }
+
+    /** 管理员：分页列出用户（用于切换 viewUserId 查看用户文件） */
+    public Call<ApiResponse<PagedResult<UserInfo>>> listUsers(int page, int size) {
+        return getService().listUsers(page, size);
+    }
+
+    /**
+     * 探测服务器连通性（同步阻塞）：请求 GET /api/health，返回是否可用。
+     * 供服务器配置页在后台线程调用；短超时快速反馈。
+     */
+    public boolean checkHealth(String baseUrl) {
+        Request request = new Request.Builder()
+                .url(baseUrl + "/api/health")
+                .get()
+                .build();
+        try (Response response = healthClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) return false;
+            String body = response.body() != null ? response.body().string() : "";
+            try {
+                return "OK".equals(new JSONObject(body).optString("code"));
+            } catch (org.json.JSONException e) {
+                return false;
+            }
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     public Call<ApiResponse<FileItem>> createFolder(String storageRootId, String parentId,
@@ -226,12 +269,13 @@ public class ApiClient {
     }
 
     public Call<ApiResponse<FileItem>> uploadFile(String storageRootId, String parentId,
-                                                    byte[] fileBytes, String fileName, String privacyToken) {
+                                                    byte[] fileBytes, String fileName, String viewUserId,
+                                                    String privacyToken) {
         RequestBody rootPart = RequestBody.create(storageRootId, MediaType.parse("text/plain"));
         RequestBody parentPart = RequestBody.create(parentId != null ? parentId : "", MediaType.parse("text/plain"));
         RequestBody fileBody = RequestBody.create(fileBytes, MediaType.parse("application/octet-stream"));
         MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", fileName, fileBody);
-        return getService().uploadFile(rootPart, parentPart, filePart, privacyToken);
+        return getService().uploadFile(rootPart, parentPart, filePart, viewUserId, privacyToken);
     }
 
     public Call<ResponseBody> downloadFile(String fileId, String privacyToken) {

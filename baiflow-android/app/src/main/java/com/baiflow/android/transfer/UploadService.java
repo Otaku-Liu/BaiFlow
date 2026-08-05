@@ -15,7 +15,7 @@ import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.FileItem;
-import com.baiflow.android.ui.FileListActivity;
+import com.baiflow.android.ui.MainActivity;
 import java.io.File;
 import java.io.FileInputStream;
 import okhttp3.MediaType;
@@ -35,6 +35,7 @@ public class UploadService extends Service {
     public static final String EXTRA_STORAGE_ROOT_ID = "storage_root_id";
     public static final String EXTRA_PARENT_ID = "parent_id";
     public static final String EXTRA_FILE_PATH = "file_path";
+    public static final String EXTRA_VIEW_USER_ID = "view_user_id";
 
     private NotificationManager notificationManager;
     private SessionManager session;
@@ -57,25 +58,26 @@ public class UploadService extends Service {
         String storageRootId = intent.getStringExtra(EXTRA_STORAGE_ROOT_ID);
         String parentId = intent.getStringExtra(EXTRA_PARENT_ID);
         String filePath = intent.getStringExtra(EXTRA_FILE_PATH);
+        String viewUserId = intent.getStringExtra(EXTRA_VIEW_USER_ID);
 
         File file = new File(filePath);
         String fileName = file.getName();
 
         startForeground(NOTIFICATION_ID, buildNotification(fileName, "准备上传...", false));
 
-        new Thread(() -> performUpload(storageRootId, parentId, file)).start();
+        new Thread(() -> performUpload(storageRootId, parentId, viewUserId, file)).start();
 
         return START_NOT_STICKY;
     }
 
-    private void performUpload(String storageRootId, String parentId, File file) {
+    private void performUpload(String storageRootId, String parentId, String viewUserId, File file) {
         try {
             String fileName = file.getName();
             byte[] fileBytes = readFileBytes(file);
 
             ApiClient client = ApiClient.getInstance(session);
             Call<ApiResponse<FileItem>> call = client.uploadFile(storageRootId, parentId,
-                    fileBytes, fileName, null);
+                    fileBytes, fileName, viewUserId, null);
             updateNotification(fileName, "上传中...", true);
             Response<ApiResponse<FileItem>> response = call.execute();
 
@@ -103,7 +105,7 @@ public class UploadService extends Service {
     }
 
     private Notification buildNotification(String fileName, String status, boolean ongoing) {
-        Intent intent = new Intent(this, FileListActivity.class);
+        Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pending = PendingIntent.getActivity(this, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 

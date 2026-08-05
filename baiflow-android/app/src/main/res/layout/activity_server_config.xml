@@ -31,7 +31,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="请输入 BaiFlow 服务器的完整地址，如 http://192.168.1.100:8080"
+        android:text="请输入 BaiFlow 服务器的完整地址，如 http://192.168.1.100:8080\n模拟器中连接本机后端请用 http://10.0.2.2:8080（不要用 127.0.0.1）"
         android:textSize="13sp"
         android:textColor="@color/text_secondary"
         android:layout_marginTop="8dp"

@@ -93,9 +93,9 @@ public class LoginActivity extends AppCompatActivity {
             public void onResponse(Call<ApiResponse<UserInfo>> call, Response<ApiResponse<UserInfo>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     UserInfo user = response.body().getData();
-                    session.saveUser(user.getUsername(), user.getDisplayName(), user.getRole());
+                    session.saveUser(user.getId(), user.getUsername(), user.getDisplayName(), user.getRole());
                     Toast.makeText(LoginActivity.this, "登录成功", Toast.LENGTH_SHORT).show();
-                    Intent intent = new Intent(LoginActivity.this, FileListActivity.class);
+                    Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                     startActivity(intent);
                     finish();
                 } else {

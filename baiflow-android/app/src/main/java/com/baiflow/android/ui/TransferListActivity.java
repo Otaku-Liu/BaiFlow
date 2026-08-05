@@ -15,6 +15,7 @@ import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.model.*;
 import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.util.FormatUtil;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -96,7 +97,7 @@ public class TransferListActivity extends AppCompatActivity {
             if (task.getSpeedBytesPerSecond() > 0) {
                 holder.tvSpeed.setVisibility(View.VISIBLE);
                 holder.tvSpeed.setText(formatSpeed(task.getSpeedBytesPerSecond()) + " | " +
-                        formatSize(task.getCompletedBytes()) + " / " + formatSize(task.getTotalBytes()));
+                        FormatUtil.formatSize(task.getCompletedBytes()) + " / " + FormatUtil.formatSize(task.getTotalBytes()));
             } else if (task.getErrorMessage() != null && !task.getErrorMessage().isEmpty()) {
                 holder.tvSpeed.setVisibility(View.VISIBLE);
                 holder.tvSpeed.setText("错误：" + task.getErrorMessage());
@@ -132,15 +133,7 @@ public class TransferListActivity extends AppCompatActivity {
         }
     }
 
-    private String formatSize(long bytes) {
-        if (bytes <= 0) { return "0 B"; }
-        if (bytes < 1024) { return bytes + " B"; }
-        if (bytes < 1024 * 1024) { return String.format("%.1f KB", bytes / 1024.0); }
-        if (bytes < 1024 * 1024 * 1024) { return String.format("%.1f MB", bytes / (1024.0 * 1024)); }
-        return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
-    }
-
     private String formatSpeed(long bytesPerSec) {
-        return formatSize(bytesPerSec) + "/s";
+        return FormatUtil.formatSize(bytesPerSec) + "/s";
     }
 }

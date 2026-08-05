@@ -9,12 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@milkdown/core": "^7.22.0",
-    "@milkdown/kit": "^7.22.0",
-    "@milkdown/plugin-history": "^7.22.0",
-    "@milkdown/plugin-listener": "^7.22.0",
-    "@milkdown/preset-commonmark": "^7.22.0",
-    "@milkdown/vue": "^7.22.0",
     "axios": "^1.7.9",
     "element-plus": "^2.9.10",
     "pinia": "^2.3.1",

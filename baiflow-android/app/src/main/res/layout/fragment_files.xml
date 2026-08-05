@@ -26,44 +26,39 @@
             android:textStyle="bold" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnTransfers"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="传输"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnLogout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="退出"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:textColor="#EF4444" />
-    </LinearLayout>
-
-    <!-- Storage Root 选择器 + 导航 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:background="@color/white">
-
-        <Spinner
-            android:id="@+id/spinnerRoot"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
-
-        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnUpload"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="上传"
             style="@style/Widget.MaterialComponents.Button.TextButton"
             android:textColor="@color/accent" />
+    </LinearLayout>
+
+    <!-- 管理员用户切换（仅管理员可见） -->
+    <LinearLayout
+        android:id="@+id/adminRow"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="@color/white"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="查看用户"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary" />
+
+        <Spinner
+            android:id="@+id/spinnerUser"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp" />
     </LinearLayout>
 
     <!-- 面包屑 / 当前路径 -->

@@ -9,6 +9,7 @@
 - 时间：`created_at`、`updated_at`、`deleted_at`
 - 逻辑删除：`deleted`（0/1）
 - 密码/提取码/token 只存 hash
+- 注释：**所有表与字段必须带 `COMMENT` 注释**，说明其含义，便于管理与理解
 
 ## 核心表
 
@@ -66,6 +67,8 @@
 `id, user_id, note_id, position_type(SCROLL_PERCENT), position_value, created_at, updated_at`
 
 每个用户对每篇笔记只存一条记录，`(user_id, note_id)` 唯一。复用 playback 的 SCROLL_PERCENT 思路，支持跨设备续读长笔记。
+
+> 以上三张表（`bf_playback_progress` / `bf_note` / `bf_note_progress`）由 `db/V2__progress_and_quick_notes.sql` 创建，**所有表与字段均带 COMMENT 注释**，便于管理与理解。
 
 ## 主要索引
 

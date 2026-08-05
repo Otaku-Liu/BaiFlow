@@ -77,7 +77,7 @@
 
 预览 URL 同时支持 `?token=` 查询参数鉴权。
 
-**Office 文档**（docx/xlsx/pptx）通过后端 LibreOffice 自动转为 PDF 后预览。
+**Office 文档**（doc/docx/xls/xlsx/ppt/pptx/odt/ods/odp）**暂不支持在线预览**：前端将其归为不支持类型，预览抽屉降级为「下载查看」。后端 `FileConvertService`（LibreOffice 转 PDF）为遗留代码，依赖未安装且前端不再触发。
 
 ### 随手记（笔记）
 - `GET /api/notes?page=&size=&keyword=&viewUserId=` — 分页列出笔记（不含正文，按更新时间倒序）；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换

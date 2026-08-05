@@ -8,14 +8,15 @@
         <item name="android:statusBarColor">@color/primary</item>
     </style>
 
-    <color name="primary">#0F766E</color>
-    <color name="primary_dark">#0B5E58</color>
-    <color name="accent">#2A9D8F</color>
+    <!-- Apple 风格 Design Token，与 Web 端统一 -->
+    <color name="primary">#007AFF</color>
+    <color name="primary_dark">#0066D6</color>
+    <color name="accent">#007AFF</color>
     <color name="white">#FFFFFF</color>
-    <color name="text_primary">#1F2937</color>
-    <color name="text_secondary">#6B7280</color>
-    <color name="background">#F8FAFC</color>
-    <color name="divider">#E5E7EB</color>
+    <color name="text_primary">#1D1D1F</color>
+    <color name="text_secondary">#86868B</color>
+    <color name="background">#F5F5F7</color>
+    <color name="divider">#E5E5EA</color>
 
     <string name="app_name">BaiFlow</string>
 </resources>
