@@ -7,31 +7,27 @@
 
     <!-- 顶部工具栏 -->
     <LinearLayout
+        style="@style/Ios.Header"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:background="@color/white"
-        android:elevation="2dp">
+        android:paddingEnd="16dp">
 
         <TextView
+            style="@style/Ios.Header.Title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="文件中心"
-            android:textSize="18sp"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
+            android:text="文件中心" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnUpload"
+            style="@style/Ios.Button.Text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="上传"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:textColor="@color/accent" />
+            android:text="上传" />
     </LinearLayout>
 
     <!-- 管理员用户切换（仅管理员可见） -->

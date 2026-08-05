@@ -39,4 +39,5 @@ cd deploy && docker compose up -d
 | [05-android.md](05-android.md) | Android 客户端设计 |
 | [06-coding-standards.md](06-coding-standards.md) | 编码规范（后端/前端/Android） |
 | [07-quick-notes.md](07-quick-notes.md) | ADR：随手记（便签/笔记）方案与三阶段实施计划 |
+| [08-ios-design-system.md](08-ios-design-system.md) | ADR：Android iOS 风格设计系统（集中式 styles） |
 | [glossary.md](glossary.md) | 术语表 |

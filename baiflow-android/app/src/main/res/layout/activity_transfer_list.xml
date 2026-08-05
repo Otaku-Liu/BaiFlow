@@ -5,36 +5,43 @@
     android:layout_height="match_parent"
     android:background="@color/background">
 
-    <LinearLayout
+    <FrameLayout
+        style="@style/Ios.Header"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="@color/white"
-        android:elevation="2dp">
+        android:layout_height="56dp">
 
+        <!-- 居中标题 -->
         <TextView
+            style="@style/Ios.Header.Title"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="下载任务" />
+
+        <!-- 左侧返回：chevron + 上一级名称 -->
+        <LinearLayout
             android:id="@+id/btnBack"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:gravity="center"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
             android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:text="‹"
-            android:textSize="28sp"
-            android:textColor="@color/accent"
-            android:background="?android:attr/selectableItemBackground" />
+            android:paddingEnd="12dp">
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:paddingEnd="16dp"
-            android:text="下载任务"
-            android:textSize="18sp"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
-    </LinearLayout>
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_back_chevron"
+                android:contentDescription="返回" />
+
+            <TextView
+                style="@style/Ios.Header.BackLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="我的"
+                android:layout_marginStart="2dp" />
+        </LinearLayout>
+    </FrameLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"

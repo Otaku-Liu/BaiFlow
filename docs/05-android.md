@@ -57,6 +57,10 @@ SharedPreferences 保存 token 和服务器地址，后续复杂缓存引入 Roo
 
 网络不可用提示、token 失效跳登录、失败保留任务和错误原因
 
+## 设计系统（iOS 风格）
+
+Android UI 采用集中式 iOS 风格设计系统：组件样式定义在 `res/values/styles_ios.xml`（`@style/Ios.*`），所有布局引用继承，改一处全局生效。已覆盖按钮（Primary/Text/Danger）、输入框、标题栏（居中标题 + chevron 返回 + 上一级名，无阴影）、卡片/列表项。**新增组件样式一律加进 `styles_ios.xml`，不写硬编码色值/圆角**，规范详见 `docs/08-ios-design-system.md`。
+
 ## 规划：随手记（分阶段）
 
 随手记笔记的 Android 端（Phase 2 在线列表/查看/编辑 → Phase 3 Room 离线缓存 + `updatedAfter` 增量同步 + outbox 后写覆盖）尚未实施，详见 `docs/07-quick-notes.md`。当前客户端仍为文件传输 MVP。

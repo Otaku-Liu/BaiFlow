@@ -68,6 +68,7 @@ docs/               项目文档（需求、架构、API、数据库等）
 - `docs/05-android.md` — Android 客户端设计
 - `docs/06-coding-standards.md` — 编码规范（后端/前端/Android）
 - `docs/07-quick-notes.md` — ADR：随手记（便签/笔记）方案与三阶段实施计划
+- `docs/08-ios-design-system.md` — ADR：Android iOS 风格设计系统（集中式 styles）
 - `docs/glossary.md` — 术语表
 
 ## 测试与验收

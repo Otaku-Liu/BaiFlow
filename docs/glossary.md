@@ -9,6 +9,16 @@ BaiFlow 涉及的关键术语速查。按字母序。
 - **bf_note_progress**
   笔记阅读进度表：`(user_id, note_id)` 唯一，`position_type` + `position_value`，本期只有 `SCROLL_PERCENT`。
 
+## C
+
+- **Compose Cupertino（`io.github.alexzhirkevich:cupertino`）**
+  Kotlin/Compose 生态的 iOS 风格组件库（CupertinoButton / SegmentedControl / Switch 等，含 `cupertino-adaptive` 自动按平台切换）。可为 Android 提供真 iOS 外观，但**需把 app 迁到 Jetpack Compose（重写）**——BaiFlow 当前不采用，远期可选。
+
+## D
+
+- **设计系统（Design System）**
+  一套集中的样式/组件规范，一处定义、全局复用。BaiFlow Android 用 `styles_ios.xml` + 主题 + drawable 集中定义 iOS 风组件样式，布局通过 `@style/Ios.*` 引用继承，避免逐控件手改。见 `docs/08-ios-design-system.md`。
+
 ## I
 
 - **增量同步（incremental sync）**
@@ -47,6 +57,12 @@ BaiFlow 涉及的关键术语速查。按字母序。
   Android 官方 SQLite ORM。随手记离线功能用它缓存笔记列表与正文，支持离线查看/编辑。
 
 ## S
+
+- **SegmentedControl（分段控件）**
+  iOS 风格的分段选择控件（类似 iOS 的分段控制器）。BaiFlow Android 设计系统中作为自定义组件（`ui/widget/SegmentedControl`）提供。
+
+- **styles_ios.xml**
+  BaiFlow Android 设计系统的组件样式定义文件，集中定义按钮 / 输入框 / 卡片 / 开关 / 分段控件 / 标题栏等 `@style/Ios.*`，所有布局引用继承。
 
 - **SCROLL_PERCENT**
   进度类型：滚动百分比（0.0~1.0）。用于文本、Markdown、笔记等长内容，跨设备续读。

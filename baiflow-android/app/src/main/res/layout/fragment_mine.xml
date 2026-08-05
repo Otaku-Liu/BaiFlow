@@ -82,7 +82,7 @@
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
-                android:background="?android:attr/selectableItemBackground">
+                android:foreground="@drawable/bg_ripple_top">
 
                 <TextView
                     android:layout_width="0dp"
@@ -113,7 +113,7 @@
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
-                android:background="?android:attr/selectableItemBackground">
+                android:foreground="@drawable/bg_ripple_bottom">
 
                 <TextView
                     android:layout_width="0dp"
@@ -135,12 +135,11 @@
         <!-- 退出 -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnLogout"
+            style="@style/Ios.Button.Danger"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="24dp"
-            android:text="退出登录"
-            android:textColor="@color/white"
-            app:backgroundTint="#EF4444" />
+            android:text="退出登录" />
 
     </LinearLayout>
 </ScrollView>
