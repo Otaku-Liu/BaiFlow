@@ -188,6 +188,12 @@ public class ApiClient {
                 @Header("X-Privacy-Access-Token") String privacyToken
         );
 
+        @GET("files/{id}/preview")
+        Call<ResponseBody> previewFile(
+                @Path("id") String fileId,
+                @Header("X-Privacy-Access-Token") String privacyToken
+        );
+
         @DELETE("files/{id}")
         Call<ApiResponse<Map<String, Object>>> deleteFile(
                 @Path("id") String id,
@@ -280,6 +286,11 @@ public class ApiClient {
 
     public Call<ResponseBody> downloadFile(String fileId, String privacyToken) {
         return getService().downloadFile(fileId, privacyToken);
+    }
+
+    /** 获取文件预览字节流（inline 模式，带鉴权） */
+    public Call<ResponseBody> previewFile(String fileId, String privacyToken) {
+        return getService().previewFile(fileId, privacyToken);
     }
 
     public Call<ApiResponse<Map<String, Object>>> deleteFile(String id, String privacyToken) {

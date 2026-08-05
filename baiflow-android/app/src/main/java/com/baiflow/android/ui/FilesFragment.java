@@ -411,15 +411,19 @@ public class FilesFragment extends Fragment {
             if (item.getCreatedAt() != null) { meta += " · " + item.getCreatedAt().substring(0, 10); }
             holder.tvMeta.setText(meta);
 
-            int icon = item.isDirectory() ? android.R.drawable.ic_menu_sort_by_size
-                    : android.R.drawable.ic_menu_gallery;
-            holder.ivIcon.setImageResource(icon);
+            holder.ivIcon.setImageResource(iconFor(item));
+            holder.ivIcon.setColorFilter(colorFor(item), android.graphics.PorterDuff.Mode.SRC_IN);
 
             holder.tvPrivacyTag.setVisibility(item.isPrivate() ? View.VISIBLE : View.GONE);
 
             holder.itemView.setOnClickListener(v -> {
                 if (item.isDirectory()) {
                     navigateTo(item);
+                } else if (PreviewActivity.canPreview(item.getMimeType())) {
+                    // 可预览类型：打开预览页
+                    startActivity(PreviewActivity.newIntent(requireContext(), item.getId(), item.getName(),
+                            item.getMimeType(), privacyTokens.get(currentParentId),
+                            item.getSizeBytes() != null ? item.getSizeBytes() : 0L));
                 } else {
                     downloadFile(item);
                 }
@@ -433,6 +437,42 @@ public class FilesFragment extends Fragment {
 
         @Override
         public int getItemCount() { return items.size(); }
+
+        /** 按文件类型返回图标 */
+        private int iconFor(FileItem item) {
+            if (item.isDirectory()) return R.drawable.ic_folder;
+            String mime = item.getMimeType();
+            if (mime == null) return R.drawable.ic_type_file;
+            if (mime.startsWith("image/")) return R.drawable.ic_type_image;
+            if (mime.startsWith("video/")) return R.drawable.ic_type_video;
+            if (mime.startsWith("audio/")) return R.drawable.ic_type_audio;
+            if ("application/pdf".equals(mime)) return R.drawable.ic_type_pdf;
+            if (mime.startsWith("text/") || "application/json".equals(mime)
+                    || "application/xml".equals(mime)) return R.drawable.ic_type_text;
+            if (mime.contains("msword") || mime.contains("wordprocessingml")
+                    || mime.contains("ms-excel") || mime.contains("spreadsheetml")
+                    || mime.contains("ms-powerpoint") || mime.contains("presentationml")) return R.drawable.ic_type_office;
+            if (mime.contains("zip") || mime.contains("compressed") || mime.contains("x-tar")
+                    || mime.contains("gzip")) return R.drawable.ic_type_archive;
+            return R.drawable.ic_type_file;
+        }
+
+        /** 文件类型图标颜色（iOS 语义色） */
+        private int colorFor(FileItem item) {
+            if (item.isDirectory()) return 0xFF007AFF;
+            String mime = item.getMimeType();
+            if (mime == null) return 0xFF8E8E93;
+            if (mime.startsWith("image/")) return 0xFF34C759;
+            if (mime.startsWith("video/")) return 0xFFFF9500;
+            if (mime.startsWith("audio/")) return 0xFFFF3B30;
+            if ("application/pdf".equals(mime)) return 0xFFFF3B30;
+            if (mime.startsWith("text/") || "application/json".equals(mime)
+                    || "application/xml".equals(mime)) return 0xFFAF52DE;
+            if (mime.contains("msword") || mime.contains("wordprocessingml")
+                    || mime.contains("ms-excel") || mime.contains("spreadsheetml")
+                    || mime.contains("ms-powerpoint") || mime.contains("presentationml")) return 0xFF5856D6;
+            return 0xFF8E8E93;
+        }
 
         class ViewHolder extends RecyclerView.ViewHolder {
             ImageView ivIcon;

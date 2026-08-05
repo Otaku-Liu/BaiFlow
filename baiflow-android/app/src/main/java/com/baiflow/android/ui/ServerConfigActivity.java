@@ -42,6 +42,9 @@ public class ServerConfigActivity extends AppCompatActivity {
         btnConnect = findViewById(R.id.btnConnect);
         tvError = findViewById(R.id.tvError);
 
+        // 顶部返回按钮
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
         // 自动填充上次保存的服务器地址
         if (session.getServerUrl() != null) {
             etServerUrl.setText(session.getServerUrl());

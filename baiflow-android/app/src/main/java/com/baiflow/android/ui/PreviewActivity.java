@@ -1,0 +1,303 @@
+package com.baiflow.android.ui;
+
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.pdf.PdfRenderer;
+import android.media.MediaPlayer;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.ParcelFileDescriptor;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.MediaController;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.VideoView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.baiflow.android.R;
+import com.baiflow.android.auth.SessionManager;
+import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.transfer.DownloadService;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+
+import okhttp3.ResponseBody;
+import retrofit2.Response;
+
+/**
+ * 文件预览页 — 按 MIME 类型预览图片 / 文本 / Markdown / 音频 / 视频 / PDF。
+ * <p>
+ * 其余类型显示「暂不支持在线预览」并提供下载。与 Web 端预览能力对齐。
+ */
+public class PreviewActivity extends AppCompatActivity {
+
+    private static final String EXTRA_FILE_ID = "file_id";
+    private static final String EXTRA_FILE_NAME = "file_name";
+    private static final String EXTRA_MIME = "mime_type";
+    private static final String EXTRA_PRIVACY_TOKEN = "privacy_token";
+    private static final String EXTRA_SIZE_BYTES = "size_bytes";
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private ApiClient client;
+    private SessionManager session;
+
+    private String fileId, fileName, mime, privacyToken;
+    private long sizeBytes;
+
+    private FrameLayout previewContainer;
+    private LinearLayout loadingContainer, errorContainer, unsupportedContainer;
+    private MediaPlayer audioPlayer;
+
+    public static Intent newIntent(android.content.Context ctx, String fileId, String fileName,
+                                   String mime, String privacyToken, long sizeBytes) {
+        Intent i = new Intent(ctx, PreviewActivity.class);
+        i.putExtra(EXTRA_FILE_ID, fileId);
+        i.putExtra(EXTRA_FILE_NAME, fileName);
+        i.putExtra(EXTRA_MIME, mime);
+        i.putExtra(EXTRA_PRIVACY_TOKEN, privacyToken);
+        i.putExtra(EXTRA_SIZE_BYTES, sizeBytes);
+        return i;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_preview);
+
+        fileId = getIntent().getStringExtra(EXTRA_FILE_ID);
+        fileName = getIntent().getStringExtra(EXTRA_FILE_NAME);
+        mime = getIntent().getStringExtra(EXTRA_MIME);
+        privacyToken = getIntent().getStringExtra(EXTRA_PRIVACY_TOKEN);
+        sizeBytes = getIntent().getLongExtra(EXTRA_SIZE_BYTES, 0);
+
+        session = SessionManager.getInstance(this);
+        client = ApiClient.getInstance(session);
+
+        previewContainer = findViewById(R.id.previewContainer);
+        loadingContainer = findViewById(R.id.loadingContainer);
+        errorContainer = findViewById(R.id.errorContainer);
+        unsupportedContainer = findViewById(R.id.unsupportedContainer);
+
+        ((TextView) findViewById(R.id.tvFileName)).setText(fileName != null ? fileName : "预览");
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
+        // 下载按钮（不支持时显示）
+        findViewById(R.id.btnDownload).setOnClickListener(v -> startDownload());
+        findViewById(R.id.btnDownloadBottom).setOnClickListener(v -> startDownload());
+
+        String category = previewCategory(mime);
+        if (!"unsupported".equals(category)) {
+            loadAndRender(category);
+        } else {
+            showUnsupported();
+        }
+    }
+
+    /** 判断预览类型，与 Web 的 mimeCategory 对齐 */
+    static String previewCategory(String mime) {
+        if (mime == null || mime.isEmpty()) { return "unsupported"; }
+        if (mime.startsWith("image/")) return "image";
+        if (mime.startsWith("video/")) return "video";
+        if (mime.startsWith("audio/")) return "audio";
+        if ("application/pdf".equals(mime)) return "pdf";
+        if ("text/markdown".equals(mime)) return "markdown";
+        if (mime.startsWith("text/") || "application/json".equals(mime) || "application/xml".equals(mime)) return "text";
+        return "unsupported";
+    }
+
+    static boolean canPreview(String mime) {
+        return !"unsupported".equals(previewCategory(mime));
+    }
+
+    private void loadAndRender(String category) {
+        loadingContainer.setVisibility(View.VISIBLE);
+        new Thread(() -> {
+            try {
+                Response<ResponseBody> resp = client.previewFile(fileId, privacyToken).execute();
+                if (resp.isSuccessful() && resp.body() != null) {
+                    byte[] bytes = resp.body().bytes();
+                    mainHandler.post(() -> {
+                        loadingContainer.setVisibility(View.GONE);
+                        render(category, bytes);
+                    });
+                } else {
+                    mainHandler.post(this::showError);
+                }
+            } catch (Exception e) {
+                mainHandler.post(this::showError);
+            }
+        }).start();
+    }
+
+    private void render(String category, byte[] bytes) {
+        switch (category) {
+            case "image": renderImage(bytes); break;
+            case "text": renderText(bytes, false); break;
+            case "markdown": renderText(bytes, true); break;
+            case "audio": renderAudio(bytes); break;
+            case "video": renderVideo(bytes); break;
+            case "pdf": renderPdf(bytes); break;
+            default: showUnsupported();
+        }
+    }
+
+    private void renderImage(byte[] bytes) {
+        Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        ImageView iv = new ImageView(this);
+        iv.setImageBitmap(bmp);
+        iv.setAdjustViewBounds(true);
+        iv.setOnClickListener(v -> { /* 点击隐藏/显示头部，简单实现忽略 */ });
+        ScrollView sv = new ScrollView(this);
+        sv.setFillViewport(true);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+        sv.addView(iv, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        previewContainer.addView(sv, lp);
+    }
+
+    private void renderText(byte[] bytes, boolean markdown) {
+        String text = new String(bytes, StandardCharsets.UTF_8);
+        TextView tv = new TextView(this);
+        if (markdown) {
+            // Markwon 渲染 Markdown（标题/加粗/列表/代码块等原生样式）
+            io.noties.markwon.Markwon.create(this).setMarkdown(tv, text);
+        } else {
+            tv.setText(text);
+        }
+        tv.setTextSize(15f);
+        tv.setTextColor(0xFF1D1D1F);
+        tv.setLineSpacing(4f, 1f);
+        tv.setPadding(24, 24, 24, 24);
+        ScrollView sv = new ScrollView(this);
+        sv.addView(tv);
+        previewContainer.addView(sv, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+    }
+
+    private void renderAudio(byte[] bytes) {
+        try {
+            File f = writeTemp(bytes, fileName);
+            audioPlayer = new MediaPlayer();
+            audioPlayer.setDataSource(f.getAbsolutePath());
+            audioPlayer.setOnPreparedListener(mp -> mp.start());
+            audioPlayer.prepareAsync();
+
+            TextView tv = new TextView(this);
+            tv.setText("正在播放：" + (fileName != null ? fileName : "音频"));
+            tv.setTextSize(16f);
+            tv.setTextColor(0xFF1D1D1F);
+            tv.setGravity(android.view.Gravity.CENTER);
+            previewContainer.addView(tv, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        } catch (Exception e) {
+            showError();
+        }
+    }
+
+    private void renderVideo(byte[] bytes) {
+        try {
+            File f = writeTemp(bytes, fileName);
+            VideoView vv = new VideoView(this);
+            MediaController mc = new MediaController(this);
+            vv.setMediaController(mc);
+            vv.setVideoURI(Uri.fromFile(f));
+            vv.start();
+            previewContainer.addView(vv, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        } catch (Exception e) {
+            showError();
+        }
+    }
+
+    private void renderPdf(byte[] bytes) {
+        try {
+            File f = writeTemp(bytes, fileName);
+            ParcelFileDescriptor pfd = ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY);
+            PdfRenderer renderer = new PdfRenderer(pfd);
+
+            // 渲染宽度上限 = 屏宽，避免高密度设备按 72dpi 放大出超大位图导致 OOM
+            float densityScale = getResources().getDisplayMetrics().densityDpi / 72f;
+            int maxWidth = getResources().getDisplayMetrics().widthPixels;
+
+            LinearLayout pageList = new LinearLayout(this);
+            pageList.setOrientation(LinearLayout.VERTICAL);
+
+            for (int i = 0; i < renderer.getPageCount(); i++) {
+                PdfRenderer.Page page = renderer.openPage(i);
+                int w = Math.max(1, (int) (page.getWidth() * densityScale));
+                int h = Math.max(1, (int) (page.getHeight() * densityScale));
+                if (w > maxWidth) {
+                    float ratio = (float) maxWidth / w;
+                    w = (int) (w * ratio);
+                    h = (int) (h * ratio);
+                }
+                Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                ImageView iv = new ImageView(this);
+                iv.setImageBitmap(bmp);
+                pageList.addView(iv, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                page.close();
+            }
+            renderer.close();
+            pfd.close();
+
+            ScrollView sv = new ScrollView(this);
+            sv.addView(pageList);
+            previewContainer.addView(sv, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        } catch (Exception e) {
+            showError();
+        }
+    }
+
+    private File writeTemp(byte[] bytes, String name) throws Exception {
+        String safe = (name != null ? name.replaceAll("[^\\w.\\-]", "_") : "file");
+        File f = new File(getCacheDir(), "preview_" + System.currentTimeMillis() + "_" + safe);
+        try (FileOutputStream out = new FileOutputStream(f)) {
+            out.write(bytes);
+        }
+        return f;
+    }
+
+    private void startDownload() {
+        Intent intent = new Intent(this, DownloadService.class);
+        intent.putExtra(DownloadService.EXTRA_FILE_ID, fileId);
+        intent.putExtra(DownloadService.EXTRA_FILE_NAME, fileName);
+        intent.putExtra(DownloadService.EXTRA_SIZE_BYTES, sizeBytes);
+        startForegroundService(intent);
+        android.widget.Toast.makeText(this, "下载已开始: " + fileName, android.widget.Toast.LENGTH_SHORT).show();
+        finish();
+    }
+
+    private void showUnsupported() {
+        findViewById(R.id.btnDownload).setVisibility(View.VISIBLE);
+        loadingContainer.setVisibility(View.GONE);
+        unsupportedContainer.setVisibility(View.VISIBLE);
+    }
+
+    private void showError() {
+        loadingContainer.setVisibility(View.GONE);
+        errorContainer.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (audioPlayer != null) {
+            try { audioPlayer.release(); } catch (Exception ignored) { }
+            audioPlayer = null;
+        }
+    }
+}

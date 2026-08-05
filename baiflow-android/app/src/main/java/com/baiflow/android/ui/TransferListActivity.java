@@ -40,6 +40,9 @@ public class TransferListActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.recyclerView);
         tvEmpty = findViewById(R.id.tvEmpty);
 
+        // 顶部返回按钮
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
         adapter = new TaskAdapter();
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
