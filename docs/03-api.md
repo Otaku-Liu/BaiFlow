@@ -20,7 +20,7 @@
 
 ## 错误码
 
-`OK` · `UNAUTHORIZED` · `FORBIDDEN` · `VALIDATION_ERROR` · `NOT_FOUND` · `FILE_OPERATION_FAILED` · `STORAGE_ROOT_OFFLINE` · `DOWNLOAD_ENGINE_ERROR` · `SHARE_LINK_INVALID` · `SHARE_LINK_EXPIRED` · `SHARE_LIMIT_EXCEEDED` · `EXTRACTION_CODE_REQUIRED` · `EXTRACTION_CODE_INVALID` · `PRIVATE_PASSWORD_REQUIRED` · `PRIVATE_PASSWORD_INVALID` · `INTERNAL_ERROR`
+`OK` · `UNAUTHORIZED` · `FORBIDDEN` · `VALIDATION_ERROR` · `NOT_FOUND` · `FILE_OPERATION_FAILED` · `STORAGE_ROOT_OFFLINE` · `DOWNLOAD_ENGINE_ERROR` · `SHARE_LINK_INVALID` · `SHARE_LINK_EXPIRED` · `SHARE_LIMIT_EXCEEDED` · `EXTRACTION_CODE_REQUIRED` · `EXTRACTION_CODE_INVALID` · `PRIVATE_PASSWORD_REQUIRED` · `PRIVATE_PASSWORD_INVALID` · `NOTE_CONFLICT` · `INTERNAL_ERROR`
 
 ## 接口清单
 
@@ -110,7 +110,7 @@
 ### 传输 · 通知 · 设备 · 事件
 - `GET /api/transfers` · `GET /api/transfers/{id}`
 - `GET /api/notifications` · `PATCH /api/notifications/{id}/read`
-- `POST /api/devices/register` · `GET /api/devices` · `PATCH /api/devices/{id}`
+- `POST /api/devices/register` · `GET /api/devices` · `PATCH /api/devices/{id}`（**待实现**：推送设备注册，与登录会话表正交）
 - `GET /api/events`（SSE，需登录）：事件类型 `NOTE_UPDATED`（已实现）/ `TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED`（后四者待各模块接入）
 
 SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GET /api/events?token=<会话token>` 查询参数（后端 `SessionAuthenticationFilter` 支持 `?token=` fallback）。`NOTE_UPDATED` 只推送给笔记所有者。

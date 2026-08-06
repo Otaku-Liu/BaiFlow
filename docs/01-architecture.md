@@ -93,8 +93,8 @@ Vue 3 Web 管理台          Android Java App
 ```
 
 ### Docker Compose 服务
-- `baiflow-server`、`mysql`、`aria2`、`nginx`
-- Redis 后续可选
+- `deploy/docker-compose.yml`：`mysql` + `redis`（数据库 / 缓存）
+- 应用服务（server / web / nginx）单独运行，部署脚本化规划中
 
 ### Nginx 职责
 - 托管静态文件、`/api/` 反代、SSE 支持、HTTPS、上传大小限制
@@ -127,6 +127,11 @@ Vue 3 Web 管理台          Android Java App
 
 ### 外网访问
 - HTTPS + 强密码 + 登录失败限制 + 定期备份
+
+### 隐私与机密
+- 配置中避免出现真实用户路径/域名/硬编码凭据；每次代码调整涉及配置/路径/凭据时做隐私与机密核查，涉及隐私先确认「保留还是屏蔽 git」
+- **已知待办**：`/home/lxb/...` 真实路径暂存于 `application.yml`（3 处默认）、`application-dev.example.yml`（2 处默认）、`deploy/nginx.conf`（root/alias/注释），部署脚本化时统一改为占位符 + 环境变量注入
+- 真实运行配置（`application-dev.yml`，含域名与凭据）gitignored，不随仓库分发
 
 ### 安全检查项
 - 未登录访问文件接口 → 401

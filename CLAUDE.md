@@ -37,6 +37,9 @@ docs/               项目文档（需求、架构、API、数据库等）
 - 用户密码、分享 token、提取码、隐私文件夹密码只存储 hash
 - 文件操作必须限制在配置的 Storage Root 内，路径需归一化校验
 - MySQL 和 aria2 RPC 不暴露在公网路由上
+- **每次代码调整**（尤其涉及配置/路径/凭据）做一次**隐私与机密核查**：真实路径（`/home/lxb/...`）、真实域名、硬编码密码/secret/token/API Key
+- 若改动涉及隐私（真实用户名路径/域名/凭据），**先向用户确认「保留还是屏蔽 git」**，不擅自提交
+- 已知待办：`/home/lxb/...` 真实路径散落在 `application.yml` / `application-dev.example.yml` / `deploy/nginx.conf`，后续**部署脚本化时统一改为占位符 + 环境变量注入**
 
 ### 阶段纪律
 - 所有 10 个阶段（Phase 0–9）均已完成

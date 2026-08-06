@@ -2,6 +2,8 @@
 
 BaiFlow（小白流转）是一个个人服务器上的下载与文件协同中心，包含 Spring Boot 后端、Vue 3 Web 管理台和 Android 客户端。
 
+主要功能：文件中心（多存储根/隐私文件夹/分享/下载）、随手记（富文本笔记 + 图片/录音/画画媒体）、登录会话持久化与设备管理、传输中心。
+
 ## 模块
 - `baiflow-server`: Spring Boot API 服务端
 - `baiflow-web`: Vue 3 Web 管理台
@@ -69,7 +71,7 @@ docker compose up -d
 |---|---|---|
 | Phase 0: 文档与边界 | ✅ | `docs/` 文档体系：需求、架构、API、数据库、安全、路线图 |
 | Phase 1: 项目骨架 | ✅ | Spring Boot 骨架、Vue 3 骨架、`/api/health`、Docker Compose |
-| Phase 2: 认证、用户与权限 | ✅ | JWT 登录、ADMIN/USER/GUEST 角色模型、接口鉴权 |
+| Phase 2: 认证、用户与权限 | ✅ | 会话 token 登录（吊销驱动）、ADMIN/USER/GUEST 角色模型、接口鉴权、登录设备管理 |
 | Phase 3: 文件根据地 MVP | ✅ | Storage Root、文件浏览/上传/下载/移动/删除 |
 | Phase 3.5: 隐私文件夹 | ✅ | 文件夹隐私密码、访问验证、短期会话 |
 | Phase 4: 下载中心 MVP | ✅ | aria2 RPC 接入、下载任务 CRUD、状态同步 |
