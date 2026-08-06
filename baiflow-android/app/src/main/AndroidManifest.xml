@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 笔记录音 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:allowBackup="true"
@@ -33,6 +35,11 @@
         <activity android:name=".ui.TransferListActivity"
             android:exported="false" />
         <activity android:name=".ui.PreviewActivity"
+            android:exported="false" />
+        <activity android:name=".ui.NoteEditActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.NoteDrawActivity"
             android:exported="false" />
 
         <service

@@ -2,29 +2,33 @@ package com.baiflow.auth.service.impl;
 
 import com.baiflow.auth.config.BaiflowProperties;
 import com.baiflow.auth.dto.request.LoginRequest;
+import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
-import com.baiflow.auth.security.JwtService;
+import com.baiflow.auth.entity.AuthSession;
+import com.baiflow.auth.mapper.AuthSessionMapper;
+import com.baiflow.auth.security.SessionTokenService;
 import com.baiflow.auth.service.AccountLockService;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.audit.service.AuditService;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.common.util.RequestUtil;
 import com.baiflow.user.dto.response.UserInfo;
 import com.baiflow.user.entity.User;
 import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.UserMapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -42,7 +46,9 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private UserMapper userMapper;
     @Autowired
-    private JwtService jwtService;
+    private SessionTokenService sessionTokenService;
+    @Autowired
+    private AuthSessionMapper sessionMapper;
     @Autowired
     private PasswordEncoder passwordEncoder;
     @Autowired
@@ -54,8 +60,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        String ip = getClientIp();
-        String ua = getClientUserAgent();
+        String ip = RequestUtil.getClientIp();
+        String ua = RequestUtil.getClientUserAgent();
 
         // 0. 检查登录失败锁定
         if (accountLockService.isLocked(request.username())) {
@@ -89,15 +95,18 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
-        // 4. 登录成功：清除失败计数，更新最后登录时间，签发 JWT
+        // 4. 登录成功：清除失败计数，更新最后登录时间，建登录会话（长会话 token）
         accountLockService.clearFailures(request.username());
         auditService.log(user.getId(), "LOGIN_SUCCESS", "USER", user.getId(), ip, ua, "登录成功");
 
         user.setLastLoginAt(LocalDateTime.now());
         userMapper.updateById(user);
 
-        String token = jwtService.generateToken(user.getId(), user.getUsername(), user.getRole().name());
-        return new LoginResponse(token, UserInfo.from(user));
+        String deviceType = "ANDROID".equalsIgnoreCase(RequestUtil.getHeader("X-Device-Type")) ? "ANDROID" : "WEB";
+        String deviceName = resolveDeviceName(deviceType, RequestUtil.getHeader("X-Device-Name"), ua);
+        SessionTokenService.CreatedSession created = sessionTokenService.create(
+                user.getId(), deviceType, deviceName, ip, ua);
+        return new LoginResponse(created.token(), created.sessionId(), created.expiresAt(), UserInfo.from(user));
     }
 
     @Override
@@ -109,30 +118,66 @@ public class AuthServiceImpl implements AuthService {
         return UserInfo.from(user);
     }
 
-    private String getClientIp() {
-        try {
-            var attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs != null) {
-                var req = attrs.getRequest();
-                String forwarded = req.getHeader("X-Forwarded-For");
-                if (forwarded != null && !forwarded.isBlank()) {
-                    return forwarded.split(",")[0].trim();
-                }
-                return req.getRemoteAddr();
-            }
-        } catch (Exception ignored) {}
-        return "unknown";
+    @Override
+    public void logout(String token) {
+        AuthSession session = sessionTokenService.findByToken(token);
+        if (session != null) {
+            sessionTokenService.revoke(session.getId());
+            log.info("会话已登出: userId={}, sessionId={}", session.getUserId(), session.getId());
+        }
     }
 
-    private String getClientUserAgent() {
-        try {
-            var attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs != null) {
-                String ua = attrs.getRequest().getHeader("User-Agent");
-                return ua != null ? ua : "";
-            }
-        } catch (Exception ignored) {}
-        return "";
+    @Override
+    public List<AuthSessionInfo> listSessions(String userId, String currentToken) {
+        AuthSession current = sessionTokenService.findByToken(currentToken);
+        String currentId = current != null ? current.getId() : null;
+
+        QueryWrapper<AuthSession> wrapper = new QueryWrapper<AuthSession>()
+                .eq("user_id", userId)
+                .isNull("revoked_at")
+                .orderByDesc("last_used_at");
+        List<AuthSession> sessions = sessionMapper.selectList(wrapper);
+        return sessions.stream()
+                .map(s -> AuthSessionInfo.from(s, s.getId().equals(currentId)))
+                .toList();
+    }
+
+    @Override
+    public void revokeSession(String userId, boolean isAdmin, String sessionId) {
+        AuthSession target = sessionMapper.selectById(sessionId);
+        if (target == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "会话不存在");
+        }
+        if (!isAdmin && !userId.equals(target.getUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权下线此设备");
+        }
+        sessionTokenService.revoke(sessionId);
+        log.info("会话已强制下线: targetUser={}, sessionId={}, by={}", target.getUserId(), sessionId, userId);
+    }
+
+    /**
+     * 设备名：优先客户端上报，其次按 UA 推导（Web 场景）。
+     */
+    private String resolveDeviceName(String deviceType, String deviceName, String userAgent) {
+        if (deviceName != null && !deviceName.isBlank()) {
+            return deviceName;
+        }
+        if ("WEB".equals(deviceType)) {
+            String ua = userAgent != null ? userAgent : "";
+            String browser = "浏览器";
+            if (ua.contains("Edg/")) browser = "Edge";
+            else if (ua.contains("Firefox/")) browser = "Firefox";
+            else if (ua.contains("Chrome/")) browser = "Chrome";
+            else if (ua.contains("Safari/")) browser = "Safari";
+            String os = "未知系统";
+            if (ua.contains("Windows")) os = "Windows";
+            else if (ua.contains("Android")) os = "Android";
+            else if (ua.contains("iPhone") || ua.contains("iPad")) os = "iOS";
+            else if (ua.contains("Mac OS")) os = "macOS";
+            else if (ua.contains("Linux")) os = "Linux";
+            return browser + " · " + os;
+        }
+        return "Android 设备";
     }
 
     @Override
@@ -215,6 +260,9 @@ public class AuthServiceImpl implements AuthService {
         // 更新为新密码
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userMapper.updateById(user);
-        log.info("密码已修改: userId={}", userId);
+
+        // 重置密码后吊销该用户全部登录会话（所有设备强制下线重新登录，含当前设备）
+        sessionTokenService.revokeAll(userId);
+        log.info("密码已修改并吊销全部会话: userId={}", userId);
     }
 }

@@ -22,7 +22,7 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:src="@drawable/ic_type_file"
-            android:contentDescription="文件类型图标" />
+            android:contentDescription="@string/files_type_icon_desc" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -54,7 +54,7 @@
             android:id="@+id/tvPrivacyTag"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="隐私"
+            android:text="@string/files_privacy_tag"
             android:textSize="10sp"
             android:textColor="#B45309"
             android:background="#FEF3C7"

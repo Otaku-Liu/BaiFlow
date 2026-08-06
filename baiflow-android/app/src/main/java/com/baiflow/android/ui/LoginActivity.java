@@ -40,7 +40,7 @@ public class LoginActivity extends AppCompatActivity {
         tvError = findViewById(R.id.tvError);
         tvServerUrl = findViewById(R.id.tvServerUrl);
 
-        tvServerUrl.setText("服务器：" + session.getServerUrl());
+        tvServerUrl.setText(getString(R.string.login_server_prefix, session.getServerUrl()));
 
         btnLogin.setOnClickListener(v -> doLogin());
         btnChangeServer.setOnClickListener(v -> {
@@ -55,13 +55,13 @@ public class LoginActivity extends AppCompatActivity {
         String password = etPassword.getText().toString().trim();
 
         if (username.isEmpty() || password.isEmpty()) {
-            tvError.setText("请输入用户名和密码");
+            tvError.setText(getString(R.string.login_input_required));
             tvError.setVisibility(TextView.VISIBLE);
             return;
         }
 
         btnLogin.setEnabled(false);
-        btnLogin.setText("登录中...");
+        btnLogin.setText(getString(R.string.login_logging_in));
         tvError.setVisibility(TextView.GONE);
 
         ApiClient client = ApiClient.getInstance(session);
@@ -73,14 +73,14 @@ public class LoginActivity extends AppCompatActivity {
                     session.saveToken(token);
                     fetchUserInfo();
                 } else {
-                    String msg = response.body() != null ? response.body().getMessage() : "登录失败";
+                    String msg = response.body() != null ? response.body().getMessage() : getString(R.string.login_failed);
                     showError(msg);
                 }
             }
 
             @Override
             public void onFailure(Call<ApiResponse<LoginData>> call, Throwable t) {
-                showError("网络错误：" + t.getMessage());
+                showError(getString(R.string.common_network_error, t.getMessage()));
             }
         });
     }
@@ -94,18 +94,18 @@ public class LoginActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     UserInfo user = response.body().getData();
                     session.saveUser(user.getId(), user.getUsername(), user.getDisplayName(), user.getRole());
-                    Toast.makeText(LoginActivity.this, "登录成功", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(LoginActivity.this, getString(R.string.login_success), Toast.LENGTH_SHORT).show();
                     Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                     startActivity(intent);
                     finish();
                 } else {
-                    showError("获取用户信息失败");
+                    showError(getString(R.string.login_fetch_user_failed));
                 }
             }
 
             @Override
             public void onFailure(Call<ApiResponse<UserInfo>> call, Throwable t) {
-                showError("网络错误：" + t.getMessage());
+                showError(getString(R.string.common_network_error, t.getMessage()));
             }
         });
     }
@@ -114,6 +114,6 @@ public class LoginActivity extends AppCompatActivity {
         tvError.setText(msg);
         tvError.setVisibility(TextView.VISIBLE);
         btnLogin.setEnabled(true);
-        btnLogin.setText("登 录");
+        btnLogin.setText(getString(R.string.login_button));
     }
 }

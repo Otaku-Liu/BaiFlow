@@ -2,6 +2,17 @@
 
 BaiFlow 涉及的关键术语速查。按字母序。
 
+## A
+
+- **Auth Session（登录会话）**
+  长会话 token + 服务端逐请求校验（`bf_auth_session`）的认证模型：吊销驱动，ANDROID 滑动续期（180 天不活跃兜底）/ WEB 固定 2h。见 `docs/09-auth-sessions.md`。
+
+- **强制下线（Force Logout）**
+  吊销某设备的登录会话，对方下次请求 401 被踢回登录。Web 个人资料弹窗「登录设备」里操作。
+
+- **吊销驱动（Revocation-driven）**
+  会话寿命不由固定到期决定，而是直到被主动吊销（登出 / 强制下线 / 改密码）才失效——类似聊天软件「登录后基本不下线」。
+
 ## B
 
 - **bf_note**
@@ -26,13 +37,13 @@ BaiFlow 涉及的关键术语速查。按字母序。
 
 ## L
 
-- **last-write-wins（后写覆盖）**
-  冲突处理策略：同一篇笔记两端都改时，以服务端时间戳为准、后保存的覆盖先保存的。实现简单、可预测；代价是可能丢编辑。个人使用可接受。
+- **乐观并发（Optimistic Concurrency）**
+  冲突处理策略：保存携带 `baseUpdatedAt`，服务端比对——若被其他设备改过则返回 `NOTE_CONFLICT`，客户端弹「覆盖 / 重新加载」由用户决定，不再静默丢改动。取代了早期「后写覆盖（last-write-wins）」。
 
 ## M
 
 - **Markdown**
-  笔记正文格式。随手记笔记 Web 端用 Vditor 编辑器（IR 即时渲染）编辑/渲染；文件预览抽屉的 .md 文件预览用 showdown 渲染为 HTML；Android 端用纯文本编辑器输入 Markdown 源。
+  笔记正文格式。随手记笔记 Web 端用 Vditor 编辑器（IR 即时渲染）编辑/渲染；文件预览抽屉的 .md 文件预览用 showdown 渲染为 HTML；Android 端用所见即所得富文本编辑器（工具栏实现加粗/标题/列表等，不手写源码），存储仍为 Markdown 源。
 
 ## N
 
@@ -85,4 +96,4 @@ BaiFlow 涉及的关键术语速查。按字母序。
 
 - **内容同步**：编辑保存 → 服务端 `updated_at=now` → SSE 推 `NOTE_UPDATED` → 其他端刷新
 - **阅读进度**：滚动 → 防抖保存 `bf_note_progress` → 换端打开时提示"续读到 X%"
-- **离线（Phase 3）**：离线编辑 → Room + outbox → 联网 → 推 PATCH + `updatedAfter` 拉取合并 → 冲突后写覆盖
+- **离线（Phase 3）**：离线编辑 → Room + outbox → 联网 → 推 PATCH + `updatedAfter` 拉取合并 → 冲突对齐在线端乐观并发（覆盖 / 重载）

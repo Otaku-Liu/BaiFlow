@@ -14,30 +14,39 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.baiflow.auth.security.JwtAuthenticationFilter;
+import com.baiflow.auth.security.SessionAuthenticationFilter;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Spring Security 配置。
  *
- * <p>默认所有 API 需要登录（JWT），仅以下例外：
+ * <p>默认所有 API 需要登录（登录会话 token），仅以下例外：
  * <ul>
  *   <li>健康检查、登录、公开分享 — 无需登录</li>
  *   <li>用户管理、存储根管理 — 仅 ADMIN</li>
  * </ul>
  *
- * <p>无状态会话，禁用 CSRF，通过 {@link JwtAuthenticationFilter} 校验 token。
+ * <p>无状态会话，禁用 CSRF，通过 {@link SessionAuthenticationFilter} 逐请求校验登录会话。
  */
 @Configuration
 public class SecurityConfig {
 
     @Autowired
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
+    private SessionAuthenticationFilter sessionAuthenticationFilter;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 未认证/会话过期 → 401（区别于「已登录但无权限」的 403，客户端据此回登录）
+                .exceptionHandling(e -> e.authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write(
+                            "{\"code\":\"UNAUTHORIZED\",\"message\":\"登录已过期，请重新登录\"}");
+                }))
                 .authorizeHttpRequests(auth -> auth
                         // 无需登录
                         .requestMatchers("/api/health").permitAll()
@@ -50,8 +59,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/storage-roots/**").hasRole("ADMIN")
                         // 其余均需登录
                         .anyRequest().authenticated())
-                // ---- JWT 过滤器 ----
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                // ---- 登录会话过滤器 ----
+                .addFilterBefore(sessionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

@@ -86,7 +86,7 @@
     </el-container>
 
     <!-- 个人资料弹窗 -->
-    <el-dialog v-model="profileDialogVisible" title="个人资料" width="440px" :close-on-click-modal="false">
+    <el-dialog v-model="profileDialogVisible" title="个人资料" width="440px" :close-on-click-modal="true">
       <el-form label-width="auto" :key="locale">
         <el-form-item label="用户名">
           <el-input :model-value="authStore.user?.username" disabled />
@@ -109,7 +109,40 @@
           </div>
         </el-form-item>
       </el-form>
+
+      <!-- 操作区：保存资料 / 修改密码（置于登录设备上方） -->
+      <div class="profile-actions">
+        <el-button type="primary" @click="handleSaveProfile">保存资料</el-button>
+        <el-button link type="primary" @click="openPasswordDialog">修改密码</el-button>
+      </div>
+
       <el-divider />
+      <!-- 登录设备管理 -->
+      <div class="session-section">
+        <div class="session-title">登录设备</div>
+        <div v-if="sessions.length === 0" class="session-empty">暂无登录设备</div>
+        <div v-for="s in sessions" :key="s.id" class="session-row">
+          <div class="session-info">
+            <div class="session-name">
+              {{ s.deviceName || (s.deviceType === 'ANDROID' ? 'Android 设备' : 'Web 浏览器') }}
+              <el-tag v-if="s.current" size="small" type="success" style="margin-left:6px">当前</el-tag>
+            </div>
+            <div class="session-meta">
+              {{ s.deviceType === 'ANDROID' ? 'App' : 'Web' }} · {{ s.ip || '—' }} ·
+              {{ formatDateTime(s.lastUsedAt) }}
+            </div>
+          </div>
+          <el-button v-if="!s.current" link type="danger" size="small" @click="handleRevokeSession(s)">强制下线</el-button>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="closeProfileDialog">取消</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 修改密码弹窗 -->
+    <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px" align-center :close-on-click-modal="true">
       <el-form label-width="auto" :key="locale">
         <el-form-item label="旧密码">
           <el-input v-model="oldPassword" type="password" placeholder="输入旧密码" show-password />
@@ -117,11 +150,13 @@
         <el-form-item label="新密码">
           <el-input v-model="newPassword" type="password" placeholder="输入新密码" show-password />
         </el-form-item>
+        <el-form-item label="确认新密码">
+          <el-input v-model="confirmPassword" type="password" placeholder="再次输入新密码" show-password />
+        </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="profileDialogVisible = false">取消</el-button>
-        <el-button @click="handleSaveProfile">保存资料</el-button>
-        <el-button type="primary" @click="handleChangePassword">修改密码</el-button>
+        <el-button @click="passwordDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleChangePassword">确定修改</el-button>
       </template>
     </el-dialog>
   </div>
@@ -134,7 +169,8 @@ import { ElMessage } from 'element-plus'
 import { FolderOpened, Download, Share, User, Fold, Expand, Document, ArrowDown, Memo } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
-import { updateProfile, uploadAvatar, changePassword } from '../api/auth'
+import { updateProfile, uploadAvatar, changePassword, listSessions, revokeSession } from '../api/auth'
+import { formatDateTime } from '../utils/format'
 import FilesView from './FilesView.vue'
 import DownloadsView from './DownloadsView.vue'
 import NotesView from './NotesView.vue'
@@ -178,16 +214,54 @@ onUnmounted(() => {
 // 个人资料弹窗
 const profileDialogVisible = ref(false)
 const profileDisplayName = ref('')
+const sessions = ref([])
+
+// 修改密码弹窗
+const passwordDialogVisible = ref(false)
 const oldPassword = ref('')
 const newPassword = ref('')
+const confirmPassword = ref('')
 
 watch(profileDialogVisible, (v) => {
   if (v) {
     profileDisplayName.value = authStore.user?.displayName || ''
-    oldPassword.value = ''
-    newPassword.value = ''
+    loadSessions()
   }
 })
+
+/** 显式关闭个人资料弹窗（取消 / X 均走此路径） */
+function closeProfileDialog() {
+  profileDialogVisible.value = false
+}
+
+/** 打开修改密码弹窗（每次重置密码字段） */
+function openPasswordDialog() {
+  oldPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  passwordDialogVisible.value = true
+}
+
+/** 加载当前用户的登录设备列表（res.data 是 ApiResponse 包装，真正列表在 res.data.data） */
+async function loadSessions() {
+  try {
+    const res = await listSessions()
+    sessions.value = res.data?.data || []
+  } catch (e) {
+    sessions.value = []
+  }
+}
+
+/** 强制下线某设备（会话） */
+async function handleRevokeSession(s) {
+  try {
+    await revokeSession(s.id)
+    ElMessage.success('已强制下线')
+    loadSessions()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '操作失败')
+  }
+}
 
 function handleMenuSelect(index) {
   activeMenu.value = index
@@ -212,7 +286,7 @@ async function handleSaveProfile() {
     const res = await updateProfile(profileDisplayName.value)
     ElMessage.success('资料已更新')
     if (authStore.user) {
-      authStore.user.displayName = res.data?.displayName || profileDisplayName.value
+      authStore.user.displayName = res.data?.data?.displayName || profileDisplayName.value
     }
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '保存失败')
@@ -228,7 +302,7 @@ async function handleAvatarUpload(file) {
     const res = await uploadAvatar(file)
     ElMessage.success('头像已更新')
     if (authStore.user) {
-      authStore.user.avatarUrl = res.data?.avatarUrl || ''
+      authStore.user.avatarUrl = res.data?.data?.avatarUrl || ''
     }
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '头像上传失败')
@@ -237,15 +311,18 @@ async function handleAvatarUpload(file) {
 }
 
 async function handleChangePassword() {
-  if (!oldPassword.value || !newPassword.value) {
-    ElMessage.warning('请输入旧密码和新密码')
+  if (!oldPassword.value || !newPassword.value || !confirmPassword.value) {
+    ElMessage.warning('请输入旧密码、新密码和确认新密码')
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    ElMessage.warning('两次输入的新密码不一致')
     return
   }
   try {
     await changePassword(oldPassword.value, newPassword.value)
     ElMessage.success('密码已修改，请重新登录')
-    oldPassword.value = ''
-    newPassword.value = ''
+    passwordDialogVisible.value = false
     profileDialogVisible.value = false
     authStore.clearSession()
     router.push('/login')
@@ -531,5 +608,45 @@ async function handleChangePassword() {
   .app-main {
     padding: 16px;
   }
+}
+
+/* 个人资料弹窗 · 操作区（保存资料 / 修改密码） */
+.profile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* 个人资料弹窗 · 登录设备 */
+.session-title {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 8px;
+}
+.session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.session-row:last-child {
+  border-bottom: none;
+}
+.session-name {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+}
+.session-meta {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 2px;
+}
+.session-empty {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  padding: 8px 0;
 }
 </style>

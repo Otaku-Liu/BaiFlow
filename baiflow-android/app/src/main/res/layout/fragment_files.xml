@@ -20,14 +20,22 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="文件中心" />
+            android:text="@string/files_title" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUp"
+            style="@style/Ios.Button.Text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/files_up_level"
+            android:enabled="false" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnUpload"
             style="@style/Ios.Button.Text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="上传" />
+            android:text="@string/files_upload" />
     </LinearLayout>
 
     <!-- 管理员用户切换（仅管理员可见） -->
@@ -45,7 +53,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="查看用户"
+            android:text="@string/files_view_user"
             android:textSize="13sp"
             android:textColor="@color/text_secondary" />
 
@@ -101,7 +109,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:gravity="center"
-        android:text="此目录为空"
+        android:text="@string/files_empty"
         android:textSize="16sp"
         android:textColor="@color/text_secondary"
         android:visibility="gone" />

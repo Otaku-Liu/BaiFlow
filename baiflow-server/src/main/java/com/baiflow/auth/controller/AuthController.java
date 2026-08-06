@@ -1,16 +1,21 @@
 package com.baiflow.auth.controller;
 
 import com.baiflow.auth.dto.request.LoginRequest;
+import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
+import com.baiflow.auth.security.AuthTokens;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.user.dto.response.UserInfo;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -24,7 +29,7 @@ public class AuthController {
     private AuthService authService;
 
     /**
-     * 用户登录 — 验证凭据，返回 JWT 令牌和用户信息。
+     * 用户登录 — 验证凭据，建登录会话，返回会话 token 和用户信息。
      */
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
@@ -32,11 +37,39 @@ public class AuthController {
     }
 
     /**
-     * 用户登出 — JWT 无状态，登出由客户端丢弃令牌完成。
+     * 用户登出 — 吊销当前请求 token 对应的登录会话（立即生效）。
      */
     @PostMapping("/logout")
-    public ApiResponse<Map<String, Object>> logout() {
+    public ApiResponse<Map<String, Object>> logout(HttpServletRequest request) {
+        authService.logout(AuthTokens.extract(request));
         return ApiResponse.success(Map.of("result", "已登出"));
+    }
+
+    /**
+     * 当前用户的登录设备列表（含当前会话标记），供 Web 端管理/强制下线。
+     */
+    @GetMapping("/sessions")
+    public ApiResponse<List<AuthSessionInfo>> sessions(Authentication auth, HttpServletRequest request) {
+        return ApiResponse.success(
+                authService.listSessions(auth.getPrincipal().toString(), AuthTokens.extract(request)));
+    }
+
+    /**
+     * 强制下线某登录设备（本人任意会话；管理员可下线任意用户的会话）。
+     */
+    @DeleteMapping("/sessions/{id}")
+    public ApiResponse<Map<String, Object>> revokeSession(@PathVariable String id,
+                                                          Authentication auth) {
+        authService.revokeSession(auth.getPrincipal().toString(), isAdmin(auth), id);
+        return ApiResponse.success(Map.of("result", "已强制下线"));
+    }
+
+    private boolean isAdmin(Authentication auth) {
+        if (auth == null || auth.getAuthorities() == null) return false;
+        for (GrantedAuthority ga : auth.getAuthorities()) {
+            if ("ROLE_ADMIN".equals(ga.getAuthority())) return true;
+        }
+        return false;
     }
 
     /**
@@ -74,10 +107,8 @@ public class AuthController {
     @PostMapping("/change-password")
     public ApiResponse<Map<String, Object>> changePassword(@RequestBody Map<String, String> body,
                                                            Authentication authentication) {
-        authService.changePassword(
-                authentication.getPrincipal().toString(),
-                body.get("oldPassword"),
-                body.get("newPassword"));
+        authService.changePassword(authentication.getPrincipal().toString(),
+                body.get("oldPassword"), body.get("newPassword"));
         return ApiResponse.success(Map.of("result", "密码已修改"));
     }
 }

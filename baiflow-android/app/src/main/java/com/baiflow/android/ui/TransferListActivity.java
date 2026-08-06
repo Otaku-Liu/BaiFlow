@@ -62,13 +62,13 @@ public class TransferListActivity extends AppCompatActivity {
                     tvEmpty.setVisibility(tasks.isEmpty() ? View.VISIBLE : View.GONE);
                     recyclerView.setVisibility(tasks.isEmpty() ? View.GONE : View.VISIBLE);
                 } else {
-                    Toast.makeText(TransferListActivity.this, "加载失败", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(TransferListActivity.this, getString(R.string.common_load_failed), Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(Call<ApiResponse<PagedResult<DownloadTask>>> call, Throwable t) {
-                Toast.makeText(TransferListActivity.this, "网络错误：" + t.getMessage(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(TransferListActivity.this, getString(R.string.common_network_error, t.getMessage()), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -103,7 +103,7 @@ public class TransferListActivity extends AppCompatActivity {
                         FormatUtil.formatSize(task.getCompletedBytes()) + " / " + FormatUtil.formatSize(task.getTotalBytes()));
             } else if (task.getErrorMessage() != null && !task.getErrorMessage().isEmpty()) {
                 holder.tvSpeed.setVisibility(View.VISIBLE);
-                holder.tvSpeed.setText("错误：" + task.getErrorMessage());
+                holder.tvSpeed.setText(getString(R.string.transfer_error, task.getErrorMessage()));
             } else {
                 holder.tvSpeed.setVisibility(View.GONE);
             }
@@ -127,11 +127,11 @@ public class TransferListActivity extends AppCompatActivity {
 
     private String statusLabel(String status) {
         switch (status) {
-            case "WAITING": return "等待中";
-            case "RUNNING": return "下载中";
-            case "PAUSED": return "已暂停";
-            case "COMPLETED": return "已完成";
-            case "FAILED": return "失败";
+            case "WAITING": return getString(R.string.transfer_status_waiting);
+            case "RUNNING": return getString(R.string.transfer_status_running);
+            case "PAUSED": return getString(R.string.transfer_status_paused);
+            case "COMPLETED": return getString(R.string.transfer_status_completed);
+            case "FAILED": return getString(R.string.transfer_status_failed);
             default: return status;
         }
     }

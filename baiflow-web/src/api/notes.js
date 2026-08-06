@@ -20,11 +20,13 @@ export function getNote(id, viewUserId) {
   return http.get(`/notes/${id}`, { params })
 }
 
-/** 更新笔记 */
-export function updateNote(id, { title, content }, viewUserId) {
+/** 更新笔记（baseUpdatedAt 为乐观并发依据：早于服务端当前值则返回 NOTE_CONFLICT） */
+export function updateNote(id, { title, content, baseUpdatedAt }, viewUserId) {
   const params = {}
   if (viewUserId) params.viewUserId = viewUserId
-  return http.patch(`/notes/${id}`, { title, content }, { params })
+  const body = { title, content }
+  if (baseUpdatedAt) body.baseUpdatedAt = baseUpdatedAt
+  return http.patch(`/notes/${id}`, body, { params })
 }
 
 /** 删除笔记（软删除） */

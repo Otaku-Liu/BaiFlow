@@ -56,6 +56,11 @@ public class SessionManager {
                 .apply();
     }
     public String getUserId() { return prefs.getString(KEY_USER_ID, null); }
+
+    /** 单独更新展示名（修改资料后本地同步） */
+    public void saveDisplayName(String displayName) {
+        prefs.edit().putString(KEY_DISPLAY_NAME, displayName).apply();
+    }
     public String getUsername() { return prefs.getString(KEY_USERNAME, null); }
     public String getDisplayName() { return prefs.getString(KEY_DISPLAY_NAME, null); }
     public String getRole() { return prefs.getString(KEY_ROLE, null); }

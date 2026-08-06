@@ -28,12 +28,14 @@
 - `GET /api/health`
 
 ### 认证
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
+- `POST /api/auth/login` — 登录建会话，返回 `{ token, sessionId, expiresAt, user }`；设备类型/名称走 `X-Device-Type` / `X-Device-Name` 请求头（ANDROID 长期 / WEB 短期）
+- `POST /api/auth/logout` — 吊销当前请求 token 对应的会话（立即生效）
 - `GET /api/auth/me`
 - `PATCH /api/auth/profile`
 - `POST /api/auth/avatar`（multipart, ≤1MB, jpg/png/gif/webp）
-- `POST /api/auth/change-password`
+- `POST /api/auth/change-password` — 改密后吊销该用户全部会话（所有设备下线）
+- `GET /api/auth/sessions` — 当前用户的登录设备列表 `{ id, deviceName, deviceType, ip, lastUsedAt, createdAt, current }`
+- `DELETE /api/auth/sessions/{id}` — 强制下线某登录设备（本人任意会话；管理员可任意用户）
 
 ### 用户（管理员）
 - `GET/POST /api/users` · `PATCH /api/users/{id}` · `POST /api/users/{id}/reset-password`
@@ -83,12 +85,17 @@
 - `GET /api/notes?page=&size=&keyword=&viewUserId=` — 分页列出笔记（不含正文，按更新时间倒序）；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换
 - `POST /api/notes` — 新建 `{ title, content }`（content 为 Markdown）
 - `GET /api/notes/{id}` — 详情（含 Markdown 正文）
-- `PATCH /api/notes/{id}` — 更新 `{ title, content }`，服务端刷新 `updated_at`
+- `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt? }`，服务端刷新 `updated_at`；`baseUpdatedAt` 为乐观并发依据，早于服务端当前 `updated_at` 时返回业务码 `NOTE_CONFLICT`（客户端可选覆盖/重新加载）
 - `DELETE /api/notes/{id}` — 软删除（status=DELETED）
 - `GET /api/notes/{id}/progress` — 查询当前用户对笔记的阅读进度 `{ positionType, positionValue, updatedAt }`
 - `PUT /api/notes/{id}/progress` — 保存阅读进度 `{ positionValue }`（滚动百分比 0~1）
 
-笔记独立于文件系统，不受存储根目录/隐私文件夹约束。Android 离线增量同步（`updatedAfter`）随客户端离线阶段落地。
+**笔记媒体**：
+- `POST /api/notes/media` — multipart `file` + 可选 `mediaType`（IMAGE/AUDIO/DRAWING）；MIME 白名单 + ≤20MB；返回 `{ id, mediaType, url, mimeType, sizeBytes, createdAt }`
+- `GET /api/notes/media/{id}` — 读取媒体内容（inline）；鉴权 Bearer 头或 `?token=`（供 Web `<img>/<audio>` 渲染）；所有者或管理员
+- 正文引用约定：图片/画画 `![名称](/api/notes/media/{mediaId})`；录音 `[录音](/api/notes/media/{mediaId}?mediaType=audio)`（`mediaType=audio` 供渲染器识别音频）
+
+笔记独立于文件系统，不受存储根目录/隐私文件夹约束。Android 离线增量同步（`updatedAfter`）随客户端离线阶段落地。笔记媒体独立存储，不进文件中心列表。
 
 ### 审计日志（管理员）
 - `GET /api/admin/audit-logs/login` — 分页查询登录日志，支持用户名模糊搜索、登录结果和日期范围筛选
@@ -106,7 +113,7 @@
 - `POST /api/devices/register` · `GET /api/devices` · `PATCH /api/devices/{id}`
 - `GET /api/events`（SSE，需登录）：事件类型 `NOTE_UPDATED`（已实现）/ `TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED`（后四者待各模块接入）
 
-SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GET /api/events?token=<jwt>` 查询参数（后端 `JwtAuthenticationFilter` 已支持 `?token=` fallback）。`NOTE_UPDATED` 只推送给笔记所有者。
+SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GET /api/events?token=<会话token>` 查询参数（后端 `SessionAuthenticationFilter` 支持 `?token=` fallback）。`NOTE_UPDATED` 只推送给笔记所有者。
 
 ## 安全要求
 

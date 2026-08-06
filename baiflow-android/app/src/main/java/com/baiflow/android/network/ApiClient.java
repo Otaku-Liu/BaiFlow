@@ -1,5 +1,6 @@
 package com.baiflow.android.network;
 
+import android.os.Build;
 import android.util.Log;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.model.*;
@@ -67,8 +68,10 @@ public class ApiClient {
         return apiService;
     }
 
-    /** OkHttp 拦截器：自动注入 Bearer token，并输出 Http 日志 */
+    /** OkHttp 拦截器：自动注入 Bearer token（长会话）+ 设备标识头，并输出 Http 日志 */
     private static class AuthInterceptor implements Interceptor {
+        private static String deviceName;
+
         private final SessionManager session;
         AuthInterceptor(SessionManager session) { this.session = session; }
 
@@ -87,6 +90,9 @@ public class ApiClient {
             if (token != null && !token.isEmpty()) {
                 builder.header("Authorization", "Bearer " + token);
             }
+            // 设备标识（登录时服务端据此建会话，供 Web 端设备管理/强制下线）
+            builder.header("X-Device-Type", "ANDROID");
+            builder.header("X-Device-Name", deviceName());
             Request request = builder.build();
 
             long start = System.currentTimeMillis();
@@ -97,12 +103,23 @@ public class ApiClient {
             Log.i(TAG, "<-- " + response.code() + " " + original.method() + " " + original.url()
                     + " (" + duration + "ms)");
 
-            // 401 时清除会话
+            // 401 时清除会话（长会话被强制下线/过期即回登录）
             if (response.code() == 401) {
                 Log.w(TAG, "收到 401，清除会话");
                 session.clearSession();
             }
             return response;
+        }
+
+        /** 设备名（机型），静态缓存避免每次请求重建 */
+        private static String deviceName() {
+            if (deviceName == null) {
+                String manufacturer = Build.MANUFACTURER;
+                String model = Build.MODEL;
+                deviceName = ((manufacturer != null && !manufacturer.isBlank()) ? manufacturer + " " : "")
+                        + (model != null ? model : "Android 设备");
+            }
+            return deviceName;
         }
     }
 
@@ -147,6 +164,12 @@ public class ApiClient {
 
         @GET("auth/me")
         Call<ApiResponse<UserInfo>> getCurrentUser();
+
+        @PATCH("auth/profile")
+        Call<ApiResponse<UserInfo>> updateProfile(@Body Map<String, String> body);
+
+        @POST("auth/change-password")
+        Call<ApiResponse<Map<String, Object>>> changePassword(@Body Map<String, String> body);
 
         // --- 文件 ---
         @GET("files")
@@ -220,6 +243,46 @@ public class ApiClient {
                 @Query("page") int page,
                 @Query("size") int size
         );
+
+        // --- 随手记笔记 ---
+        @GET("notes")
+        Call<ApiResponse<PagedResult<NoteSummary>>> listNotes(
+                @Query("keyword") String keyword,
+                @Query("viewUserId") String viewUserId,
+                @Query("page") int page,
+                @Query("size") int size
+        );
+
+        @POST("notes")
+        Call<ApiResponse<NoteDetail>> createNote(@Body Map<String, String> body);
+
+        @GET("notes/{id}")
+        Call<ApiResponse<NoteDetail>> getNote(@Path("id") String id);
+
+        @HTTP(method = "PATCH", path = "notes/{id}", hasBody = true)
+        Call<ApiResponse<NoteDetail>> updateNote(@Path("id") String id, @Body Map<String, String> body);
+
+        @DELETE("notes/{id}")
+        Call<ApiResponse<Map<String, Object>>> deleteNote(@Path("id") String id);
+
+        // --- 笔记媒体 ---
+        @Multipart
+        @POST("notes/media")
+        Call<ApiResponse<NoteMedia>> uploadNoteMedia(
+                @Part("mediaType") RequestBody mediaType,
+                @Part MultipartBody.Part file
+        );
+
+        @GET("notes/media/{id}")
+        Call<ResponseBody> getNoteMedia(@Path("id") String id);
+
+        // --- 笔记阅读进度（契约定义；Android 不主动上报）---
+        @GET("notes/{id}/progress")
+        Call<ApiResponse<NoteProgress>> getNoteProgress(@Path("id") String id);
+
+        @PUT("notes/{id}/progress")
+        Call<ApiResponse<Map<String, Object>>> saveNoteProgress(@Path("id") String id,
+                @Body Map<String, Object> body);
     }
 
     // ==================== 便捷方法 ====================
@@ -230,6 +293,19 @@ public class ApiClient {
 
     public Call<ApiResponse<UserInfo>> getCurrentUser() {
         return getService().getCurrentUser();
+    }
+
+    public Call<ApiResponse<UserInfo>> updateProfile(String displayName) {
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("displayName", displayName != null ? displayName : "");
+        return getService().updateProfile(body);
+    }
+
+    public Call<ApiResponse<Map<String, Object>>> changePassword(String oldPassword, String newPassword) {
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("oldPassword", oldPassword != null ? oldPassword : "");
+        body.put("newPassword", newPassword != null ? newPassword : "");
+        return getService().changePassword(body);
     }
 
     public Call<ApiResponse<PagedResult<FileItem>>> listFiles(String storageRootId, String parentId,
@@ -318,5 +394,57 @@ public class ApiClient {
 
     public Call<ApiResponse<PagedResult<DownloadTask>>> listDownloads(String status, int page, int size) {
         return getService().listDownloads(status, page, size);
+    }
+
+    // ==================== 随手记笔记 ====================
+
+    public Call<ApiResponse<PagedResult<NoteSummary>>> listNotes(String keyword, String viewUserId,
+                                                                  int page, int size) {
+        return getService().listNotes(keyword, viewUserId, page, size);
+    }
+
+    public Call<ApiResponse<NoteDetail>> createNote(String title, String content) {
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("title", title != null ? title : "");
+        body.put("content", content != null ? content : "");
+        return getService().createNote(body);
+    }
+
+    public Call<ApiResponse<NoteDetail>> getNote(String id) {
+        return getService().getNote(id);
+    }
+
+    public Call<ApiResponse<NoteDetail>> updateNote(String id, String title, String content,
+                                                    String baseUpdatedAt) {
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("title", title != null ? title : "");
+        body.put("content", content != null ? content : "");
+        // 乐观并发：携带本次编辑基于的 updatedAt；早于服务端当前值则返回 NOTE_CONFLICT
+        if (baseUpdatedAt != null && !baseUpdatedAt.isEmpty()) {
+            body.put("baseUpdatedAt", baseUpdatedAt);
+        }
+        return getService().updateNote(id, body);
+    }
+
+    public Call<ApiResponse<Map<String, Object>>> deleteNote(String id) {
+        return getService().deleteNote(id);
+    }
+
+    // ==================== 笔记媒体 ====================
+
+    /**
+     * 上传笔记媒体（图片/录音/画画），mediaType 取值 IMAGE / AUDIO / DRAWING。
+     */
+    public Call<ApiResponse<NoteMedia>> uploadNoteMedia(String mediaType, byte[] bytes,
+                                                        String fileName, String mime) {
+        RequestBody typePart = RequestBody.create(mediaType, MediaType.parse("text/plain"));
+        RequestBody fileBody = RequestBody.create(bytes, MediaType.parse(mime != null ? mime : "application/octet-stream"));
+        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", fileName, fileBody);
+        return getService().uploadNoteMedia(typePart, filePart);
+    }
+
+    /** 获取笔记媒体字节流（带鉴权，供编辑器回读图片/录音） */
+    public Call<ResponseBody> getNoteMedia(String mediaId) {
+        return getService().getNoteMedia(mediaId);
     }
 }

@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ==================== Common ==================== -->
+    <string name="common_back">Back</string>
+    <string name="common_save">Save</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_confirm">OK</string>
+    <string name="common_close">Close</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_deleted">Deleted</string>
+    <string name="common_delete_failed">Delete failed</string>
+    <string name="common_confirm_delete">Confirm Delete</string>
+    <string name="common_delete_message">Delete \"%1$s\"?</string>
+    <string name="common_save_failed">Save failed</string>
+    <string name="common_save_failed_detail">Save failed: %1$s</string>
+    <string name="common_load_failed">Load failed</string>
+    <string name="common_load_failed_detail">Load failed: %1$s</string>
+    <string name="common_network_error">Network error: %1$s</string>
+    <string name="common_network_error_short">Network error</string>
+
+    <!-- ==================== Bottom navigation ==================== -->
+    <string name="nav_files">Files</string>
+    <string name="nav_mine">Me</string>
+
+    <!-- ==================== Login ==================== -->
+    <string name="login_title">BaiFlow Login</string>
+    <string name="login_username_hint">Username</string>
+    <string name="login_password_hint">Password</string>
+    <string name="login_button">Log In</string>
+    <string name="login_logging_in">Logging in...</string>
+    <string name="login_change_server">Change Server</string>
+    <string name="login_server_prefix">Server: %1$s</string>
+    <string name="login_input_required">Enter username and password</string>
+    <string name="login_failed">Login failed</string>
+    <string name="login_success">Logged in</string>
+    <string name="login_fetch_user_failed">Failed to fetch user info</string>
+
+    <!-- ==================== Server config ==================== -->
+    <string name="server_config_title">Server Settings</string>
+    <string name="server_url_hint">Server URL</string>
+    <string name="server_connect">Connect</string>
+    <string name="server_checking">Checking…</string>
+    <string name="server_url_required">Enter a server address</string>
+    <string name="server_connect_success">Connected, server address saved</string>
+    <string name="server_connect_failed">Unable to connect to server (%1$s)\nCheck the address, network, or confirm the backend is running</string>
+
+    <!-- ==================== Files ==================== -->
+    <string name="files_title">File Center</string>
+    <string name="files_up_level">Up</string>
+    <string name="files_upload">Upload</string>
+    <string name="files_view_user">View User</string>
+    <string name="files_empty">This folder is empty</string>
+    <string name="files_folder">Folder</string>
+    <string name="files_privacy_tag">Private</string>
+    <string name="files_type_icon_desc">File type icon</string>
+    <string name="files_upload_started">Upload started: %1$s</string>
+    <string name="files_download">Download</string>
+    <string name="files_download_started">Download started: %1$s</string>
+    <string name="files_no_storage_root">No storage root available</string>
+    <string name="files_load_storage_root_failed">Failed to load storage roots</string>
+    <string name="files_load_users_failed">Failed to load user list</string>
+    <string name="files_my_files">My Files</string>
+    <string name="files_user_display">%1$s (%2$s)</string>
+    <string name="files_all_users">All (all users)</string>
+    <string name="files_privacy_verify_title">Private Folder Access</string>
+    <string name="files_privacy_verify_message">This folder is protected. Enter the private password to access it.</string>
+    <string name="files_privacy_password_hint">Enter private password</string>
+    <string name="files_privacy_verify">Verify</string>
+    <string name="files_privacy_verify_success">Verified</string>
+    <string name="files_privacy_wrong_password">Wrong password</string>
+    <string name="files_back_up">Go Back</string>
+
+    <!-- ==================== Notes list ==================== -->
+    <string name="notes_title">Quick Notes</string>
+    <string name="notes_new">New</string>
+    <string name="notes_search_hint">Search notes</string>
+    <string name="notes_empty">No notes yet. Tap New to create one.</string>
+    <string name="notes_untitled">Untitled</string>
+    <string name="notes_my_notes">My Notes</string>
+
+    <!-- ==================== Note editor ==================== -->
+    <string name="note_edit_title_hint">Title</string>
+    <string name="note_edit_content_hint">Start typing…</string>
+    <string name="note_edit_new_title">New Note</string>
+    <string name="note_edit_edit_title">Edit Note</string>
+    <string name="note_edit_bold_sample">bold text</string>
+    <string name="note_edit_italic_sample">italic text</string>
+    <string name="note_edit_strike_sample">strikethrough text</string>
+    <string name="note_edit_code_sample">code</string>
+    <string name="note_edit_link_sample">link</string>
+    <string name="note_edit_insert_link">Insert Link</string>
+    <string name="note_edit_saved">Saved</string>
+    <string name="note_edit_conflict_title">Conflict Detected</string>
+    <string name="note_edit_conflict_message">This note was modified on another device. Overwriting will lose their changes; reloading will lose your unsaved changes.</string>
+    <string name="note_edit_overwrite">Overwrite</string>
+    <string name="note_edit_reload">Reload</string>
+    <string name="note_edit_reloaded">Reloaded</string>
+    <string name="note_edit_mic_permission_required">Microphone permission is required to record audio</string>
+    <string name="note_edit_image_alt">Image</string>
+    <string name="note_edit_image_title">Image</string>
+    <string name="note_edit_image_decode_failed">Failed to decode image</string>
+    <string name="note_edit_image_read_failed">Failed to read image</string>
+    <string name="note_edit_image_upload_failed">Failed to upload image</string>
+    <string name="note_edit_image_view">View</string>
+    <string name="note_edit_image_replace">Replace</string>
+    <string name="note_edit_image_not_loaded">Image not loaded yet</string>
+    <string name="note_edit_recording_title">Record</string>
+    <string name="note_edit_recording_hint">Tap to start recording</string>
+    <string name="note_edit_record_start">Start</string>
+    <string name="note_edit_record_stop">Stop</string>
+    <string name="note_edit_recording_status">Recording…</string>
+    <string name="note_edit_processing">Processing…</string>
+    <string name="note_edit_recording_start_failed">Failed to start recording: %1$s</string>
+    <string name="note_edit_recording_empty">Recording is empty</string>
+    <string name="note_edit_recording_read_failed">Failed to read recording</string>
+    <string name="note_edit_recording_upload_failed">Failed to upload recording</string>
+    <string name="note_edit_audio_alt">Recording</string>
+    <string name="note_edit_audio_filename">Recording.m4a</string>
+    <string name="note_edit_playing">Playing…</string>
+    <string name="note_edit_audio_load_failed">Failed to load audio</string>
+    <string name="note_edit_play_failed">Playback failed</string>
+
+    <!-- ==================== Drawing ==================== -->
+    <string name="note_draw_title">Drawing</string>
+    <string name="note_draw_empty">Canvas is empty</string>
+    <string name="note_edit_drawing_filename">Drawing.png</string>
+
+    <!-- ==================== File preview ==================== -->
+    <string name="preview_title_default">Preview</string>
+    <string name="preview_loading">Loading…</string>
+    <string name="preview_error">Unable to load preview</string>
+    <string name="preview_unsupported">Preview not supported</string>
+    <string name="preview_download_view">Download and view</string>
+    <string name="preview_playing">Now playing: %1$s</string>
+    <string name="preview_audio_default">Audio</string>
+
+    <!-- ==================== Mine ==================== -->
+    <string name="mine_profile">Edit Profile</string>
+    <string name="mine_password">Change Password</string>
+    <string name="mine_language">Language</string>
+    <string name="mine_transfers">Transfers</string>
+    <string name="mine_logout">Log Out</string>
+    <string name="mine_not_logged_in">Not logged in</string>
+    <string name="mine_display_name_hint">Display name</string>
+    <string name="mine_profile_updated">Profile updated</string>
+    <string name="mine_old_password_hint">Old password</string>
+    <string name="mine_new_password_hint">New password</string>
+    <string name="mine_confirm_password_hint">Confirm new password</string>
+    <string name="mine_password_message">After changing, all devices will be signed out and must log in again</string>
+    <string name="mine_fill_all_fields">Please fill in all fields</string>
+    <string name="mine_password_mismatch">The two new passwords do not match</string>
+    <string name="mine_password_changed">Password changed, please log in again</string>
+    <string name="mine_password_change_failed">Change failed</string>
+    <string name="mine_language_chinese">Chinese</string>
+    <string name="mine_language_english">English</string>
+
+    <!-- ==================== Transfer ==================== -->
+    <string name="transfer_title">Download Tasks</string>
+    <string name="transfer_empty">No download tasks</string>
+    <string name="transfer_error">Error: %1$s</string>
+    <string name="transfer_status_waiting">Waiting</string>
+    <string name="transfer_status_running">Downloading</string>
+    <string name="transfer_status_paused">Paused</string>
+    <string name="transfer_status_completed">Completed</string>
+    <string name="transfer_status_failed">Failed</string>
+    <string name="transfer_upload_preparing">Preparing upload...</string>
+    <string name="transfer_upload_uploading">Uploading...</string>
+    <string name="transfer_upload_completed">Upload complete</string>
+    <string name="transfer_upload_failed">Upload failed</string>
+    <string name="transfer_upload_failed_detail">Upload failed: %1$s</string>
+    <string name="transfer_upload_notification_title">BaiFlow Upload</string>
+    <string name="transfer_upload_channel_name">Upload notifications</string>
+    <string name="transfer_upload_channel_desc">BaiFlow file upload progress</string>
+    <string name="transfer_download_preparing">Preparing download...</string>
+    <string name="transfer_download_server_error">Download failed: server error</string>
+    <string name="transfer_download_completed">Download complete</string>
+    <string name="transfer_download_failed_detail">Download failed: %1$s</string>
+    <string name="transfer_download_notification_title">BaiFlow Download</string>
+    <string name="transfer_download_channel_name">Download notifications</string>
+    <string name="transfer_download_channel_desc">BaiFlow file download progress</string>
+    <string name="transfer_unknown_size">Unknown</string>
+</resources>

@@ -63,7 +63,7 @@ public class NoteController {
                                           Authentication auth) {
         return ApiResponse.success(
                 noteService.updateNote(id, auth.getPrincipal().toString(), isAdmin(auth),
-                        req.title(), req.content()));
+                        req.title(), req.content(), req.baseUpdatedAt()));
     }
 
     /** 软删除笔记 */

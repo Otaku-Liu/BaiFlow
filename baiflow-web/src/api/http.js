@@ -24,18 +24,20 @@ http.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status
-    if (status === 401 || status === 403) {
-      const authStore = useAuthStore()
-      // 防止多个并发请求同时弹窗和跳转
+    const authStore = useAuthStore()
+    if (status === 401) {
+      // 会话过期 / 被强制下线：清会话并回登录
       if (!authErrorShown) {
         authErrorShown = true
         authStore.clearSession()
-        const msg = status === 403 ? '权限不足，请重新登录' : '登录已过期，请重新登录'
-        ElMessage.error(msg)
+        ElMessage.error('登录已过期，请重新登录')
         setTimeout(() => {
           window.location.href = '/login'
         }, 1500)
       }
+    } else if (status === 403) {
+      // 已登录但无权限：保留登录态，仅提示
+      ElMessage.error(error.response?.data?.message || '无权限执行此操作')
     }
     return Promise.reject(error)
   }

@@ -82,15 +82,31 @@ public class NoteServiceImpl implements NoteService {
     @Override
     @Transactional
     public NoteDetail updateNote(String id, String userId, boolean isAdmin,
-                                 String title, String content) {
+                                 String title, String content, String baseUpdatedAt) {
         Note note = requireNote(id);
         checkAccess(note, userId, isAdmin);
+        // 乐观并发：客户端基于的 updatedAt 早于服务端当前值 → 说明被其他设备改过，返回冲突
+        if (baseUpdatedAt != null && !baseUpdatedAt.isBlank()) {
+            LocalDateTime base = parseBaseTimestamp(baseUpdatedAt);
+            if (base != null && note.getUpdatedAt() != null && note.getUpdatedAt().isAfter(base)) {
+                throw new BusinessException(ErrorCode.NOTE_CONFLICT, "笔记已在其他设备被修改");
+            }
+        }
         if (title != null) note.setTitle(title);
         if (content != null) note.setContent(content);
         note.setUpdatedAt(LocalDateTime.now());
         noteMapper.updateById(note);
         publishUpdated(note.getUserId(), note);
         return NoteDetail.from(note);
+    }
+
+    /** 解析客户端回传的 ISO 时间戳；无法解析返回 null（跳过并发校验，不阻塞保存） */
+    private LocalDateTime parseBaseTimestamp(String s) {
+        try {
+            return LocalDateTime.parse(s);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override

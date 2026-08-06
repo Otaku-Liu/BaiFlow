@@ -65,6 +65,9 @@ public class FilesFragment extends Fragment {
     private FileAdapter adapter;
     private SessionManager session;
     private ApiClient client;
+    private com.google.android.material.button.MaterialButton btnUp;
+    /** 文件夹导航栈（栈顶=当前目录；空=根目录），支持逐级返回上一级 */
+    private final java.util.ArrayDeque<FileItem> folderStack = new java.util.ArrayDeque<>();
 
     private List<StorageRoot> roots = new ArrayList<>();
     private List<UserInfo> users = new ArrayList<>();
@@ -88,7 +91,7 @@ public class FilesFragment extends Fragment {
                     uploadIntent.putExtra(UploadService.EXTRA_VIEW_USER_ID, currentViewUserId);
                     uploadIntent.putExtra("file_name", fileName);
                     requireContext().startForegroundService(uploadIntent);
-                    Toast.makeText(requireContext(), "上传已开始: " + fileName, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), getString(R.string.files_upload_started, fileName), Toast.LENGTH_SHORT).show();
                 }
             });
 
@@ -114,6 +117,7 @@ public class FilesFragment extends Fragment {
         adminRow = view.findViewById(R.id.adminRow);
         spinnerUser = view.findViewById(R.id.spinnerUser);
         View btnUpload = view.findViewById(R.id.btnUpload);
+        btnUp = view.findViewById(R.id.btnUp);
 
         adapter = new FileAdapter();
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -121,6 +125,9 @@ public class FilesFragment extends Fragment {
 
         swipeRefresh.setOnRefreshListener(this::loadFiles);
         btnUpload.setOnClickListener(v -> filePicker.launch("*/*"));
+        // 「上一级」按钮：逐级返回，根目录时置灰
+        btnUp.setOnClickListener(v -> navigateUp());
+        updateUpButton();
 
         // 返回键：在子目录时先返回上级
         requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),
@@ -154,25 +161,27 @@ public class FilesFragment extends Fragment {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     roots = response.body().getData();
                     if (roots == null || roots.isEmpty()) {
-                        Toast.makeText(requireContext(), "没有可用的存储根目录", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), getString(R.string.files_no_storage_root), Toast.LENGTH_SHORT).show();
                         return;
                     }
                     StorageRoot first = roots.get(0);
                     if (!first.getId().equals(currentRootId)) {
                         currentRootId = first.getId();
+                        folderStack.clear();
                         currentParentId = null;
                         currentPath = "";
                         tvPath.setVisibility(View.GONE);
+                        updateUpButton();
                         loadFiles();
                     }
                 } else {
-                    Toast.makeText(requireContext(), "无法加载存储根目录", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), getString(R.string.files_load_storage_root_failed), Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(Call<ApiResponse<List<StorageRoot>>> call, Throwable t) {
-                Toast.makeText(requireContext(), "网络错误：" + t.getMessage(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), getString(R.string.common_network_error, t.getMessage()), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -203,7 +212,7 @@ public class FilesFragment extends Fragment {
 
             @Override
             public void onFailure(Call<ApiResponse<PagedResult<UserInfo>>> call, Throwable t) {
-                Toast.makeText(requireContext(), "用户列表加载失败", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), getString(R.string.files_load_users_failed), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -217,17 +226,17 @@ public class FilesFragment extends Fragment {
         final List<String> targetIds = new ArrayList<>();   // 与 names 平行；空串表示"全部"
         String myId = session.getUserId();
 
-        names.add("我的文件");
+        names.add(getString(R.string.files_my_files));
         targetIds.add(myId != null ? myId : "");
 
         for (UserInfo u : users) {
             if (u.getId() != null && u.getId().equals(myId)) continue;   // 跳过自己，避免与"我的文件"重复
             String display = u.getDisplayName() != null ? u.getDisplayName() : u.getUsername();
-            names.add(display + "（" + u.getUsername() + "）");
+            names.add(getString(R.string.files_user_display, display, u.getUsername()));
             targetIds.add(u.getId());
         }
 
-        names.add("全部（所有用户）");
+        names.add(getString(R.string.files_all_users));
         targetIds.add("");
 
         ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(requireContext(),
@@ -241,9 +250,11 @@ public class FilesFragment extends Fragment {
                 String target = targetIds.get(pos);
                 currentViewUserId = target.isEmpty() ? null : target;
                 // 切换用户后回到根目录重新加载
+                folderStack.clear();
                 currentParentId = null;
                 currentPath = "";
                 tvPath.setVisibility(View.GONE);
+                updateUpButton();
                 loadFiles();
             }
 
@@ -287,7 +298,7 @@ public class FilesFragment extends Fragment {
                     public void onFailure(Call<ApiResponse<PagedResult<FileItem>>> call, Throwable t) {
                         swipeRefresh.setRefreshing(false);
                         showLoading(false);
-                        Toast.makeText(requireContext(), "网络错误：" + t.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), getString(R.string.common_network_error, t.getMessage()), Toast.LENGTH_SHORT).show();
                     }
                 });
     }
@@ -321,20 +332,20 @@ public class FilesFragment extends Fragment {
     // ---- 隐私密码对话框 ----
     private void showPrivacyPasswordDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("隐私文件夹访问验证");
-        builder.setMessage("此文件夹受隐私保护，需要输入隐私密码才能访问。");
+        builder.setTitle(getString(R.string.files_privacy_verify_title));
+        builder.setMessage(getString(R.string.files_privacy_verify_message));
 
         final EditText input = new EditText(requireContext());
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        input.setHint("请输入隐私密码");
+        input.setHint(getString(R.string.files_privacy_password_hint));
         builder.setView(input);
 
-        builder.setPositiveButton("验证", (dialog, which) -> {
+        builder.setPositiveButton(getString(R.string.files_privacy_verify), (dialog, which) -> {
             String password = input.getText().toString().trim();
             if (!password.isEmpty()) { verifyPrivacyAndRetry(password); }
         });
-        builder.setNegativeButton("返回上级", (dialog, which) -> navigateUp());
+        builder.setNegativeButton(getString(R.string.files_back_up), (dialog, which) -> navigateUp());
         builder.setCancelable(false);
         builder.show();
     }
@@ -352,37 +363,57 @@ public class FilesFragment extends Fragment {
                     String token = data != null ? (String) data.get("accessToken") : null;
                     if (token != null) {
                         privacyTokens.put(folderId, token);
-                        Toast.makeText(requireContext(), "验证成功", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), getString(R.string.files_privacy_verify_success), Toast.LENGTH_SHORT).show();
                         loadFiles();
                     }
                 } else {
-                    String msg = response.body() != null ? response.body().getMessage() : "密码错误";
+                    String msg = response.body() != null ? response.body().getMessage() : getString(R.string.files_privacy_wrong_password);
                     Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
-                Toast.makeText(requireContext(), "网络错误", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), getString(R.string.common_network_error_short), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
     // ---- 导航 ----
     private void navigateTo(FileItem folder) {
+        folderStack.push(folder);
         currentParentId = folder.getId();
-        currentPath = currentPath.isEmpty() ? folder.getName() : currentPath + " / " + folder.getName();
-        tvPath.setText(currentPath);
-        tvPath.setVisibility(View.VISIBLE);
+        rebuildPath();
         loadFiles();
     }
 
+    /** 返回上一级；根目录时无操作（按钮此时置灰） */
     private void navigateUp() {
-        if (currentParentId == null) { return; }
-        currentParentId = null;
-        currentPath = "";
-        tvPath.setVisibility(View.GONE);
+        if (folderStack.isEmpty()) { return; }
+        folderStack.pop();
+        currentParentId = folderStack.isEmpty() ? null : folderStack.peek().getId();
+        rebuildPath();
         loadFiles();
+    }
+
+    /** 从导航栈重建路径文案，并维护「上一级」按钮可用态 */
+    private void rebuildPath() {
+        StringBuilder sb = new StringBuilder();
+        java.util.Iterator<FileItem> it = folderStack.descendingIterator();
+        while (it.hasNext()) {
+            if (sb.length() > 0) { sb.append(" / "); }
+            sb.append(it.next().getName());
+        }
+        currentPath = sb.toString();
+        tvPath.setText(currentPath);
+        tvPath.setVisibility(folderStack.isEmpty() ? View.GONE : View.VISIBLE);
+        updateUpButton();
+    }
+
+    private void updateUpButton() {
+        if (btnUp != null) {
+            btnUp.setEnabled(!folderStack.isEmpty());
+        }
     }
 
     private void showLoading(boolean show) {
@@ -407,7 +438,7 @@ public class FilesFragment extends Fragment {
             FileItem item = items.get(pos);
 
             holder.tvName.setText(item.getName());
-            String meta = item.isDirectory() ? "文件夹" : FormatUtil.formatSize(item.getSizeBytes());
+            String meta = item.isDirectory() ? getString(R.string.files_folder) : FormatUtil.formatSize(item.getSizeBytes());
             if (item.getCreatedAt() != null) { meta += " · " + item.getCreatedAt().substring(0, 10); }
             holder.tvMeta.setText(meta);
 
@@ -494,11 +525,11 @@ public class FilesFragment extends Fragment {
         downloadIntent.putExtra(DownloadService.EXTRA_SIZE_BYTES,
                 item.getSizeBytes() != null ? item.getSizeBytes() : 0L);
         requireContext().startForegroundService(downloadIntent);
-        Toast.makeText(requireContext(), "下载已开始: " + item.getName(), Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), getString(R.string.files_download_started, item.getName()), Toast.LENGTH_SHORT).show();
     }
 
     private void showFileContextMenu(FileItem item) {
-        String[] options = item.isDirectory() ? new String[]{"删除"} : new String[]{"下载", "删除"};
+        String[] options = item.isDirectory() ? new String[]{getString(R.string.common_delete)} : new String[]{getString(R.string.files_download), getString(R.string.common_delete)};
         new AlertDialog.Builder(requireContext())
                 .setTitle(item.getName())
                 .setItems(options, (dialog, which) -> {
@@ -517,30 +548,30 @@ public class FilesFragment extends Fragment {
 
     private void confirmDelete(FileItem item) {
         new AlertDialog.Builder(requireContext())
-                .setTitle("确认删除")
-                .setMessage("确定要删除 \"" + item.getName() + "\" 吗？")
-                .setPositiveButton("删除", (dialog, which) -> {
+                .setTitle(getString(R.string.common_confirm_delete))
+                .setMessage(getString(R.string.common_delete_message, item.getName()))
+                .setPositiveButton(getString(R.string.common_delete), (dialog, which) -> {
                     String token = privacyTokens.get(currentParentId);
                     client.deleteFile(item.getId(), token).enqueue(new Callback<ApiResponse<Map<String, Object>>>() {
                         @Override
                         public void onResponse(Call<ApiResponse<Map<String, Object>>> call,
                                                Response<ApiResponse<Map<String, Object>>> response) {
                             if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
-                                Toast.makeText(requireContext(), "已删除", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(requireContext(), getString(R.string.common_deleted), Toast.LENGTH_SHORT).show();
                                 loadFiles();
                             } else {
-                                String msg = response.body() != null ? response.body().getMessage() : "删除失败";
+                                String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_delete_failed);
                                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
                             }
                         }
 
                         @Override
                         public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
-                            Toast.makeText(requireContext(), "网络错误", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(requireContext(), getString(R.string.common_network_error_short), Toast.LENGTH_SHORT).show();
                         }
                     });
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(getString(R.string.common_cancel), null)
                 .show();
     }
 }

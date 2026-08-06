@@ -63,6 +63,7 @@ export default {
     title: '文件中心',
     viewUserSpace: '查看用户空间',
     currentPath: '当前路径：',
+    upLevel: '上一级',
     rootDirectory: '根目录',
     myFiles: '我的文件',
     privacy: '隐私',
@@ -264,6 +265,10 @@ export default {
     synced: '这篇笔记已在其他设备更新',
     saveFailed: '保存失败',
     loadFailed: '加载失败',
-    deleteFailed: '删除失败'
+    deleteFailed: '删除失败',
+    conflictTitle: '检测到冲突',
+    conflictMessage: '这篇笔记已在其他设备被修改。覆盖会丢失对方的改动，重新加载会丢失你本次未保存的改动。',
+    conflictOverwrite: '覆盖',
+    conflictReload: '重新加载'
   }
 }

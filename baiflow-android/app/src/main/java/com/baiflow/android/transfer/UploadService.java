@@ -11,6 +11,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.model.ApiResponse;
@@ -63,7 +64,7 @@ public class UploadService extends Service {
         File file = new File(filePath);
         String fileName = file.getName();
 
-        startForeground(NOTIFICATION_ID, buildNotification(fileName, "准备上传...", false));
+        startForeground(NOTIFICATION_ID, buildNotification(fileName, getString(R.string.transfer_upload_preparing), false));
 
         new Thread(() -> performUpload(storageRootId, parentId, viewUserId, file)).start();
 
@@ -78,20 +79,20 @@ public class UploadService extends Service {
             ApiClient client = ApiClient.getInstance(session);
             Call<ApiResponse<FileItem>> call = client.uploadFile(storageRootId, parentId,
                     fileBytes, fileName, viewUserId, null);
-            updateNotification(fileName, "上传中...", true);
+            updateNotification(fileName, getString(R.string.transfer_upload_uploading), true);
             Response<ApiResponse<FileItem>> response = call.execute();
 
             if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
-                updateNotification(fileName, "上传完成", false);
+                updateNotification(fileName, getString(R.string.transfer_upload_completed), false);
                 Log.i(TAG, "上传完成: " + fileName);
             } else {
-                String msg = response.body() != null ? response.body().getMessage() : "上传失败";
-                updateNotification(fileName, "上传失败：" + msg, false);
+                String msg = response.body() != null ? response.body().getMessage() : getString(R.string.transfer_upload_failed);
+                updateNotification(fileName, getString(R.string.transfer_upload_failed_detail, msg), false);
             }
 
         } catch (Exception e) {
             Log.e(TAG, "上传失败", e);
-            updateNotification(file.getName(), "上传失败：" + e.getMessage(), false);
+            updateNotification(file.getName(), getString(R.string.transfer_upload_failed_detail, e.getMessage()), false);
         }
         stopSelf();
     }
@@ -110,7 +111,7 @@ public class UploadService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("BaiFlow 上传")
+                .setContentTitle(getString(R.string.transfer_upload_notification_title))
                 .setContentText(fileName + " - " + status)
                 .setSmallIcon(android.R.drawable.stat_sys_upload)
                 .setContentIntent(pending)
@@ -125,8 +126,8 @@ public class UploadService extends Service {
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "上传通知", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("BaiFlow 文件上传进度");
+                    CHANNEL_ID, getString(R.string.transfer_upload_channel_name), NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription(getString(R.string.transfer_upload_channel_desc));
             notificationManager.createNotificationChannel(channel);
         }
     }

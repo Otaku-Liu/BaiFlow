@@ -58,12 +58,13 @@ logging:
     com.baiflow: INFO
 
 baiflow:
-  jwt:
-    secret: ${BAIFLOW_JWT_SECRET:replace-with-a-32-byte-secret}
-    expire-seconds: ${BAIFLOW_JWT_EXPIRE_SECONDS:7200}
+  auth-session:
+    web-hours: ${BAIFLOW_AUTH_WEB_HOURS:2}
+    android-days: ${BAIFLOW_AUTH_ANDROID_DAYS:180}
   init-admin:
     username: ${BAIFLOW_INIT_ADMIN_USERNAME:admin}
     password: ${BAIFLOW_INIT_ADMIN_PASSWORD:admin}
   storage:
     default-root-path: ${BAIFLOW_STORAGE_ROOT:/home/lxb/baiflow-data/files}
     avatar-path: ${BAIFLOW_AVATAR_PATH:/home/lxb/baiflow-data/avatars}
+    note-media-path: ${BAIFLOW_NOTE_MEDIA_PATH:/home/lxb/baiflow-data/notes-media}

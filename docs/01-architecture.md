@@ -44,7 +44,7 @@ Vue 3 Web 管理台          Android Java App
 ## MVP 功能
 
 ### 认证与权限
-- 用户名密码登录 + JWT token
+- 用户名密码登录 + **登录会话 token**（长会话，吊销驱动 + ANDROID 180 天不活跃兜底 / WEB 固定 2h，见 `docs/09-auth-sessions.md`）
 - 三种角色：ADMIN、USER、GUEST
 - 访客通过分享 URL 访问，不登录管理台
 
@@ -107,15 +107,18 @@ Vue 3 Web 管理台          Android Java App
 - 防火墙只开放必要端口
 
 ### 认证与鉴权
-- 受保护 API 必须携带 `Authorization: Bearer <token>`
-- 强制 ADMIN/USER/GUEST 角色行为
-- 密码、分享 token、提取码、隐私密码只存 hash
+- 受保护 API 必须携带会话 token：`Authorization: Bearer <token>` 或 `?token=`（后者供 `<img>/<video>`、SSE 等浏览器直接请求）
+- 服务端逐请求校验 `bf_auth_session`（未吊销/未过期），吊销即时生效；ANDROID 会话滑动续期
+- **未认证/会话过期返回 401**（客户端清会话回登录）；已登录但无权限返回 403（保留登录态，仅提示）
+- 强制 ADMIN/USER/GUEST 角色行为（role 取用户表当前值）
+- 密码、分享 token、提取码、隐私密码、会话 token 只存 hash
 
 ### 文件安全
 - 文件操作限制在配置的 Storage Root 内，路径需归一化校验
 - 后端进程不用 root 运行
 - 不向客户端暴露服务器绝对路径
 - 启动时自动从 `baiflow.storage.default-root-path` 创建默认存储根目录（环境变量 `BAIFLOW_STORAGE_ROOT`）
+- 笔记媒体（随手记图片/录音/画画）落盘 `baiflow.notes.media-path`（环境变量 `BAIFLOW_NOTE_MEDIA_PATH`），独立于文件中心，不参与 `/api/files` 列表
 
 ### 分享安全
 - 分享 URL 使用不可预测 token，数据库只存 hash

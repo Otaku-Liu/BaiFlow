@@ -56,7 +56,7 @@ public class ServerConfigActivity extends AppCompatActivity {
     private void testAndConnect() {
         String url = etServerUrl.getText().toString().trim();
         if (url.isEmpty()) {
-            showError("请输入服务器地址");
+            showError(getString(R.string.server_url_required));
             return;
         }
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -78,11 +78,11 @@ public class ServerConfigActivity extends AppCompatActivity {
                 setLoading(false);
                 if (ok) {
                     session.saveServerUrl(finalUrl);
-                    Toast.makeText(this, "连接成功，服务器地址已保存", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, getString(R.string.server_connect_success), Toast.LENGTH_SHORT).show();
                     startActivity(new Intent(this, LoginActivity.class));
                     finish();
                 } else {
-                    showError("无法连接服务器（" + finalUrl + "）\n请检查地址、网络，或确认后端已启动");
+                    showError(getString(R.string.server_connect_failed, finalUrl));
                 }
             });
         }).start();
@@ -90,7 +90,7 @@ public class ServerConfigActivity extends AppCompatActivity {
 
     private void setLoading(boolean loading) {
         btnConnect.setEnabled(!loading);
-        btnConnect.setText(loading ? "检测中…" : "连接服务器");
+        btnConnect.setText(loading ? getString(R.string.server_checking) : getString(R.string.server_connect));
     }
 
     private void showError(String msg) {

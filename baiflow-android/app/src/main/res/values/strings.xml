@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ==================== 通用 ==================== -->
+    <string name="common_back">返回</string>
+    <string name="common_save">保存</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_confirm">确定</string>
+    <string name="common_close">关闭</string>
+    <string name="common_delete">删除</string>
+    <string name="common_deleted">已删除</string>
+    <string name="common_delete_failed">删除失败</string>
+    <string name="common_confirm_delete">确认删除</string>
+    <string name="common_delete_message">确定要删除 \"%1$s\" 吗？</string>
+    <string name="common_save_failed">保存失败</string>
+    <string name="common_save_failed_detail">保存失败：%1$s</string>
+    <string name="common_load_failed">加载失败</string>
+    <string name="common_load_failed_detail">加载失败：%1$s</string>
+    <string name="common_network_error">网络错误：%1$s</string>
+    <string name="common_network_error_short">网络错误</string>
+
+    <!-- ==================== 底部导航 ==================== -->
+    <string name="nav_files">文件</string>
+    <string name="nav_mine">我的</string>
+
+    <!-- ==================== 登录 ==================== -->
+    <string name="login_title">BaiFlow 登录</string>
+    <string name="login_username_hint">用户名</string>
+    <string name="login_password_hint">密码</string>
+    <string name="login_button">登 录</string>
+    <string name="login_logging_in">登录中...</string>
+    <string name="login_change_server">更换服务器</string>
+    <string name="login_server_prefix">服务器：%1$s</string>
+    <string name="login_input_required">请输入用户名和密码</string>
+    <string name="login_failed">登录失败</string>
+    <string name="login_success">登录成功</string>
+    <string name="login_fetch_user_failed">获取用户信息失败</string>
+
+    <!-- ==================== 服务器配置 ==================== -->
+    <string name="server_config_title">服务器配置</string>
+    <string name="server_url_hint">服务器地址</string>
+    <string name="server_connect">连接服务器</string>
+    <string name="server_checking">检测中…</string>
+    <string name="server_url_required">请输入服务器地址</string>
+    <string name="server_connect_success">连接成功，服务器地址已保存</string>
+    <string name="server_connect_failed">无法连接服务器（%1$s）\n请检查地址、网络，或确认后端已启动</string>
+
+    <!-- ==================== 文件 ==================== -->
+    <string name="files_title">文件中心</string>
+    <string name="files_up_level">上一级</string>
+    <string name="files_upload">上传</string>
+    <string name="files_view_user">查看用户</string>
+    <string name="files_empty">此目录为空</string>
+    <string name="files_folder">文件夹</string>
+    <string name="files_privacy_tag">隐私</string>
+    <string name="files_type_icon_desc">文件类型图标</string>
+    <string name="files_upload_started">上传已开始: %1$s</string>
+    <string name="files_download">下载</string>
+    <string name="files_download_started">下载已开始: %1$s</string>
+    <string name="files_no_storage_root">没有可用的存储根目录</string>
+    <string name="files_load_storage_root_failed">无法加载存储根目录</string>
+    <string name="files_load_users_failed">用户列表加载失败</string>
+    <string name="files_my_files">我的文件</string>
+    <string name="files_user_display">%1$s（%2$s）</string>
+    <string name="files_all_users">全部（所有用户）</string>
+    <string name="files_privacy_verify_title">隐私文件夹访问验证</string>
+    <string name="files_privacy_verify_message">此文件夹受隐私保护，需要输入隐私密码才能访问。</string>
+    <string name="files_privacy_password_hint">请输入隐私密码</string>
+    <string name="files_privacy_verify">验证</string>
+    <string name="files_privacy_verify_success">验证成功</string>
+    <string name="files_privacy_wrong_password">密码错误</string>
+    <string name="files_back_up">返回上级</string>
+
+    <!-- ==================== 随手记列表 ==================== -->
+    <string name="notes_title">随手记</string>
+    <string name="notes_new">新建</string>
+    <string name="notes_search_hint">搜索笔记</string>
+    <string name="notes_empty">暂无笔记，点右上角新建</string>
+    <string name="notes_untitled">无标题</string>
+    <string name="notes_my_notes">我的笔记</string>
+
+    <!-- ==================== 笔记编辑 ==================== -->
+    <string name="note_edit_title_hint">标题</string>
+    <string name="note_edit_content_hint">开始记录…</string>
+    <string name="note_edit_new_title">新建随手记</string>
+    <string name="note_edit_edit_title">编辑随手记</string>
+    <string name="note_edit_bold_sample">加粗文字</string>
+    <string name="note_edit_italic_sample">斜体文字</string>
+    <string name="note_edit_strike_sample">删除线文字</string>
+    <string name="note_edit_code_sample">代码</string>
+    <string name="note_edit_link_sample">链接</string>
+    <string name="note_edit_insert_link">插入链接</string>
+    <string name="note_edit_saved">已保存</string>
+    <string name="note_edit_conflict_title">检测到冲突</string>
+    <string name="note_edit_conflict_message">这篇笔记已在其他设备被修改。覆盖会丢失对方的改动，重新加载会丢失你本次未保存的改动。</string>
+    <string name="note_edit_overwrite">覆盖</string>
+    <string name="note_edit_reload">重新加载</string>
+    <string name="note_edit_reloaded">已重新加载</string>
+    <string name="note_edit_mic_permission_required">需要麦克风权限才能录音</string>
+    <string name="note_edit_image_alt">图片</string>
+    <string name="note_edit_image_title">图片</string>
+    <string name="note_edit_image_decode_failed">图片解析失败</string>
+    <string name="note_edit_image_read_failed">读取图片失败</string>
+    <string name="note_edit_image_upload_failed">图片上传失败</string>
+    <string name="note_edit_image_view">查看</string>
+    <string name="note_edit_image_replace">替换</string>
+    <string name="note_edit_image_not_loaded">图片尚未加载</string>
+    <string name="note_edit_recording_title">录音</string>
+    <string name="note_edit_recording_hint">点击开始录音</string>
+    <string name="note_edit_record_start">开始</string>
+    <string name="note_edit_record_stop">停止</string>
+    <string name="note_edit_recording_status">录音中…</string>
+    <string name="note_edit_processing">处理中…</string>
+    <string name="note_edit_recording_start_failed">录音启动失败：%1$s</string>
+    <string name="note_edit_recording_empty">录音内容为空</string>
+    <string name="note_edit_recording_read_failed">录音读取失败</string>
+    <string name="note_edit_recording_upload_failed">录音上传失败</string>
+    <string name="note_edit_audio_alt">录音</string>
+    <string name="note_edit_audio_filename">录音.m4a</string>
+    <string name="note_edit_playing">播放中…</string>
+    <string name="note_edit_audio_load_failed">音频加载失败</string>
+    <string name="note_edit_play_failed">播放失败</string>
+
+    <!-- ==================== 画画 ==================== -->
+    <string name="note_draw_title">画画</string>
+    <string name="note_draw_empty">画布是空的</string>
+    <string name="note_edit_drawing_filename">画画.png</string>
+
+    <!-- ==================== 文件预览 ==================== -->
+    <string name="preview_title_default">预览</string>
+    <string name="preview_loading">加载中…</string>
+    <string name="preview_error">无法加载预览</string>
+    <string name="preview_unsupported">暂不支持在线预览</string>
+    <string name="preview_download_view">下载查看</string>
+    <string name="preview_playing">正在播放：%1$s</string>
+    <string name="preview_audio_default">音频</string>
+
+    <!-- ==================== 我的 ==================== -->
+    <string name="mine_profile">修改资料</string>
+    <string name="mine_password">修改密码</string>
+    <string name="mine_language">语言</string>
+    <string name="mine_transfers">传输任务</string>
+    <string name="mine_logout">退出登录</string>
+    <string name="mine_not_logged_in">未登录</string>
+    <string name="mine_display_name_hint">展示名称</string>
+    <string name="mine_profile_updated">资料已更新</string>
+    <string name="mine_old_password_hint">旧密码</string>
+    <string name="mine_new_password_hint">新密码</string>
+    <string name="mine_confirm_password_hint">确认新密码</string>
+    <string name="mine_password_message">修改后所有设备将被强制下线，需重新登录</string>
+    <string name="mine_fill_all_fields">请填写完整</string>
+    <string name="mine_password_mismatch">两次输入的新密码不一致</string>
+    <string name="mine_password_changed">密码已修改，请重新登录</string>
+    <string name="mine_password_change_failed">修改失败</string>
+    <string name="mine_language_chinese">中文</string>
+    <string name="mine_language_english">English</string>
+
+    <!-- ==================== 传输 ==================== -->
+    <string name="transfer_title">下载任务</string>
+    <string name="transfer_empty">没有下载任务</string>
+    <string name="transfer_error">错误：%1$s</string>
+    <string name="transfer_status_waiting">等待中</string>
+    <string name="transfer_status_running">下载中</string>
+    <string name="transfer_status_paused">已暂停</string>
+    <string name="transfer_status_completed">已完成</string>
+    <string name="transfer_status_failed">失败</string>
+    <string name="transfer_upload_preparing">准备上传...</string>
+    <string name="transfer_upload_uploading">上传中...</string>
+    <string name="transfer_upload_completed">上传完成</string>
+    <string name="transfer_upload_failed">上传失败</string>
+    <string name="transfer_upload_failed_detail">上传失败：%1$s</string>
+    <string name="transfer_upload_notification_title">BaiFlow 上传</string>
+    <string name="transfer_upload_channel_name">上传通知</string>
+    <string name="transfer_upload_channel_desc">BaiFlow 文件上传进度</string>
+    <string name="transfer_download_preparing">准备下载...</string>
+    <string name="transfer_download_server_error">下载失败：服务器错误</string>
+    <string name="transfer_download_completed">下载完成</string>
+    <string name="transfer_download_failed_detail">下载失败：%1$s</string>
+    <string name="transfer_download_notification_title">BaiFlow 下载</string>
+    <string name="transfer_download_channel_name">下载通知</string>
+    <string name="transfer_download_channel_desc">BaiFlow 文件下载进度</string>
+    <string name="transfer_unknown_size">未知</string>
+</resources>

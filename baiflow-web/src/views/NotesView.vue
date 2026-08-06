@@ -29,6 +29,7 @@
     <section class="note-editor">
       <div class="editor-header">
         <el-input v-model="title" :placeholder="t('notes.titlePlaceholder')" class="title-input" @input="onTitleInput" :disabled="!currentId && !isCreating" />
+        <el-button size="small" type="primary" text :disabled="!currentId && !isCreating" @click="saveNow">保存</el-button>
         <el-button size="small" type="danger" text :disabled="!currentId" @click="onDelete">{{ t('notes.delete') }}</el-button>
       </div>
       <!-- Vditor 编辑器：IR 即时渲染，编辑即见渲染效果 -->
@@ -48,11 +49,12 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { listNotes, createNote, getNote, updateNote, deleteNote } from '../api/notes'
+import { useAuthStore } from '../stores/auth'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useSse } from '../composables/useSse'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
@@ -61,6 +63,7 @@ import { formatDateTime } from '../utils/format'
 
 const { t } = useI18n()
 const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
+const authStore = useAuthStore()
 
 // ---- 列表状态 ----
 const notes = ref([])
@@ -75,8 +78,9 @@ const vditorEl = ref(null)
 let vditor = null
 let vditorReady = false
 let pendingContent = null
-let ownSaveAt = 0
-let saveTimer = null
+let dirty = false        // 有未保存改动（10s 自动保存 / 手动保存）
+let noteUpdatedAt = null // 当前打开笔记基于的 updatedAt（乐观并发）
+let saveInterval = null
 let searchTimer = null
 
 const { maybeResume, saveFromScroll } = useNoteProgress(currentId, confirm)
@@ -133,7 +137,11 @@ function initVditor() {
       'link', 'table', '|',
       'undo', 'redo', '|', 'preview', 'fullscreen'
     ],
-    input: () => onContentInput(),
+    input: () => {
+      onContentInput()
+      // IR 模式每次输入会重渲染，异步重写笔记媒体鉴权 URL（?token=）
+      setTimeout(rewriteMediaAuth, 0)
+    },
     after: () => {
       vditorReady = true
       if (pendingContent != null) {
@@ -145,6 +153,40 @@ function initVditor() {
       const ir = vditorEl.value?.querySelector('.vditor-ir')
       if (content) content.addEventListener('scroll', () => saveFromScroll(getScrollEl))
       if (ir) ir.addEventListener('scroll', () => saveFromScroll(getScrollEl))
+      // 渲染完成后重写一次媒体鉴权 URL
+      rewriteMediaAuth()
+    }
+  })
+}
+
+/**
+ * 笔记媒体渲染兼容：
+ * - {@code <img src="/api/notes/media/{id}">}（浏览器 <img> 带不了 Authorization 头）
+ *   追加当前会话 token 的 {@code ?token=}，复用后端 SessionAuthenticationFilter 的兜底鉴权；
+ * - {@code [录音](/api/notes/media/{id}?mediaType=audio)} 链接转成 {@code <audio controls>}。
+ * IR 模式输入重渲染后需重新执行（已在 input/after 中调度）。
+ */
+function rewriteMediaAuth() {
+  const token = authStore.token
+  const el = vditorEl.value
+  if (!token || !el) return
+  const withToken = (url) => url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token)
+
+  const root = el.querySelector('.vditor-ir') || el
+  root.querySelectorAll('img[src^="/api/notes/media/"]').forEach((img) => {
+    const src = img.getAttribute('src')
+    if (src && !src.includes('token=')) {
+      img.setAttribute('src', withToken(src))
+    }
+  })
+  root.querySelectorAll('a[href^="/api/notes/media/"]').forEach((a) => {
+    const href = a.getAttribute('href')
+    if (href && href.includes('mediaType=audio') && !href.includes('token=')) {
+      const audio = document.createElement('audio')
+      audio.controls = true
+      audio.style.maxWidth = '100%'
+      audio.setAttribute('src', withToken(href))
+      a.replaceWith(audio)
     }
   })
 }
@@ -152,6 +194,8 @@ function initVditor() {
 function setVditorContent(md) {
   if (vditorReady && vditor) {
     vditor.setValue(md || '')
+    // setValue 不保证触发 input，这里主动重写一次媒体鉴权 URL
+    setTimeout(rewriteMediaAuth, 0)
   } else {
     pendingContent = md || ''
   }
@@ -160,33 +204,85 @@ function setVditorContent(md) {
 // ---- 保存 ----
 async function saveNow() {
   if (!currentId.value && !isCreating.value) return
-  // 记录本次保存时间：SSE 收到自己写入的回声事件时（短窗口内）不重载
-  ownSaveAt = Date.now()
   const body = { title: title.value, content: vditor?.getValue() || '' }
   try {
     if (isCreating.value) {
       const { data } = await createNote(body)
       const detail = data?.data
-      if (detail) {
-        currentId.value = detail.id
-        isCreating.value = false
+      if (data?.code !== 'OK' || !detail) {
+        ElMessage.error(data?.message || t('notes.saveFailed'))
+        return
       }
+      currentId.value = detail.id
+      isCreating.value = false
+      noteUpdatedAt = detail.updatedAt
     } else {
-      await updateNote(currentId.value, body)
+      const { data } = await updateNote(currentId.value, { ...body, baseUpdatedAt: noteUpdatedAt })
+      if (data?.code !== 'OK') {
+        if (data?.code === 'NOTE_CONFLICT') {
+          handleConflict()
+        } else {
+          ElMessage.error(data?.message || t('notes.saveFailed'))
+        }
+        return
+      }
+      noteUpdatedAt = data?.data?.updatedAt || noteUpdatedAt
     }
+    dirty = false
     loadList()
   } catch (e) {
     ElMessage.error(e.response?.data?.message || t('notes.saveFailed'))
   }
 }
 
-function onContentInput() {
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(saveNow, 1500)
+/** 乐观并发冲突：让用户选择「覆盖」（丢对方的改动）还是「重新加载」（丢本地改动） */
+async function handleConflict() {
+  let overwrite = false
+  try {
+    await ElMessageBox.confirm(t('notes.conflictMessage'), t('notes.conflictTitle'), {
+      confirmButtonText: t('notes.conflictOverwrite'),
+      cancelButtonText: t('notes.conflictReload'),
+      distinguishCancelAndClose: true,
+      type: 'warning'
+    })
+    overwrite = true
+  } catch (action) {
+    overwrite = false // cancel → 重新加载；close（X）→ 保持编辑不动
+    if (action === 'cancel') {
+      await reloadOpenNote()
+      return
+    }
+    return
+  }
+  // 覆盖：清掉 baseUpdatedAt 强制保存
+  noteUpdatedAt = null
+  await saveNow()
 }
 
+/** 重新加载当前打开的笔记（放弃本地未保存改动） */
+async function reloadOpenNote() {
+  if (!currentId.value) return
+  try {
+    const { data } = await getNote(currentId.value)
+    const detail = data?.data
+    if (!detail) return
+    title.value = detail.title || ''
+    setVditorContent(detail.content || '')
+    noteUpdatedAt = detail.updatedAt
+    dirty = false
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || t('notes.loadFailed'))
+  }
+}
+
+/** 内容变更 → 标记未保存（10s 定时自动保存） */
+function onContentInput() {
+  dirty = true
+}
+
+/** 标题变更 → 标记未保存 */
 function onTitleInput() {
-  onContentInput()
+  dirty = true
 }
 
 // ---- 新建 / 打开 ----
@@ -196,6 +292,8 @@ function newNote() {
   isCreating.value = true
   title.value = ''
   setVditorContent('')
+  dirty = false
+  noteUpdatedAt = null
 }
 
 async function openNote(note) {
@@ -209,6 +307,8 @@ async function openNote(note) {
     if (!detail) return
     title.value = detail.title || ''
     setVditorContent(detail.content || '')
+    dirty = false
+    noteUpdatedAt = detail.updatedAt
     await maybeResume(getScrollEl)
   } catch (e) {
     ElMessage.error(e.response?.data?.message || t('notes.loadFailed'))
@@ -231,27 +331,28 @@ async function onDelete() {
     currentId.value = null
     title.value = ''
     setVditorContent('')
+    noteUpdatedAt = null
     loadList()
   } catch (e) {
     ElMessage.error(e.response?.data?.message || t('notes.deleteFailed'))
   }
 }
 
-// ---- SSE 同步 ----
+// ---- SSE 同步：设备/其他端保存时通知本浏览器 ----
 useSse({
   NOTE_UPDATED: (e) => {
     let payload = {}
     try { payload = JSON.parse(e.data || '{}') } catch { /* ignore */ }
     loadList()
-    // 自己保存的回声事件（保存后 2s 窗口内到达）不重载正文，避免打断输入
-    const isOwnEcho = payload.noteId === currentId.value && (Date.now() - ownSaveAt) < 2000
-    if (!isOwnEcho && payload.noteId === currentId.value && !isCreating.value) {
+    // 若当前打开的就是被改的笔记，且本端没有未保存改动（避免覆盖正在编辑的内容），则同步正文
+    const isOpenNote = payload.noteId === currentId.value
+    if (isOpenNote && !isCreating.value && !dirty) {
       getNote(currentId.value).then(({ data }) => {
         const detail = data?.data
         if (detail) {
           title.value = detail.title || ''
           setVditorContent(detail.content || '')
-          ElMessage.info(t('notes.synced'))
+          noteUpdatedAt = detail.updatedAt
         }
       })
     }
@@ -260,9 +361,7 @@ useSse({
 
 // ---- 生命周期 ----
 function flushSave() {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
+  if (dirty) {
     saveNow()
   }
 }
@@ -270,9 +369,14 @@ function flushSave() {
 onMounted(() => {
   loadList()
   initVditor()
+  // 10 秒自动保存一次（仅在有未保存改动时）
+  saveInterval = setInterval(() => {
+    if (dirty) saveNow()
+  }, 10000)
 })
 
 onBeforeUnmount(() => {
+  if (saveInterval) clearInterval(saveInterval)
   flushSave()
   vditor?.destroy()
 })

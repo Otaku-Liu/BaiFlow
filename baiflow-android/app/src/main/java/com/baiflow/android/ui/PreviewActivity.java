@@ -88,7 +88,7 @@ public class PreviewActivity extends AppCompatActivity {
         errorContainer = findViewById(R.id.errorContainer);
         unsupportedContainer = findViewById(R.id.unsupportedContainer);
 
-        ((TextView) findViewById(R.id.tvFileName)).setText(fileName != null ? fileName : "预览");
+        ((TextView) findViewById(R.id.tvFileName)).setText(fileName != null ? fileName : getString(R.string.preview_title_default));
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 
         // 下载按钮（不支持时显示）
@@ -194,7 +194,8 @@ public class PreviewActivity extends AppCompatActivity {
             audioPlayer.prepareAsync();
 
             TextView tv = new TextView(this);
-            tv.setText("正在播放：" + (fileName != null ? fileName : "音频"));
+            tv.setText(getString(R.string.preview_playing,
+                    fileName != null ? fileName : getString(R.string.preview_audio_default)));
             tv.setTextSize(16f);
             tv.setTextColor(0xFF1D1D1F);
             tv.setGravity(android.view.Gravity.CENTER);
@@ -277,7 +278,7 @@ public class PreviewActivity extends AppCompatActivity {
         intent.putExtra(DownloadService.EXTRA_FILE_NAME, fileName);
         intent.putExtra(DownloadService.EXTRA_SIZE_BYTES, sizeBytes);
         startForegroundService(intent);
-        android.widget.Toast.makeText(this, "下载已开始: " + fileName, android.widget.Toast.LENGTH_SHORT).show();
+        android.widget.Toast.makeText(this, getString(R.string.files_download_started, fileName), android.widget.Toast.LENGTH_SHORT).show();
         finish();
     }
 

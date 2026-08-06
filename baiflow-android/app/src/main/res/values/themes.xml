@@ -17,6 +17,11 @@
     <color name="text_secondary">#86868B</color>
     <color name="background">#F5F5F7</color>
     <color name="divider">#E5E5EA</color>
+    <color name="danger">#FF3B30</color>
+
+    <!-- 富文本编辑器专用（代码块/行内代码底色） -->
+    <color name="code_bg">#F2F2F7</color>
+    <color name="inline_code_bg">#F2F2F7</color>
 
     <string name="app_name">BaiFlow</string>
 </resources>

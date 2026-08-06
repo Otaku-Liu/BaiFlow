@@ -10,6 +10,7 @@
 
       <!-- 面包屑导航 -->
       <div v-if="rootId" class="breadcrumb-wrapper">
+        <el-button size="small" :disabled="!canGoUp" @click="goUp" style="margin-right:8px">↑ {{ t('files.upLevel') }}</el-button>
         <span class="breadcrumb-label">{{ t('files.currentPath') }}</span>
         <el-breadcrumb separator="/" class="breadcrumb">
           <el-breadcrumb-item>
@@ -329,6 +330,20 @@ function navigateTo(item) {
   }
   fileStore.page = 1
   loadFiles()
+}
+
+/** 根目录时不可返回上一级（按钮置灰） */
+const canGoUp = computed(() => fileStore.breadcrumb.length > 0)
+
+/** 返回上一级 */
+function goUp() {
+  const b = fileStore.breadcrumb
+  if (b.length === 0) return
+  if (b.length === 1) {
+    navigateTo(null)          // 上一级 = 根目录
+  } else {
+    navigateTo(b[b.length - 2]) // 上一级 = 面包屑倒数第二项
+  }
 }
 
 /** 上传 */

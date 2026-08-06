@@ -43,6 +43,12 @@ docs/               项目文档（需求、架构、API、数据库等）
 - 修改代码时注意不要破坏已有功能
 - 修改需求、API、数据库、安全规则或部署行为后同步更新 `docs/` 对应文档
 
+### 数据库迁移
+- schema 统一维护在**单个可重复迁移** `baiflow-server/src/main/resources/db/R__V1_init.sql`（全部表结构 + 初始数据）：
+  - **可重复迁移**：每次启动比对校验和，文件有改动即自动重新执行（全表 `IF NOT EXISTS`、管理员 `INSERT WHERE NOT EXISTS`，幂等）
+  - **新表 DDL 一律追加本文件末尾，不新建迁移脚本**；版本号以文件名 `R__V{n}_` 标识（排序与管理用）
+- 脚本内只保留表/字段的 COMMENT 描述；长期约定与表结构说明写在 `docs/02-database.md` 等 md 文档
+
 ## 功能决策
 
 - 支持三种角色：`ADMIN`、`USER`、`GUEST`

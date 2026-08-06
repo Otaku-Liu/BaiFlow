@@ -11,6 +11,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.model.ApiResponse;
@@ -58,7 +59,7 @@ public class DownloadService extends Service {
         String fileName = intent.getStringExtra(EXTRA_FILE_NAME);
         long totalBytes = intent.getLongExtra(EXTRA_SIZE_BYTES, 0);
 
-        startForeground(NOTIFICATION_ID, buildNotification(fileName, "准备下载...", 0));
+        startForeground(NOTIFICATION_ID, buildNotification(fileName, getString(R.string.transfer_download_preparing), 0));
 
         // 在后台线程执行下载
         new Thread(() -> performDownload(fileId, fileName, totalBytes)).start();
@@ -73,7 +74,7 @@ public class DownloadService extends Service {
             Response<ResponseBody> response = call.execute();
 
             if (!response.isSuccessful() || response.body() == null) {
-                updateNotification(fileName, "下载失败：服务器错误", 0);
+                updateNotification(fileName, getString(R.string.transfer_download_server_error), 0);
                 stopSelf();
                 return;
             }
@@ -100,7 +101,7 @@ public class DownloadService extends Service {
                 if (now - lastUpdate >= 500) {
                     int progress = totalBytes > 0 ? (int) (downloaded * 100 / totalBytes) : 0;
                     updateNotification(fileName,
-                            FormatUtil.formatSize(downloaded) + " / " + (totalBytes > 0 ? FormatUtil.formatSize(totalBytes) : "未知"),
+                            FormatUtil.formatSize(downloaded) + " / " + (totalBytes > 0 ? FormatUtil.formatSize(totalBytes) : getString(R.string.transfer_unknown_size)),
                             Math.min(progress, 100));
                     lastUpdate = now;
                 }
@@ -109,12 +110,12 @@ public class DownloadService extends Service {
             out.close();
             in.close();
 
-            updateNotification(fileName, "下载完成", 100);
+            updateNotification(fileName, getString(R.string.transfer_download_completed), 100);
             Log.i(TAG, "下载完成: " + outputFile.getAbsolutePath());
 
         } catch (Exception e) {
             Log.e(TAG, "下载失败", e);
-            updateNotification(fileName, "下载失败：" + e.getMessage(), 0);
+            updateNotification(fileName, getString(R.string.transfer_download_failed_detail, e.getMessage()), 0);
         }
         stopSelf();
     }
@@ -125,7 +126,7 @@ public class DownloadService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("BaiFlow 下载")
+                .setContentTitle(getString(R.string.transfer_download_notification_title))
                 .setContentText(fileName + " - " + status)
                 .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setContentIntent(pending)
@@ -141,8 +142,8 @@ public class DownloadService extends Service {
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "下载通知", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("BaiFlow 文件下载进度");
+                    CHANNEL_ID, getString(R.string.transfer_download_channel_name), NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription(getString(R.string.transfer_download_channel_desc));
             notificationManager.createNotificationChannel(channel);
         }
     }

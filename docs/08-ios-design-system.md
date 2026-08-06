@@ -45,6 +45,7 @@ Apple 色板：#007AFF 主色、#1D1D1F 主文字、#F5F5F7 背景、#86868B 次
 | 分段控件 | `Ios.Segmented` | 自定义 `SegmentedControl` View（待补充） |
 | 弹窗 | `Ios.Dialog` | 圆角、白底、统一按钮（待补充） |
 | 标题栏 | `Ios.Header` + `.Title`（居中）+ `.BackLabel`（上一级名） | 居中标题 + 左侧 chevron+上一级名，无阴影 |
+| 编辑器工具栏 | `Ios.ToolbarButton`（文本式按钮）+ `Ios.ToolbarRow`（容器行） | 随手记富文本编辑器工具栏，激活态由代码改文字颜色 |
 
 ### 4.3 drawable
 
@@ -63,8 +64,8 @@ Apple 色板：#007AFF 主色、#1D1D1F 主文字、#F5F5F7 背景、#86868B 次
 
 已落地：
 
-- `res/values/styles_ios.xml`：`Ios` 基样式 + 按钮（`Ios.Button` / `.Primary` / `.Text` / `.Danger`）、输入框 `Ios.TextInput`、标题栏 `Ios.Header`（`.Title` 居中 / `.BackLabel` 上一级名）
-- 应用到现有界面：服务器配置、传输任务、预览、文件、我的、**登录**（输入框/按钮）
+- `res/values/styles_ios.xml`：`Ios` 基样式 + 按钮（`Ios.Button` / `.Primary` / `.Text` / `.Danger`）、输入框 `Ios.TextInput`、标题栏 `Ios.Header`（`.Title` 居中 / `.BackLabel` 上一级名）、编辑器工具栏（`Ios.ToolbarButton` / `Ios.ToolbarRow`，2026-08-06 随手记编辑器新增）
+- 应用到现有界面：服务器配置、传输任务、预览、文件、我的、**登录**（输入框/按钮）、**随手记编辑器**（工具栏）
 - 返回按钮 = chevron + 上一级名，无按压反馈；标题栏无阴影
 
 **样式清理**（2026-08-06）：删除未使用的 `Ios.Button.Tonal`、`Ios.Card`、`Ios.Header.Back`（空样式）与 `bg_ripple_middle.xml`；所有界面统一改用 `@style/Ios.*`，无 Material 默认控件样式残留。

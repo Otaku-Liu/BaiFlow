@@ -1,7 +1,7 @@
 -- ============================================================
--- BaiFlow 初始化数据库脚本
--- 包含所有表结构（含完整字段和表注释）及初始数据
--- 适用于全新部署，可重复执行（使用 IF NOT EXISTS）
+-- R__V1 统一 schema（可重复迁移，唯一脚本）：全部表结构（含完整字段和表注释）+ 初始数据
+-- 所有表 IF NOT EXISTS、管理员 INSERT WHERE NOT EXISTS，幂等；文件有改动即自动重新执行
+-- 新表 DDL 一律追加于本文件末尾
 -- ============================================================
 
 -- -----------------------------------------------------------
@@ -227,3 +227,85 @@ CREATE TABLE IF NOT EXISTS `bf_audit_log` (
     KEY `idx_al_action` (`action`, `created_at`),
     KEY `idx_al_target` (`target_type`, `target_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作审计日志表';
+
+-- -----------------------------------------------------------
+-- 12. 播放/阅读进度表（视频/音频/PDF/文本，跨设备断点续看）
+-- -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_playback_progress` (
+    `id`             VARCHAR(32) NOT NULL COMMENT '主键，UUID',
+    `user_id`        VARCHAR(32) NOT NULL COMMENT '进度所属用户 ID',
+    `file_item_id`   VARCHAR(32) NOT NULL COMMENT '对应文件 ID（bf_file_item.id）',
+    `position_type`  VARCHAR(16) NOT NULL DEFAULT 'SECONDS' COMMENT '进度类型：SECONDS（视频/音频秒数）/ PAGE（PDF 页码）/ SCROLL_PERCENT（文本滚动百分比）',
+    `position_value` DOUBLE      NOT NULL DEFAULT 0 COMMENT '进度值：秒数 / 页码 / 0~1 滚动百分比',
+    `created_at`     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_file` (`user_id`, `file_item_id`),
+    KEY `idx_user` (`user_id`, `updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='播放/阅读进度表（每个用户对每个文件一条记录，支持跨设备断点续看）';
+
+-- -----------------------------------------------------------
+-- 13. 随手记笔记表（便签/笔记，正文存 Markdown）
+-- -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_note` (
+    `id`         VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
+    `user_id`    VARCHAR(32)  NOT NULL COMMENT '笔记所有者用户 ID',
+    `title`      VARCHAR(200) NOT NULL DEFAULT '' COMMENT '笔记标题',
+    `content`    LONGTEXT     NOT NULL COMMENT 'Markdown 正文（直接落库，非文件系统）',
+    `status`     VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE（正常）/ DELETED（软删除）',
+    `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间（后写覆盖同步的时间基准）',
+    `deleted_at` TIMESTAMP    NULL COMMENT '软删除时间（NULL 表示未删除）',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_updated` (`user_id`, `updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='随手记笔记表（标题 + Markdown 正文，独立于文件系统存储）';
+
+-- -----------------------------------------------------------
+-- 14. 笔记阅读进度表（跨设备续读长笔记）
+-- -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_note_progress` (
+    `id`             VARCHAR(32) NOT NULL COMMENT '主键，UUID',
+    `user_id`        VARCHAR(32) NOT NULL COMMENT '进度所属用户 ID',
+    `note_id`        VARCHAR(32) NOT NULL COMMENT '对应笔记 ID（bf_note.id）',
+    `position_type`  VARCHAR(16) NOT NULL DEFAULT 'SCROLL_PERCENT' COMMENT '进度类型（当前固定为 SCROLL_PERCENT）',
+    `position_value` DOUBLE      NOT NULL DEFAULT 0 COMMENT '滚动百分比（0~1）',
+    `created_at`     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_note` (`user_id`, `note_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='笔记阅读进度表（每个用户对每篇笔记一条记录，支持跨设备续读）';
+
+-- -----------------------------------------------------------
+-- 15. 随手记笔记媒体表（图片/录音/画画，独立于文件中心存储）
+-- -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_note_media` (
+    `id`         VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
+    `user_id`    VARCHAR(32)  NOT NULL COMMENT '媒体所有者用户 ID',
+    `media_type` VARCHAR(16)  NOT NULL COMMENT '媒体类型：IMAGE（图片）/ AUDIO（录音）/ DRAWING（画画）',
+    `file_name`  VARCHAR(255) NOT NULL COMMENT '原始文件名',
+    `mime_type`  VARCHAR(100) NOT NULL COMMENT 'Content-Type（如 image/png、audio/mp4）',
+    `size_bytes` BIGINT       NOT NULL DEFAULT 0 COMMENT '文件大小（字节）',
+    `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user` (`user_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='随手记笔记媒体表（图片/录音/画画，独立于文件中心存储）';
+
+-- -----------------------------------------------------------
+-- 16. 登录会话表（长会话 token + 设备信息，吊销驱动 + 不活跃兜底）
+-- -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_auth_session` (
+    `id`            VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
+    `user_id`       VARCHAR(32)  NOT NULL COMMENT '用户 ID',
+    `device_name`   VARCHAR(100) NOT NULL DEFAULT '' COMMENT '设备名（App 机型 / Web 浏览器摘要）',
+    `device_type`   VARCHAR(16)  NOT NULL COMMENT '设备类型：ANDROID / WEB',
+    `ip`            VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '最近登录 IP',
+    `user_agent`    VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'User-Agent',
+    `token_hash`    VARCHAR(64)  NOT NULL COMMENT '会话 token 的 SHA-256（十六进制）',
+    `expires_at`    TIMESTAMP    NOT NULL COMMENT '会话到期时间（ANDROID 滑动续期 / WEB 固定）',
+    `last_used_at`  TIMESTAMP    NOT NULL COMMENT '最近使用时间（滑动续期基准）',
+    `created_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `revoked_at`    TIMESTAMP    NULL COMMENT '吊销时间（非空 = 已登出 / 被强制下线）',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_token_hash` (`token_hash`),
+    KEY `idx_user` (`user_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录会话表（长会话 token + 设备信息，吊销驱动 + 不活跃兜底）';

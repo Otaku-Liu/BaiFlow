@@ -75,7 +75,7 @@
             android:background="@drawable/bg_card">
 
             <LinearLayout
-                android:id="@+id/rowTransfers"
+                android:id="@+id/rowProfile"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
@@ -88,7 +88,100 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="传输任务"
+                    android:text="@string/mine_profile"
+                    android:textSize="15sp"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textSize="20sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider" />
+
+            <LinearLayout
+                android:id="@+id/rowPassword"
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:gravity="center_vertical"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:foreground="@drawable/bg_ripple_middle">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/mine_password"
+                    android:textSize="15sp"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textSize="20sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider" />
+
+            <LinearLayout
+                android:id="@+id/rowLanguage"
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:gravity="center_vertical"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:foreground="@drawable/bg_ripple_middle">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/mine_language"
+                    android:textSize="15sp"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textSize="20sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider" />
+
+            <LinearLayout
+                android:id="@+id/rowTransfers"
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:gravity="center_vertical"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:foreground="@drawable/bg_ripple_middle">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/mine_transfers"
                     android:textSize="15sp"
                     android:textColor="@color/text_primary" />
 
@@ -119,7 +212,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="服务器配置"
+                    android:text="@string/server_config_title"
                     android:textSize="15sp"
                     android:textColor="@color/text_primary" />
 
@@ -139,7 +232,7 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="24dp"
-            android:text="退出登录" />
+            android:text="@string/mine_logout" />
 
     </LinearLayout>
 </ScrollView>

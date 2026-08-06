@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <!-- 顶部标题栏 -->
+    <FrameLayout
+        style="@style/Ios.Header"
+        android:layout_width="match_parent"
+        android:layout_height="56dp">
+
+        <TextView
+            style="@style/Ios.Header.Title"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="@string/note_draw_title" />
+
+        <LinearLayout
+            android:id="@+id/btnBack"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="12dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_back_chevron"
+                android:contentDescription="@string/common_back" />
+
+            <TextView
+                style="@style/Ios.Header.BackLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/notes_title"
+                android:layout_marginStart="2dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnDrawSave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="16dp"
+            android:text="@string/common_save"
+            android:textSize="16sp"
+            android:textColor="@color/accent" />
+    </FrameLayout>
+
+    <!-- 画笔工具条：颜色点 / 粗细 / 撤销 / 清空 -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:background="@color/white">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <View
+                android:id="@+id/btnColorBlack"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_margin="6dp"
+                android:background="@drawable/bg_dot_black"
+                android:clickable="true" />
+            <View
+                android:id="@+id/btnColorRed"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_margin="6dp"
+                android:background="@drawable/bg_dot_red"
+                android:clickable="true" />
+            <View
+                android:id="@+id/btnColorBlue"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_margin="6dp"
+                android:background="@drawable/bg_dot_blue"
+                android:clickable="true" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThin"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_line_thin"
+                app:iconSize="22dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThick"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_line_thick"
+                app:iconSize="22dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnUndo"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_undo"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnClear"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_delete"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- 画布 -->
+    <com.baiflow.android.ui.NoteDrawView
+        android:id="@+id/drawView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/white" />
+
+</LinearLayout>

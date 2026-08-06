@@ -61,14 +61,24 @@
 ### note — 随手记笔记
 `id, user_id, title, content(LONGTEXT, Markdown), status(ACTIVE/DELETED 软删除), created_at, updated_at, deleted_at`
 
-笔记独立于文件系统，正文直接落库。`updated_at` 由服务端显式刷新，作为跨端同步"后写覆盖"的时间基准。`status` 软删除标记随增量拉取同步。
+笔记独立于文件系统，正文直接落库。`updated_at` 由服务端显式刷新，作为乐观并发（保存携带 `baseUpdatedAt` 比对）的时间基准。`status` 软删除标记随增量拉取同步。
 
 ### note_progress — 笔记阅读进度
 `id, user_id, note_id, position_type(SCROLL_PERCENT), position_value, created_at, updated_at`
 
 每个用户对每篇笔记只存一条记录，`(user_id, note_id)` 唯一。复用 playback 的 SCROLL_PERCENT 思路，支持跨设备续读长笔记。
 
-> 以上三张表（`bf_playback_progress` / `bf_note` / `bf_note_progress`）由 `db/V2__progress_and_quick_notes.sql` 创建，**所有表与字段均带 COMMENT 注释**，便于管理与理解。
+### note_media — 笔记媒体
+`id, user_id, media_type(IMAGE/AUDIO/DRAWING), file_name, mime_type, size_bytes, created_at`
+
+Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体落磁盘（`baiflow.notes.media-path` 专用目录，文件名 `<mediaId>.<ext>`），独立于文件中心、不参与 `/api/files` 列表；正文通过 Markdown 引用（`![…](/api/notes/media/{id})` / `[录音](…?mediaType=audio)`）关联媒体。
+
+### auth_session — 登录会话
+`id, user_id, device_name, device_type(ANDROID/WEB), ip, user_agent, token_hash(SHA-256), expires_at, last_used_at, created_at, revoked_at`
+
+登录会话（模型 2）：每次请求按 `token_hash` 精确查询校验（未吊销/未过期），吊销即时生效。ANDROID 会话滑动续期（180 天不活跃兜底），WEB 会话固定短时。`token_hash` 只存哈希，数据库泄露不暴露可用 token。详见 `docs/09-auth-sessions.md`。
+
+> 以上 5 张表统一由可重复迁移 `db/R__V1_init.sql` 创建（**项目约定：新表一律追加进 `R__V1_init.sql`，不单独建迁移脚本**；可重复迁移文件有改动即自动重新执行，全表 `IF NOT EXISTS` 幂等），**所有表与字段均带 COMMENT 注释**，便于管理与理解。
 
 ## 主要索引
 

@@ -1,0 +1,148 @@
+package com.baiflow.auth.security;
+
+import com.baiflow.auth.config.BaiflowProperties;
+import com.baiflow.auth.entity.AuthSession;
+import com.baiflow.auth.mapper.AuthSessionMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Base64;
+
+/**
+ * 会话 token 服务 — 签发（随机 256-bit，只存 SHA-256 哈希）、校验、吊销、滑动续期。
+ * <p>
+ * 认证模型 2：登录建一条会话，每次请求按 token 哈希查会话校验；吊销即时生效。
+ * ANDROID 会话滑动续期（每次使用顺延到 now + androidDays，180 天不活跃自动失效）；
+ * WEB 会话固定短时（webHours，不滑动）。
+ */
+@Service
+public class SessionTokenService {
+
+    /** 会话 token 随机长度：32 字节（256-bit） */
+    private static final int TOKEN_BYTES = 32;
+    private static final SecureRandom RANDOM = new SecureRandom();
+    /** ANDROID 滑动续期节流：距上次使用超过 1 小时才写库更新 */
+    private static final Duration ANDROID_TOUCH_INTERVAL = Duration.ofHours(1);
+
+    @Autowired
+    private AuthSessionMapper sessionMapper;
+    @Autowired
+    private BaiflowProperties properties;
+
+    /** 新建会话的结果：明文 token（仅此一次返回给客户端）+ 会话 ID + 到期时间 */
+    public record CreatedSession(String token, String sessionId, LocalDateTime expiresAt) {
+    }
+
+    /**
+     * 签发会话。
+     *
+     * @param userId     用户 ID
+     * @param deviceType 设备类型（ANDROID / WEB）
+     * @param deviceName 设备名（可空，空则后续按 UA 推导）
+     * @param ip         登录 IP
+     * @param userAgent  登录 User-Agent
+     * @return 明文 token（客户端保存）与元信息
+     */
+    public CreatedSession create(String userId, String deviceType, String deviceName,
+                                 String ip, String userAgent) {
+        String token = generateToken();
+        AuthSession session = new AuthSession();
+        session.setUserId(userId);
+        session.setDeviceType("ANDROID".equals(deviceType) ? "ANDROID" : "WEB");
+        session.setDeviceName(deviceName != null ? deviceName : "");
+        session.setIp(ip != null ? ip : "");
+        session.setUserAgent(userAgent != null ? userAgent : "");
+        session.setTokenHash(sha256Hex(token));
+        LocalDateTime now = LocalDateTime.now();
+        session.setCreatedAt(now);
+        session.setLastUsedAt(now);
+        session.setExpiresAt(now.plus(expiryFor(session.getDeviceType())));
+        sessionMapper.insert(session);
+        return new CreatedSession(token, session.getId(), session.getExpiresAt());
+    }
+
+    /** 按明文 token 查会话（内部先哈希） */
+    public AuthSession findByToken(String token) {
+        if (token == null || token.isEmpty()) {
+            return null;
+        }
+        return sessionMapper.selectByTokenHash(sha256Hex(token));
+    }
+
+    /** 吊销指定会话（登出 / 强制下线） */
+    public void revoke(String sessionId) {
+        AuthSession session = sessionMapper.selectById(sessionId);
+        if (session != null && session.getRevokedAt() == null) {
+            session.setRevokedAt(LocalDateTime.now());
+            sessionMapper.updateById(session);
+        }
+    }
+
+    /** 吊销某用户全部会话（重置密码时调用，所有设备强制下线重新登录） */
+    public void revokeAll(String userId) {
+        revokeAllExcept(userId, null);
+    }
+
+    /**
+     * 吊销某用户全部未吊销会话，保留指定会话。
+     *
+     * @param keepSessionId 保留的会话 ID（可空 = 全部吊销）
+     */
+    public void revokeAllExcept(String userId, String keepSessionId) {
+        var wrapper = new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<AuthSession>()
+                .eq("user_id", userId).isNull("revoked_at");
+        if (keepSessionId != null && !keepSessionId.isEmpty()) {
+            wrapper.ne("id", keepSessionId);
+        }
+        AuthSession upd = new AuthSession();
+        upd.setRevokedAt(LocalDateTime.now());
+        sessionMapper.update(upd, wrapper);
+    }
+
+    /** ANDROID 滑动续期：更新 last_used_at 并把 expires_at 顺延到 now + androidDays */
+    public void touch(AuthSession session) {
+        LocalDateTime now = LocalDateTime.now();
+        session.setLastUsedAt(now);
+        session.setExpiresAt(now.plus(Duration.ofDays(properties.getAuthSession().getAndroidDays())));
+        sessionMapper.updateById(session);
+    }
+
+    /** ANDROID 滑动续期写库节流间隔 */
+    public Duration androidTouchInterval() {
+        return ANDROID_TOUCH_INTERVAL;
+    }
+
+    private Duration expiryFor(String deviceType) {
+        if ("ANDROID".equals(deviceType)) {
+            return Duration.ofDays(properties.getAuthSession().getAndroidDays());
+        }
+        return Duration.ofHours(properties.getAuthSession().getWebHours());
+    }
+
+    private static String generateToken() {
+        byte[] buf = new byte[TOKEN_BYTES];
+        RANDOM.nextBytes(buf);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(buf);
+    }
+
+    /** token → SHA-256 十六进制（入库/查询用，绝不落明文） */
+    public static String sha256Hex(String token) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
+    }
+}

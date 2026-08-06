@@ -3,15 +3,111 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
     android:background="@color/background">
 
+    <!-- 顶部工具栏：标题 + 新建 -->
+    <LinearLayout
+        style="@style/Ios.Header"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <TextView
+            style="@style/Ios.Header.Title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/notes_title" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNew"
+            style="@style/Ios.Button.Text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/notes_new" />
+    </LinearLayout>
+
+    <!-- 搜索框 -->
+    <EditText
+        android:id="@+id/etSearch"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:background="@color/white"
+        android:hint="@string/notes_search_hint"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_secondary"
+        android:inputType="text"
+        android:imeOptions="actionSearch"
+        android:singleLine="true"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp" />
+
+    <!-- 管理员查看用户切换（仅管理员可见） -->
+    <LinearLayout
+        android:id="@+id/adminRow"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="@color/white"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/files_view_user"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary" />
+
+        <Spinner
+            android:id="@+id/spinnerUser"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp" />
+    </LinearLayout>
+
+    <!-- 进度条 -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <!-- 笔记列表 -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- 空状态 -->
     <TextView
-        android:id="@+id/tvNotesPlaceholder"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="随手记开发中…"
+        android:id="@+id/tvEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/notes_empty"
         android:textSize="16sp"
-        android:textColor="@color/text_secondary" />
+        android:textColor="@color/text_secondary"
+        android:visibility="gone" />
 
 </LinearLayout>

@@ -69,4 +69,7 @@ public final class ErrorCode {
 
     /** 用户名或密码错误 */
     public static final String INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
+
+    /** 笔记已被其他设备修改（乐观并发冲突） */
+    public static final String NOTE_CONFLICT = "NOTE_CONFLICT";
 }

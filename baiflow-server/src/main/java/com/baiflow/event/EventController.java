@@ -11,8 +11,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 /**
  * SSE 事件接口 — 长连接实时推送。
  * <p>
- * 需登录（JWT）。浏览器 EventSource 无法带 Authorization 头，
- * 使用 {@code /api/events?token=<jwt>} 查询参数鉴权（后端 JwtAuthenticationFilter 已支持）。
+ * 需登录（会话 token）。浏览器 EventSource 无法带 Authorization 头，
+ * 使用 {@code /api/events?token=<会话token>} 查询参数鉴权（后端 SessionAuthenticationFilter 已支持）。
  */
 @RestController
 @RequestMapping("/api/events")

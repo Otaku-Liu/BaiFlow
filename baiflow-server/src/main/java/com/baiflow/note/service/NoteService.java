@@ -51,7 +51,8 @@ public interface NoteService {
      * @throws com.baiflow.common.exception.BusinessException NOT_FOUND  笔记不存在
      * @throws com.baiflow.common.exception.BusinessException FORBIDDEN  非所有者修改他人笔记
      */
-    NoteDetail updateNote(String id, String userId, boolean isAdmin, String title, String content);
+    NoteDetail updateNote(String id, String userId, boolean isAdmin, String title, String content,
+                          String baseUpdatedAt);
 
     /**
      * 软删除笔记（status=DELETED），并推送 NOTE_UPDATED。

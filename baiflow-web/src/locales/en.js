@@ -63,6 +63,7 @@ export default {
     title: 'Files',
     viewUserSpace: 'View user space',
     currentPath: 'Path: ',
+    upLevel: 'Up',
     rootDirectory: 'Root',
     myFiles: 'My Files',
     privacy: 'Private',
@@ -264,6 +265,10 @@ export default {
     synced: 'This note was updated on another device',
     saveFailed: 'Save failed',
     loadFailed: 'Load failed',
-    deleteFailed: 'Delete failed'
+    deleteFailed: 'Delete failed',
+    conflictTitle: 'Conflict detected',
+    conflictMessage: 'This note was modified on another device. Overwriting will discard the other changes; reloading will discard your unsaved edits.',
+    conflictOverwrite: 'Overwrite',
+    conflictReload: 'Reload'
   }
 }

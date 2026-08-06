@@ -11,9 +11,9 @@ spring:
       database: 0
 
 baiflow:
-  jwt:
-    secret: replace-with-a-real-secret
-    expire-seconds: 7200
+  auth-session:
+    web-hours: 2
+    android-days: 180
   init-admin:
     username: admin
     password: change-me

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <!-- 顶部标题栏：返回 + 居中标题 + 保存（与返回同高、无点击水波） -->
+    <FrameLayout
+        style="@style/Ios.Header"
+        android:layout_width="match_parent"
+        android:layout_height="56dp">
+
+        <TextView
+            android:id="@+id/tvHeaderTitle"
+            style="@style/Ios.Header.Title"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:maxLines="1"
+            android:ellipsize="middle" />
+
+        <LinearLayout
+            android:id="@+id/btnBack"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="12dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_back_chevron"
+                android:contentDescription="@string/common_back" />
+
+            <TextView
+                style="@style/Ios.Header.BackLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/notes_title"
+                android:layout_marginStart="2dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnSave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="16dp"
+            android:text="@string/common_save"
+            android:textSize="16sp"
+            android:textColor="@color/accent" />
+    </FrameLayout>
+
+    <!-- 标题输入 -->
+    <EditText
+        android:id="@+id/etTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/white"
+        android:hint="@string/note_edit_title_hint"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_secondary"
+        android:inputType="text"
+        android:maxLines="1"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider" />
+
+    <!-- 工具栏 第一行（常显）：媒体 + 更多 -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:background="@color/white">
+
+        <LinearLayout
+            style="@style/Ios.ToolbarRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnImage"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_image"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAudio"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_mic"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDraw"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_draw"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMore"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_more"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- 工具栏 第二行（「更多」展开）：文字格式 -->
+    <HorizontalScrollView
+        android:id="@+id/moreRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:background="@color/white"
+        android:visibility="gone">
+
+        <LinearLayout
+            style="@style/Ios.ToolbarRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBold"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_bold"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnItalic"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_italic"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnStrike"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_strike"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnH1"
+                style="@style/Ios.ToolbarButton"
+                android:text="H1" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnH2"
+                style="@style/Ios.ToolbarButton"
+                android:text="H2" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnH3"
+                style="@style/Ios.ToolbarButton"
+                android:text="H3" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBullet"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_bullet_list"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnOrdered"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_numbered_list"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnInlineCode"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_inline_code"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnLink"
+                style="@style/Ios.ToolbarButton"
+                app:icon="@drawable/ic_tool_link"
+                app:iconSize="20dp"
+                app:iconTint="@color/text_primary" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider" />
+
+    <!-- 正文富文本编辑器 -->
+    <com.baiflow.android.editor.RichEditText
+        android:id="@+id/etContent"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/white"
+        android:hint="@string/note_edit_content_hint"
+        android:inputType="textMultiLine|textCapSentences"
+        android:gravity="top|start"
+        android:textSize="16sp"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_secondary"
+        android:lineSpacingExtra="4dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp" />
+
+</LinearLayout>
