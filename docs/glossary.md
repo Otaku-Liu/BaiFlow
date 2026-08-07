@@ -52,8 +52,11 @@ BaiFlow 涉及的关键术语速查。按字母序。
 
 ## O
 
-- **outbox（待同步队列）**
-  Android 离线编辑时写入本地队列，恢复联网后逐个推送到服务端，实现离线可编辑。
+- **Offline Mode（离线模式）**
+  Android 三态之一（本地模式 / 在线模式 / 离线模式）：已配服务器但主动离线（清 token 留缓存），随手记用本地镜像 + outbox，文件中心禁用；重连必须重新登录。本地模式（未配服务器）免登录纯本地；在线模式（服务器 + token）全功能。见 `docs/12-android-offline-mode.md`。
+
+- **Outbox（离线变更队列）**
+  离线模式下本地笔记的待同步标记（`dirty + source`），重连登录后先推 outbox（create/update 带 `baseUpdatedAt`、TOMBSTONE 删除），再按 `updatedAfter` 拉增量合并。Android 离线编辑时写入本地队列，恢复联网后逐个推送。见 `docs/12-android-offline-mode.md`。
 
 ## P
 
@@ -79,6 +82,12 @@ BaiFlow 涉及的关键术语速查。按字母序。
   进度类型：滚动百分比（0.0~1.0）。用于文本、Markdown、笔记等长内容，跨设备续读。
 - **SSE（Server-Sent Events）**
   服务端单向实时推送（`text/event-stream`）。`GET /api/events` 已实现（`com.baiflow.event`：`SseService` 用户连接注册表 + `EventController` + 定时心跳清理），已推送 `NOTE_UPDATED` 事件；`TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 为已定义待接入。
+- **Server Connection Timeout（服务器连接超时）**
+  Web 管理台对**网络级失败**（连不上/连接超时/断网）的处理：距上次成功联系 ≥30s 且发生一次失败即判定超时，提示后返回登录页，**保留会话 token**，登录页提供「重新连接」一键恢复。见 `docs/10-web-connection-timeout.md`。
+
+- **UiCallback（Android 网络回调包装）**
+  Android 交互层统一网络错误处理的 Retrofit `Callback` 包装：`onResponse` 全局记录成功联系 + 兜底 5xx，`onFailure` 全局分类提示（无网络/无法连接服务器），页面只写业务处理。后台传输服务用 `execute()` 不经过它，因此不弹 UI。见 `docs/11-android-network-error.md`。
+
 - **SseEmitter**
   Spring 的 SSE 实现：服务端保持连接，向客户端推事件。
 

@@ -26,7 +26,8 @@ router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next('/login')
-  } else if (to.path === '/login' && authStore.isLoggedIn) {
+  } else if (to.path === '/login' && authStore.isLoggedIn && !authStore.connectionTimeout) {
+    // 连接超时态（保留 token）时放行登录页，便于展示「重新连接」
     next('/')
   } else {
     next()

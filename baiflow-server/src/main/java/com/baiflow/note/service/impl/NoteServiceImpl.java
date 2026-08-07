@@ -41,13 +41,22 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public IPage<NoteSummary> listNotes(String userId, boolean isAdmin, String viewUserId,
-                                        String keyword, int page, int size) {
+                                        String keyword, int page, int size, String updatedAfter) {
         QueryWrapper<Note> wrapper = new QueryWrapper<>();
         // 非管理员始终限定本人；管理员不传 viewUserId 则看全部
         if (!isAdmin || viewUserId != null) {
             wrapper.eq("user_id", isAdmin ? viewUserId : userId);
         }
-        wrapper.eq("status", NoteStatus.ACTIVE.name());
+        // 增量同步模式：只取该时间之后的更新，并包含软删除（客户端据此同步删除）
+        boolean incremental = updatedAfter != null && !updatedAfter.isBlank();
+        if (incremental) {
+            LocalDateTime ts = parseBaseTimestamp(updatedAfter);
+            if (ts != null) {
+                wrapper.gt("updated_at", ts);
+            }
+        } else {
+            wrapper.eq("status", NoteStatus.ACTIVE.name());
+        }
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like("title", keyword).or().like("content", keyword));
         }

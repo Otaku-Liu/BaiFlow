@@ -1,19 +1,15 @@
 package com.baiflow.android.ui;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -25,23 +21,21 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
-import com.baiflow.android.model.ApiResponse;
-import com.baiflow.android.model.NoteSummary;
-import com.baiflow.android.model.PagedResult;
-import com.baiflow.android.model.UserInfo;
-import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.data.AppDatabase;
+import com.baiflow.android.data.LocalNote;
+import com.baiflow.android.data.LocalNoteDao;
+import com.baiflow.android.data.SyncService;
+import com.baiflow.android.sync.SyncWorker;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 /**
- * 随手记列表页（底部「随手记」栏）— 列表 / 搜索 / 新建 / 删除，管理员可切换查看用户。
- * 点击项或「新建」进入 {@link NoteEditActivity}。
+ * 随手记列表页（底部「随手记」栏）— 列表 / 搜索 / 新建 / 删除。
+ * <p>
+ * 离线模式三态共用：数据一律读本地 Room（分区键 = 服务器地址 或 LOCAL）；在线模式
+ * resume/下拉时后台同步并刷新。管理员用户切换仅在线模式显示。
+ * 见 docs/12-android-offline-mode.md。
  */
 public class NotesFragment extends Fragment {
 
@@ -54,10 +48,8 @@ public class NotesFragment extends Fragment {
     private EditText etSearch;
     private NoteAdapter adapter;
     private SessionManager session;
-    private ApiClient client;
+    private LocalNoteDao dao;
 
-    private final List<UserInfo> users = new ArrayList<>();
-    private String currentViewUserId;   // 管理员切换目标（null = 全部）
     private String searchKeyword = "";
     private final android.os.Handler searchHandler = new android.os.Handler();
     private Runnable searchRunnable;
@@ -74,7 +66,7 @@ public class NotesFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         session = SessionManager.getInstance(requireContext());
-        client = ApiClient.getInstance(session);
+        dao = AppDatabase.get(requireContext()).noteDao();
 
         recyclerView = view.findViewById(R.id.recyclerView);
         swipeRefresh = view.findViewById(R.id.swipeRefresh);
@@ -89,141 +81,67 @@ public class NotesFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerView.setAdapter(adapter);
 
-        swipeRefresh.setOnRefreshListener(this::loadNotes);
-        btnNew.setOnClickListener(v -> openEditor(null, null));
+        swipeRefresh.setOnRefreshListener(() -> {
+            reload();
+            syncAndReload();
+        });
+        btnNew.setOnClickListener(v -> openEditor(null));
 
-        // 搜索：防抖 500ms
+        // 搜索：防抖 500ms（本地模糊过滤）
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
                 if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
                 searchRunnable = () -> {
                     searchKeyword = etSearch.getText().toString().trim();
-                    loadNotes();
+                    reload();
                 };
                 searchHandler.postDelayed(searchRunnable, 500);
             }
             @Override public void afterTextChanged(Editable s) { }
         });
 
-        // 管理员显示用户切换
-        if ("ADMIN".equals(session.getRole())) {
-            adminRow.setVisibility(View.VISIBLE);
-            loadUsers();
-        }
+        // 离线优先：本地分区为本人笔记，不再支持管理员按用户切换（见 docs/12 §9 边界）
+        adminRow.setVisibility(View.GONE);
+
+        reload();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // 从编辑器返回（MainActivity 重新 resume）时刷新列表，让新建/编辑/删除立即生效
-        loadNotes();
+        // 从编辑器返回刷新；在线模式触发一次后台同步后刷新
+        reload();
+        syncAndReload();
     }
 
-    private void loadNotes() {
-        showLoading(true);
-        swipeRefresh.setRefreshing(true);
-
-        client.listNotes(searchKeyword.isEmpty() ? null : searchKeyword,
-                        currentViewUserId, 1, 100)
-                .enqueue(new Callback<ApiResponse<PagedResult<NoteSummary>>>() {
-                    @Override
-                    public void onResponse(Call<ApiResponse<PagedResult<NoteSummary>>> call,
-                                           Response<ApiResponse<PagedResult<NoteSummary>>> response) {
-                        swipeRefresh.setRefreshing(false);
-                        showLoading(false);
-                        if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
-                            PagedResult<NoteSummary> result = response.body().getData();
-                            List<NoteSummary> items = result != null ? result.getRecords() : new ArrayList<>();
-                            adapter.setItems(items);
-                            tvEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                            recyclerView.setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
-                        } else {
-                            String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_load_failed);
-                            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<ApiResponse<PagedResult<NoteSummary>>> call, Throwable t) {
-                        swipeRefresh.setRefreshing(false);
-                        showLoading(false);
-                        Toast.makeText(requireContext(), getString(R.string.common_network_error, t.getMessage()), Toast.LENGTH_SHORT).show();
-                    }
-                });
+    /** 读本地 Room 渲染列表（三态通用） */
+    private void reload() {
+        String partition = session.getDataPartition();
+        List<LocalNote> items = searchKeyword.isEmpty()
+                ? dao.listByServer(partition)
+                : dao.search(partition, "%" + searchKeyword + "%");
+        adapter.setItems(items != null ? items : new ArrayList<>());
+        tvEmpty.setVisibility(items == null || items.isEmpty() ? View.VISIBLE : View.GONE);
+        recyclerView.setVisibility(items == null || items.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
-    /** 管理员用户切换（对齐文件页）：默认「我的文件」，可切换其他用户 / 全部 */
-    private void loadUsers() {
-        users.clear();
-        fetchUsersPage(1);
-    }
-
-    private void fetchUsersPage(final int page) {
-        client.listUsers(page, 100).enqueue(new Callback<ApiResponse<PagedResult<UserInfo>>>() {
-            @Override
-            public void onResponse(Call<ApiResponse<PagedResult<UserInfo>>> call,
-                                   Response<ApiResponse<PagedResult<UserInfo>>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
-                    PagedResult<UserInfo> result = response.body().getData();
-                    List<UserInfo> records = result != null ? result.getRecords() : new ArrayList<>();
-                    users.addAll(records);
-                    if (records.size() == 100) {
-                        fetchUsersPage(page + 1);
-                    } else {
-                        populateUserSpinner();
-                    }
-                }
+    /** 在线模式：后台同步一次，完成后刷新列表 */
+    private void syncAndReload() {
+        if (!session.isOnlineMode()) return;
+        android.content.Context ctx = requireContext();
+        new Thread(() -> {
+            SyncService.syncOnce(ctx);
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(this::reload);
             }
-
-            @Override
-            public void onFailure(Call<ApiResponse<PagedResult<UserInfo>>> call, Throwable t) {
-                Toast.makeText(requireContext(), getString(R.string.files_load_users_failed), Toast.LENGTH_SHORT).show();
-            }
-        });
+        }).start();
     }
 
-    private void populateUserSpinner() {
-        final List<String> names = new ArrayList<>();
-        final List<String> targetIds = new ArrayList<>();
-        String myId = session.getUserId();
-
-        names.add(getString(R.string.notes_my_notes));
-        targetIds.add(myId != null ? myId : "");
-
-        for (UserInfo u : users) {
-            if (u.getId() != null && u.getId().equals(myId)) continue;
-            String display = u.getDisplayName() != null ? u.getDisplayName() : u.getUsername();
-            names.add(getString(R.string.files_user_display, display, u.getUsername()));
-            targetIds.add(u.getId());
-        }
-        names.add(getString(R.string.files_all_users));
-        targetIds.add("");
-
-        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_item, names);
-        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerUser.setAdapter(spinnerAdapter);
-
-        spinnerUser.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                String target = targetIds.get(pos);
-                currentViewUserId = target.isEmpty() ? null : target;
-                loadNotes();
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
-    }
-
-    private void openEditor(String noteId, String title) {
-        Intent intent = new Intent(requireContext(), NoteEditActivity.class);
-        if (noteId != null) {
-            intent.putExtra(NoteEditActivity.EXTRA_NOTE_ID, noteId);
-            intent.putExtra(NoteEditActivity.EXTRA_TITLE, title);
+    private void openEditor(LocalNote note) {
+        android.content.Intent intent = new android.content.Intent(requireContext(), NoteEditActivity.class);
+        if (note != null) {
+            intent.putExtra(NoteEditActivity.EXTRA_LOCAL_ID, note.id);
         }
         startActivity(intent);
     }
@@ -235,9 +153,9 @@ public class NotesFragment extends Fragment {
     // ==================== Adapter ====================
 
     class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.ViewHolder> {
-        private List<NoteSummary> items = new ArrayList<>();
+        private List<LocalNote> items = new ArrayList<>();
 
-        void setItems(List<NoteSummary> items) { this.items = items; notifyDataSetChanged(); }
+        void setItems(List<LocalNote> items) { this.items = items; notifyDataSetChanged(); }
 
         @NonNull @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -247,12 +165,12 @@ public class NotesFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int pos) {
-            NoteSummary note = items.get(pos);
-            holder.tvTitle.setText(note.getTitle() != null && !note.getTitle().isEmpty()
-                    ? note.getTitle() : getString(R.string.notes_untitled));
-            holder.tvTime.setText(formatTime(note.getUpdatedAt()));
+            LocalNote note = items.get(pos);
+            holder.tvTitle.setText(note.title != null && !note.title.isEmpty()
+                    ? note.title : getString(R.string.notes_untitled));
+            holder.tvTime.setText(formatTime(note.updatedAt));
 
-            holder.itemView.setOnClickListener(v -> openEditor(note.getId(), note.getTitle()));
+            holder.itemView.setOnClickListener(v -> openEditor(note));
             holder.itemView.setOnLongClickListener(v -> {
                 confirmDelete(note);
                 return true;
@@ -272,40 +190,35 @@ public class NotesFragment extends Fragment {
         }
     }
 
-    private void confirmDelete(NoteSummary note) {
+    private void confirmDelete(LocalNote note) {
         new AlertDialog.Builder(requireContext())
                 .setTitle(getString(R.string.common_confirm_delete))
                 .setMessage(getString(R.string.common_delete_message,
-                        note.getTitle() == null || note.getTitle().isEmpty()
-                                ? getString(R.string.notes_untitled) : note.getTitle()))
+                        note.title == null || note.title.isEmpty()
+                                ? getString(R.string.notes_untitled) : note.title))
                 .setPositiveButton(getString(R.string.common_delete), (dialog, which) -> {
-                    client.deleteNote(note.getId()).enqueue(new Callback<ApiResponse<Map<String, Object>>>() {
-                        @Override
-                        public void onResponse(Call<ApiResponse<Map<String, Object>>> call,
-                                               Response<ApiResponse<Map<String, Object>>> response) {
-                            if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
-                                Toast.makeText(requireContext(), getString(R.string.common_deleted), Toast.LENGTH_SHORT).show();
-                                loadNotes();
-                            } else {
-                                String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_delete_failed);
-                                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
-                            }
+                    if (note.serverId == null) {
+                        // 从未上传：直接删本地行
+                        dao.delete(note);
+                    } else {
+                        // 已同步：标记 tombstone，重连同步删除服务端
+                        note.source = SyncService.SOURCE_TOMBSTONE;
+                        note.dirty = true;
+                        note.updatedAt = System.currentTimeMillis();
+                        dao.update(note);
+                        if (session.isOnlineMode()) {
+                            SyncWorker.requestNow(requireContext());
                         }
-
-                        @Override
-                        public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
-                            Toast.makeText(requireContext(), getString(R.string.common_network_error_short), Toast.LENGTH_SHORT).show();
-                        }
-                    });
+                    }
+                    reload();
                 })
                 .setNegativeButton(getString(R.string.common_cancel), null)
                 .show();
     }
 
-    /** 时间显示：取到分钟，去掉 T */
-    static String formatTime(String iso) {
-        if (iso == null || iso.isEmpty()) return "";
-        String s = iso.length() > 16 ? iso.substring(0, 16) : iso;
-        return s.replace('T', ' ');
+    /** 时间显示：epoch millis → "yyyy-MM-dd HH:mm" */
+    static String formatTime(long epochMillis) {
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+        return sdf.format(new java.util.Date(epochMillis));
     }
 }

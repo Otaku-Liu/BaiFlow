@@ -13,7 +13,9 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
+import com.baiflow.android.data.AppDatabase;
 import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.network.NetworkFeedback;
 
 /**
  * 服务器配置页 — 输入 BaiFlow 服务器地址，并检测连通性（经 ApiClient 请求 /api/health）。
@@ -77,12 +79,19 @@ public class ServerConfigActivity extends AppCompatActivity {
             mainHandler.post(() -> {
                 setLoading(false);
                 if (ok) {
+                    // 换服务器时清掉旧服务器的本地缓存与同步基准，防数据串号/漏拉（见 docs/12 §8）
+                    String oldUrl = session.getServerUrl();
+                    if (oldUrl != null && !oldUrl.equals(finalUrl)) {
+                        AppDatabase.get(this).noteDao().clearByServer(oldUrl);
+                        session.saveLastSyncAt(null);
+                    }
                     session.saveServerUrl(finalUrl);
                     Toast.makeText(this, getString(R.string.server_connect_success), Toast.LENGTH_SHORT).show();
                     startActivity(new Intent(this, LoginActivity.class));
                     finish();
                 } else {
-                    showError(getString(R.string.server_connect_failed, finalUrl));
+                    // 友好文案：设备无网 → 无网络连接；否则 → 无法连接服务器
+                    showError(getString(NetworkFeedback.classify(this)));
                 }
             });
         }).start();

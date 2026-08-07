@@ -29,16 +29,17 @@ public class NoteController {
     @Autowired
     private NoteService noteService;
 
-    /** 分页列出笔记，支持关键字搜索（标题/正文）与管理员视角切换 */
+    /** 分页列出笔记；传 updatedAfter 为增量同步模式（含软删除），否则普通列表（仅 ACTIVE） */
     @GetMapping
     public ApiResponse<IPage<NoteSummary>> list(@RequestParam(required = false) String keyword,
                                                  @RequestParam(required = false) String viewUserId,
                                                  @RequestParam(defaultValue = "1") int page,
                                                  @RequestParam(defaultValue = "50") int size,
+                                                 @RequestParam(required = false) String updatedAfter,
                                                  Authentication auth) {
         return ApiResponse.success(
                 noteService.listNotes(auth.getPrincipal().toString(), isAdmin(auth), viewUserId,
-                        keyword, page, size));
+                        keyword, page, size, updatedAfter));
     }
 
     /** 新建笔记 */

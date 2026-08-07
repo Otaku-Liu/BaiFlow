@@ -20,14 +20,17 @@ import androidx.fragment.app.Fragment;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
+import com.baiflow.android.data.AppDatabase;
+import com.baiflow.android.data.SyncService;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.UserInfo;
 import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.network.UiCallback;
+import com.baiflow.android.sync.SyncWorker;
 
 import java.util.Map;
 
 import retrofit2.Call;
-import retrofit2.Callback;
 import retrofit2.Response;
 
 /**
@@ -70,7 +73,68 @@ public class MineFragment extends Fragment {
                 startActivity(new Intent(requireContext(), TransferListActivity.class)));
         view.findViewById(R.id.rowServer).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), ServerConfigActivity.class)));
+        view.findViewById(R.id.rowOffline).setOnClickListener(v -> handleOfflineToggle());
+        view.findViewById(R.id.rowSync).setOnClickListener(v -> handleSync());
+        view.findViewById(R.id.rowReconnect).setOnClickListener(v -> {
+            startActivity(new Intent(requireContext(), LoginActivity.class));
+        });
         view.findViewById(R.id.btnLogout).setOnClickListener(v -> doLogout());
+
+        updateModeRows(view);
+    }
+
+    /** 刷新模式指示与离线/同步/重连行的可见性 */
+    private void updateModeRows(View root) {
+        TextView tvMode = root.findViewById(R.id.tvMode);
+        View rowOffline = root.findViewById(R.id.rowOffline);
+        View rowSync = root.findViewById(R.id.rowSync);
+        View rowReconnect = root.findViewById(R.id.rowReconnect);
+
+        if (session.isLocalMode()) {
+            tvMode.setText(getString(R.string.mine_mode_local));
+            rowOffline.setVisibility(View.GONE);
+            rowSync.setVisibility(View.GONE);
+            rowReconnect.setVisibility(View.GONE);
+        } else if (session.isOnlineMode()) {
+            tvMode.setText(getString(R.string.mine_mode_online));
+            rowOffline.setVisibility(View.VISIBLE);
+            ((TextView) rowOffline.findViewById(R.id.tvOffline)).setText(getString(R.string.mine_offline_toggle_on));
+            rowSync.setVisibility(View.VISIBLE);
+            rowReconnect.setVisibility(View.GONE);
+        } else {
+            tvMode.setText(getString(R.string.mine_mode_offline));
+            rowOffline.setVisibility(View.VISIBLE);
+            ((TextView) rowOffline.findViewById(R.id.tvOffline)).setText(getString(R.string.mine_offline_toggle_off));
+            rowSync.setVisibility(View.GONE);
+            rowReconnect.setVisibility(View.VISIBLE);
+        }
+    }
+
+    /** 离线模式开关：进离线清 token 留缓存；退出离线 → 重新登录 */
+    private void handleOfflineToggle() {
+        if (session.isOfflineMode()) {
+            session.saveOffline(false);
+            startActivity(new Intent(requireContext(), LoginActivity.class));
+        } else {
+            session.enterOfflineMode();
+            SyncWorker.cancel(requireContext());
+            Toast.makeText(requireContext(), getString(R.string.mine_offline_toggle_on), Toast.LENGTH_SHORT).show();
+            requireActivity().recreate();
+        }
+    }
+
+    /** 手动同步：后台同步一次（仅在线模式有意义） */
+    private void handleSync() {
+        Toast.makeText(requireContext(), getString(R.string.mine_sync_pending), Toast.LENGTH_SHORT).show();
+        android.content.Context ctx = requireContext();
+        new Thread(() -> {
+            boolean ok = SyncService.syncOnce(ctx);
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> Toast.makeText(ctx,
+                        getString(ok ? R.string.mine_sync_done : R.string.mine_sync_failed),
+                        Toast.LENGTH_SHORT).show());
+            }
+        }).start();
     }
 
     /** 刷新用户卡（展示名 + 头像首字） */
@@ -93,23 +157,23 @@ public class MineFragment extends Fragment {
                 .setPositiveButton(getString(R.string.common_save), (d, w) -> {
                     String name = input.getText().toString().trim();
                     if (name.isEmpty()) return;
-                    client.updateProfile(name).enqueue(new Callback<ApiResponse<UserInfo>>() {
+                    client.updateProfile(name).enqueue(new UiCallback<ApiResponse<UserInfo>>(requireContext()) {
                         @Override
-                        public void onResponse(Call<ApiResponse<UserInfo>> call,
-                                               Response<ApiResponse<UserInfo>> response) {
+                        protected void onUiResponse(Call<ApiResponse<UserInfo>> call,
+                                                    Response<ApiResponse<UserInfo>> response) {
                             if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                                 session.saveDisplayName(name);
                                 refreshUserCard();
                                 Toast.makeText(requireContext(), getString(R.string.mine_profile_updated), Toast.LENGTH_SHORT).show();
-                            } else {
+                            } else if (response.code() < 500) {
                                 String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_save_failed);
                                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
                             }
                         }
 
                         @Override
-                        public void onFailure(Call<ApiResponse<UserInfo>> call, Throwable t) {
-                            Toast.makeText(requireContext(), getString(R.string.common_network_error_short), Toast.LENGTH_SHORT).show();
+                        protected void onUiFailure(Call<ApiResponse<UserInfo>> call, Throwable t) {
+                            // 网络失败已由 UiCallback 统一提示
                         }
                     });
                 })
@@ -154,22 +218,22 @@ public class MineFragment extends Fragment {
                         Toast.makeText(requireContext(), getString(R.string.mine_password_mismatch), Toast.LENGTH_SHORT).show();
                         return;
                     }
-                    client.changePassword(oldP, newP).enqueue(new Callback<ApiResponse<Map<String, Object>>>() {
+                    client.changePassword(oldP, newP).enqueue(new UiCallback<ApiResponse<Map<String, Object>>>(requireContext()) {
                         @Override
-                        public void onResponse(Call<ApiResponse<Map<String, Object>>> call,
-                                               Response<ApiResponse<Map<String, Object>>> response) {
+                        protected void onUiResponse(Call<ApiResponse<Map<String, Object>>> call,
+                                                    Response<ApiResponse<Map<String, Object>>> response) {
                             if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                                 Toast.makeText(requireContext(), getString(R.string.mine_password_changed), Toast.LENGTH_SHORT).show();
                                 doLogout();
-                            } else {
+                            } else if (response.code() < 500) {
                                 String msg = response.body() != null ? response.body().getMessage() : getString(R.string.mine_password_change_failed);
                                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
                             }
                         }
 
                         @Override
-                        public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
-                            Toast.makeText(requireContext(), getString(R.string.common_network_error_short), Toast.LENGTH_SHORT).show();
+                        protected void onUiFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
+                            // 网络失败已由 UiCallback 统一提示
                         }
                     });
                 })
@@ -191,8 +255,14 @@ public class MineFragment extends Fragment {
                 .show();
     }
 
+    /** 登出：清 token + 清该服务器本地缓存（两级语义，见 docs/12 §2），保留服务器地址停在登录页 */
     private void doLogout() {
+        String partition = session.getDataPartition();
         session.clearSession();
+        if (!SessionManager.PARTITION_LOCAL.equals(partition)) {
+            AppDatabase.get(requireContext()).noteDao().clearByServer(partition);
+        }
+        SyncWorker.cancel(requireContext());
         Intent intent = new Intent(requireContext(), LoginActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);

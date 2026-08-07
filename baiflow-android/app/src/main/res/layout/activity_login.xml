@@ -75,4 +75,12 @@
         style="@style/Ios.Button.Text"
         android:layout_marginTop="8dp" />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOfflineMode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/login_offline_mode"
+        style="@style/Ios.Button.Text"
+        android:layout_marginTop="4dp" />
+
 </LinearLayout>

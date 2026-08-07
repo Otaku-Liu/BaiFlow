@@ -15,9 +15,9 @@ import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.model.*;
 import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.network.UiCallback;
 import com.baiflow.android.util.FormatUtil;
 import retrofit2.Call;
-import retrofit2.Callback;
 import retrofit2.Response;
 import java.util.*;
 
@@ -36,12 +36,21 @@ public class TransferListActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_transfer_list);
 
-        client = ApiClient.getInstance(SessionManager.getInstance(this));
+        com.baiflow.android.auth.SessionManager session = com.baiflow.android.auth.SessionManager.getInstance(this);
+        client = ApiClient.getInstance(session);
         recyclerView = findViewById(R.id.recyclerView);
         tvEmpty = findViewById(R.id.tvEmpty);
 
         // 顶部返回按钮
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
+        // 本地/离线模式：传输不可用
+        if (!session.isOnlineMode()) {
+            tvEmpty.setText(getString(R.string.transfer_offline_unavailable));
+            tvEmpty.setVisibility(View.VISIBLE);
+            recyclerView.setVisibility(View.GONE);
+            return;
+        }
 
         adapter = new TaskAdapter();
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -51,24 +60,24 @@ public class TransferListActivity extends AppCompatActivity {
     }
 
     private void loadTasks() {
-        client.listDownloads(null, 1, 50).enqueue(new Callback<ApiResponse<PagedResult<DownloadTask>>>() {
+        client.listDownloads(null, 1, 50).enqueue(new UiCallback<ApiResponse<PagedResult<DownloadTask>>>(this) {
             @Override
-            public void onResponse(Call<ApiResponse<PagedResult<DownloadTask>>> call,
-                                   Response<ApiResponse<PagedResult<DownloadTask>>> response) {
+            protected void onUiResponse(Call<ApiResponse<PagedResult<DownloadTask>>> call,
+                                        Response<ApiResponse<PagedResult<DownloadTask>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     PagedResult<DownloadTask> result = response.body().getData();
                     List<DownloadTask> tasks = result != null ? result.getRecords() : new ArrayList<>();
                     adapter.setItems(tasks);
                     tvEmpty.setVisibility(tasks.isEmpty() ? View.VISIBLE : View.GONE);
                     recyclerView.setVisibility(tasks.isEmpty() ? View.GONE : View.VISIBLE);
-                } else {
+                } else if (response.code() < 500) {
                     Toast.makeText(TransferListActivity.this, getString(R.string.common_load_failed), Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
-            public void onFailure(Call<ApiResponse<PagedResult<DownloadTask>>> call, Throwable t) {
-                Toast.makeText(TransferListActivity.this, getString(R.string.common_network_error, t.getMessage()), Toast.LENGTH_SHORT).show();
+            protected void onUiFailure(Call<ApiResponse<PagedResult<DownloadTask>>> call, Throwable t) {
+                // 网络失败已由 UiCallback 统一提示
             }
         });
     }

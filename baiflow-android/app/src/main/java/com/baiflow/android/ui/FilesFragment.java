@@ -35,6 +35,7 @@ import com.baiflow.android.model.PagedResult;
 import com.baiflow.android.model.StorageRoot;
 import com.baiflow.android.model.UserInfo;
 import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.network.UiCallback;
 import com.baiflow.android.transfer.DownloadService;
 import com.baiflow.android.transfer.UploadService;
 import com.baiflow.android.util.FormatUtil;
@@ -44,7 +45,6 @@ import java.util.List;
 import java.util.Map;
 
 import retrofit2.Call;
-import retrofit2.Callback;
 import retrofit2.Response;
 
 /**
@@ -143,6 +143,17 @@ public class FilesFragment extends Fragment {
                     }
                 });
 
+        // 本地/离线模式：文件中心不可用（离线模式，见 docs/12 §4）
+        if (!session.isOnlineMode()) {
+            tvEmpty.setVisibility(View.VISIBLE);
+            tvEmpty.setText(getString(R.string.files_offline_unavailable));
+            recyclerView.setVisibility(View.GONE);
+            swipeRefresh.setEnabled(false);
+            adminRow.setVisibility(View.GONE);
+            btnUpload.setEnabled(false);
+            return;
+        }
+
         // 管理员显示用户切换
         if ("ADMIN".equals(session.getRole())) {
             adminRow.setVisibility(View.VISIBLE);
@@ -154,10 +165,10 @@ public class FilesFragment extends Fragment {
 
     // ---- 存储根目录：自动选第一个可用根（不再用下拉框） ----
     private void loadStorageRoots() {
-        client.listStorageRoots().enqueue(new Callback<ApiResponse<List<StorageRoot>>>() {
+        client.listStorageRoots().enqueue(new UiCallback<ApiResponse<List<StorageRoot>>>(requireContext()) {
             @Override
-            public void onResponse(Call<ApiResponse<List<StorageRoot>>> call,
-                                   Response<ApiResponse<List<StorageRoot>>> response) {
+            protected void onUiResponse(Call<ApiResponse<List<StorageRoot>>> call,
+                                        Response<ApiResponse<List<StorageRoot>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     roots = response.body().getData();
                     if (roots == null || roots.isEmpty()) {
@@ -174,14 +185,15 @@ public class FilesFragment extends Fragment {
                         updateUpButton();
                         loadFiles();
                     }
-                } else {
+                } else if (response.code() < 500) {
+                    // 5xx 已由 UiCallback 全局兜底提示「服务器异常」，这里避免双弹
                     Toast.makeText(requireContext(), getString(R.string.files_load_storage_root_failed), Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
-            public void onFailure(Call<ApiResponse<List<StorageRoot>>> call, Throwable t) {
-                Toast.makeText(requireContext(), getString(R.string.common_network_error, t.getMessage()), Toast.LENGTH_SHORT).show();
+            protected void onUiFailure(Call<ApiResponse<List<StorageRoot>>> call, Throwable t) {
+                // 网络失败已由 UiCallback 统一提示
             }
         });
     }
@@ -194,10 +206,10 @@ public class FilesFragment extends Fragment {
 
     /** 分页拉取用户（每页 100，直到拉完），避免 >100 用户被静默截断 */
     private void fetchUsersPage(final int page) {
-        client.listUsers(page, 100).enqueue(new Callback<ApiResponse<PagedResult<UserInfo>>>() {
+        client.listUsers(page, 100).enqueue(new UiCallback<ApiResponse<PagedResult<UserInfo>>>(requireContext()) {
             @Override
-            public void onResponse(Call<ApiResponse<PagedResult<UserInfo>>> call,
-                                   Response<ApiResponse<PagedResult<UserInfo>>> response) {
+            protected void onUiResponse(Call<ApiResponse<PagedResult<UserInfo>>> call,
+                                        Response<ApiResponse<PagedResult<UserInfo>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     PagedResult<UserInfo> result = response.body().getData();
                     List<UserInfo> records = result != null ? result.getRecords() : new ArrayList<>();
@@ -211,8 +223,8 @@ public class FilesFragment extends Fragment {
             }
 
             @Override
-            public void onFailure(Call<ApiResponse<PagedResult<UserInfo>>> call, Throwable t) {
-                Toast.makeText(requireContext(), getString(R.string.files_load_users_failed), Toast.LENGTH_SHORT).show();
+            protected void onUiFailure(Call<ApiResponse<PagedResult<UserInfo>>> call, Throwable t) {
+                // 网络失败已由 UiCallback 统一提示
             }
         });
     }
@@ -274,10 +286,10 @@ public class FilesFragment extends Fragment {
         String token = privacyTokens.get(currentParentId);
 
         client.listFiles(currentRootId, currentParentId, 1, 100, currentViewUserId, token)
-                .enqueue(new Callback<ApiResponse<PagedResult<FileItem>>>() {
+                .enqueue(new UiCallback<ApiResponse<PagedResult<FileItem>>>(requireContext()) {
                     @Override
-                    public void onResponse(Call<ApiResponse<PagedResult<FileItem>>> call,
-                                           Response<ApiResponse<PagedResult<FileItem>>> response) {
+                    protected void onUiResponse(Call<ApiResponse<PagedResult<FileItem>>> call,
+                                                Response<ApiResponse<PagedResult<FileItem>>> response) {
                         swipeRefresh.setRefreshing(false);
                         showLoading(false);
 
@@ -291,14 +303,17 @@ public class FilesFragment extends Fragment {
                             } else {
                                 handleError(response.body());
                             }
+                        } else if (response.code() < 500 && response.body() != null) {
+                            // 5xx 已由 UiCallback 全局兜底提示，避免双弹；顺带防御空 body
+                            handleError(response.body());
                         }
                     }
 
                     @Override
-                    public void onFailure(Call<ApiResponse<PagedResult<FileItem>>> call, Throwable t) {
+                    protected void onUiFailure(Call<ApiResponse<PagedResult<FileItem>>> call, Throwable t) {
+                        // 网络失败已由 UiCallback 统一提示
                         swipeRefresh.setRefreshing(false);
                         showLoading(false);
-                        Toast.makeText(requireContext(), getString(R.string.common_network_error, t.getMessage()), Toast.LENGTH_SHORT).show();
                     }
                 });
     }
@@ -354,10 +369,10 @@ public class FilesFragment extends Fragment {
         String folderId = currentParentId;
         if (folderId == null) { return; }
 
-        client.verifyPrivacy(folderId, password).enqueue(new Callback<ApiResponse<Map<String, Object>>>() {
+        client.verifyPrivacy(folderId, password).enqueue(new UiCallback<ApiResponse<Map<String, Object>>>(requireContext()) {
             @Override
-            public void onResponse(Call<ApiResponse<Map<String, Object>>> call,
-                                   Response<ApiResponse<Map<String, Object>>> response) {
+            protected void onUiResponse(Call<ApiResponse<Map<String, Object>>> call,
+                                        Response<ApiResponse<Map<String, Object>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     Map<String, Object> data = response.body().getData();
                     String token = data != null ? (String) data.get("accessToken") : null;
@@ -366,15 +381,15 @@ public class FilesFragment extends Fragment {
                         Toast.makeText(requireContext(), getString(R.string.files_privacy_verify_success), Toast.LENGTH_SHORT).show();
                         loadFiles();
                     }
-                } else {
+                } else if (response.code() < 500) {
                     String msg = response.body() != null ? response.body().getMessage() : getString(R.string.files_privacy_wrong_password);
                     Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
-            public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
-                Toast.makeText(requireContext(), getString(R.string.common_network_error_short), Toast.LENGTH_SHORT).show();
+            protected void onUiFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
+                // 网络失败已由 UiCallback 统一提示
             }
         });
     }
@@ -552,22 +567,22 @@ public class FilesFragment extends Fragment {
                 .setMessage(getString(R.string.common_delete_message, item.getName()))
                 .setPositiveButton(getString(R.string.common_delete), (dialog, which) -> {
                     String token = privacyTokens.get(currentParentId);
-                    client.deleteFile(item.getId(), token).enqueue(new Callback<ApiResponse<Map<String, Object>>>() {
+                    client.deleteFile(item.getId(), token).enqueue(new UiCallback<ApiResponse<Map<String, Object>>>(requireContext()) {
                         @Override
-                        public void onResponse(Call<ApiResponse<Map<String, Object>>> call,
-                                               Response<ApiResponse<Map<String, Object>>> response) {
+                        protected void onUiResponse(Call<ApiResponse<Map<String, Object>>> call,
+                                                    Response<ApiResponse<Map<String, Object>>> response) {
                             if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                                 Toast.makeText(requireContext(), getString(R.string.common_deleted), Toast.LENGTH_SHORT).show();
                                 loadFiles();
-                            } else {
+                            } else if (response.code() < 500) {
                                 String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_delete_failed);
                                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
                             }
                         }
 
                         @Override
-                        public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
-                            Toast.makeText(requireContext(), getString(R.string.common_network_error_short), Toast.LENGTH_SHORT).show();
+                        protected void onUiFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
+                            // 网络失败已由 UiCallback 统一提示
                         }
                     });
                 })

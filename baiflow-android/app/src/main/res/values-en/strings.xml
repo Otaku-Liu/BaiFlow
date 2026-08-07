@@ -12,11 +12,34 @@
     <string name="common_confirm_delete">Confirm Delete</string>
     <string name="common_delete_message">Delete \"%1$s\"?</string>
     <string name="common_save_failed">Save failed</string>
-    <string name="common_save_failed_detail">Save failed: %1$s</string>
     <string name="common_load_failed">Load failed</string>
-    <string name="common_load_failed_detail">Load failed: %1$s</string>
-    <string name="common_network_error">Network error: %1$s</string>
-    <string name="common_network_error_short">Network error</string>
+    <string name="network_no_connection">No network connection. Check your network settings.</string>
+    <string name="cannot_reach_server">Cannot reach the server. Check the network and retry later.</string>
+    <string name="server_error">Server error. Please retry later.</string>
+    <string name="network_recovered">Network recovered. Please continue.</string>
+    <!-- ==================== Offline mode ==================== -->
+    <string name="login_offline_mode">Use offline mode (local notes)</string>
+    <string name="guide_title">Welcome to BaiFlow</string>
+    <string name="guide_desc">Quick notes work offline. Set up a server to sync across devices and use the file center.</string>
+    <string name="guide_btn_server">Set up server</string>
+    <string name="guide_btn_local">Not now, use locally</string>
+    <string name="offline_upload_prompt_title">Upload local notes</string>
+    <string name="offline_upload_prompt_message">You have %1$s local notes. Upload them to the server?</string>
+    <string name="offline_upload_yes">Upload</string>
+    <string name="offline_upload_no">Not now</string>
+    <string name="note_edit_image_save_failed">Failed to save image</string>
+    <string name="mine_offline_toggle_on">Enter offline mode</string>
+    <string name="mine_offline_toggle_off">Exit offline mode (log in again)</string>
+    <string name="mine_sync">Sync now</string>
+    <string name="mine_sync_done">Synced</string>
+    <string name="mine_sync_pending">Syncing…</string>
+    <string name="mine_sync_failed">Sync failed. Please retry later.</string>
+    <string name="mine_reconnect">Reconnect to server</string>
+    <string name="mine_mode_local">Local mode</string>
+    <string name="mine_mode_online">Online mode</string>
+    <string name="mine_mode_offline">Offline mode</string>
+    <string name="files_offline_unavailable">Offline / no server configured. File center unavailable.</string>
+    <string name="transfer_offline_unavailable">Offline / no server configured. Transfers unavailable.</string>
 
     <!-- ==================== Bottom navigation ==================== -->
     <string name="nav_files">Files</string>
@@ -42,7 +65,6 @@
     <string name="server_checking">Checking…</string>
     <string name="server_url_required">Enter a server address</string>
     <string name="server_connect_success">Connected, server address saved</string>
-    <string name="server_connect_failed">Unable to connect to server (%1$s)\nCheck the address, network, or confirm the backend is running</string>
 
     <!-- ==================== Files ==================== -->
     <string name="files_title">File Center</string>
@@ -58,7 +80,6 @@
     <string name="files_download_started">Download started: %1$s</string>
     <string name="files_no_storage_root">No storage root available</string>
     <string name="files_load_storage_root_failed">Failed to load storage roots</string>
-    <string name="files_load_users_failed">Failed to load user list</string>
     <string name="files_my_files">My Files</string>
     <string name="files_user_display">%1$s (%2$s)</string>
     <string name="files_all_users">All (all users)</string>

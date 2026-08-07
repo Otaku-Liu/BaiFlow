@@ -32,6 +32,8 @@
             android:exported="false" />
         <activity android:name=".ui.ServerConfigActivity"
             android:exported="false" />
+        <activity android:name=".ui.GuideActivity"
+            android:exported="false" />
         <activity android:name=".ui.TransferListActivity"
             android:exported="false" />
         <activity android:name=".ui.PreviewActivity"

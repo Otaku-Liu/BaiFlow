@@ -52,7 +52,8 @@ public class ApiClient {
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(new AuthInterceptor(session))
                     .addInterceptor(new LoggingInterceptor())
-                    .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    // connect 10s：连不上/拒连更快反馈；read/write 60s 保留（下载/大响应需要长读）
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                     .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
                     .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
                     .build();
@@ -250,7 +251,8 @@ public class ApiClient {
                 @Query("keyword") String keyword,
                 @Query("viewUserId") String viewUserId,
                 @Query("page") int page,
-                @Query("size") int size
+                @Query("size") int size,
+                @Query("updatedAfter") String updatedAfter
         );
 
         @POST("notes")
@@ -400,7 +402,14 @@ public class ApiClient {
 
     public Call<ApiResponse<PagedResult<NoteSummary>>> listNotes(String keyword, String viewUserId,
                                                                   int page, int size) {
-        return getService().listNotes(keyword, viewUserId, page, size);
+        return getService().listNotes(keyword, viewUserId, page, size, null);
+    }
+
+    /** 增量同步：拉取 updatedAfter 之后更新的笔记（含软删除标记）；viewUserId 传自己则只拉本人 */
+    public Call<ApiResponse<PagedResult<NoteSummary>>> listNotesSince(String viewUserId,
+                                                                      String updatedAfter,
+                                                                      int page, int size) {
+        return getService().listNotes(null, viewUserId, page, size, updatedAfter);
     }
 
     public Call<ApiResponse<NoteDetail>> createNote(String title, String content) {

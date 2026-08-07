@@ -58,7 +58,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 ## API 调用
 
 - Axios 统一注入 Bearer token
-- 401 统一跳转登录页
+- 401 统一跳转登录页；**网络级失败（连不上/超时/断网）**：距上次成功联系 ≥30s 判定「服务器连接超时」→ 提示后回登录页（**保留 token**，登录页提供「重新连接」），见 `docs/10-web-connection-timeout.md`
 - 管理员文件列表传入 `viewUserId` 参数切换用户视角
 - 文件上传显示进度，文件下载使用浏览器下载能力
 

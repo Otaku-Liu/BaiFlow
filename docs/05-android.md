@@ -65,6 +65,10 @@ SharedPreferences 保存 token（**登录会话 token，长期保持**）和服�
 
 网络不可用提示、token 失效跳登录、失败保留任务和错误原因
 
+- **网络连接失败**（见 `docs/11-android-network-error.md`）：`UiCallback` 交互回调统一处理——收到任何响应即视为成功联系，网络级失败（IOException）按「无网络连接 / 无法连接服务器」分类全局 Toast + 去重（断连时段内一条、成功即清除、恢复时提示「网络已恢复」）；HTTP 5xx 全局兜底「服务器异常」。OkHttp connect 超时 10s。设备断网由 MainActivity 的 ConnectivityManager 监听即时提示。**后台传输服务不弹 UI**（有通知与失败状态）。
+- **token 失效**：`AuthInterceptor` 401 清会话（下次启动回登录）。
+- **上传/下载失败**：任务保留 + 错误原因记录。
+
 ## 设计系统（iOS 风格）
 
 Android UI 采用集中式 iOS 风格设计系统：组件样式定义在 `res/values/styles_ios.xml`（`@style/Ios.*`），所有布局引用继承，改一处全局生效。已覆盖按钮（Primary/Text/Danger）、输入框、标题栏（居中标题 + chevron 返回 + 上一级名，无阴影）、卡片/列表项。**新增组件样式一律加进 `styles_ios.xml`，不写硬编码色值/圆角**，规范详见 `docs/08-ios-design-system.md`。
@@ -73,4 +77,4 @@ Android UI 采用集中式 iOS 风格设计系统：组件样式定义在 `res/v
 
 Phase 2（在线）：列表页 + 富文本所见即所得编辑器（`editor/` 纯 JVM Markdown 解析/发射 + Spannable 适配层，未知内容透传不丢数据）+ 图片/录音/画画媒体。详见 `docs/07-quick-notes.md`。
 
-Phase 3（待实施）：Room 本地缓存 + WorkManager 同步 + outbox + `updatedAfter` 增量合并（冲突对齐在线端乐观并发）。
+Phase 3（待实施）：**Android 离线模式**（三态：本地模式 / 在线模式 / 离线模式）——Room 本地缓存 + outbox + `updatedAfter` 增量合并（冲突对齐在线端乐观并发）+ WorkManager 后台同步；入口改为「配置引导页」，登录页提供离线逃生口，进离线清 token 本地免登录。完整设计见 `docs/12-android-offline-mode.md`。

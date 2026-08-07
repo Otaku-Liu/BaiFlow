@@ -1,6 +1,9 @@
 package com.baiflow.android.ui;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -11,6 +14,7 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
+import com.baiflow.android.network.NetworkFeedback;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
@@ -18,28 +22,46 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
  * <p>
  * 用 {@link ViewPager2} 承载三个 Fragment，支持左右滑动切换，与底部导航双向同步。
  * 应用入口：未登录时先引导到服务器配置/登录；已登录直接进入三栏界面。
+ * 注册设备网络监听：断网即时提示「无网络连接」，恢复时提示「网络已恢复」（见 docs/11-android-network-error.md）。
  */
 public class MainActivity extends AppCompatActivity {
 
     private ViewPager2 viewPager;
     private BottomNavigationView bottomNav;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         SessionManager session = SessionManager.getInstance(this);
-        if (!session.isLoggedIn()) {
-            // 未登录：引导到服务器配置或登录页
-            Intent intent = session.getServerUrl() != null
-                    ? new Intent(this, LoginActivity.class)
-                    : new Intent(this, ServerConfigActivity.class);
-            startActivity(intent);
+
+        // 首次启动（未配服务器）：引导页「设置服务器 / 先本地用」
+        if (!session.isGuideShown() && session.getServerUrl() == null) {
+            startActivity(new Intent(this, GuideActivity.class));
+            finish();
+            return;
+        }
+        session.saveGuideShown();
+
+        // 三态分发（见 docs/12-android-offline-mode.md §4）：
+        // 本地模式 / 在线模式 / 离线模式 → 主界面；服务器已设但未登录且未离线 → 登录页（登录门槛）
+        if (!session.isLocalMode() && !session.isOnlineMode() && !session.isOfflineMode()) {
+            startActivity(new Intent(this, LoginActivity.class));
             finish();
             return;
         }
 
         setContentView(R.layout.activity_main);
+
+        registerNetworkListener();
+
+        // 在线模式：周期后台同步；离线/本地模式暂停
+        if (session.isOnlineMode()) {
+            com.baiflow.android.sync.SyncWorker.schedule(this);
+        } else {
+            com.baiflow.android.sync.SyncWorker.cancel(this);
+        }
 
         viewPager = findViewById(R.id.viewPager);
         bottomNav = findViewById(R.id.bottomNav);
@@ -80,5 +102,35 @@ public class MainActivity extends AppCompatActivity {
             }
             return true;
         });
+    }
+
+    /** 注册设备网络监听：断网即时提示，恢复时提示「网络已恢复」 */
+    private void registerNetworkListener() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) return;
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(@NonNull Network network) {
+                NetworkFeedback.reportContact(MainActivity.this);
+            }
+
+            @Override
+            public void onLost(@NonNull Network network) {
+                NetworkFeedback.reportDeviceOffline(MainActivity.this);
+            }
+        };
+        cm.registerDefaultNetworkCallback(networkCallback);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (networkCallback != null) {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                cm.unregisterNetworkCallback(networkCallback);
+            }
+            networkCallback = null;
+        }
     }
 }

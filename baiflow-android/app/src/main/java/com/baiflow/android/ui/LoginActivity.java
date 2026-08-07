@@ -6,13 +6,21 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
+import com.baiflow.android.data.AppDatabase;
+import com.baiflow.android.data.SyncService;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.LoginData;
 import com.baiflow.android.model.UserInfo;
 import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.network.NetworkFeedback;
+import com.baiflow.android.sync.SyncWorker;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -48,6 +56,12 @@ public class LoginActivity extends AppCompatActivity {
             startActivity(intent);
             finish();
         });
+        // 登录页逃生口：服务器不可达/忘密码时进离线模式（本地笔记可用，见 docs/12 §4）
+        findViewById(R.id.btnOfflineMode).setOnClickListener(v -> {
+            session.enterOfflineMode();
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        });
     }
 
     private void doLogin() {
@@ -80,7 +94,7 @@ public class LoginActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<ApiResponse<LoginData>> call, Throwable t) {
-                showError(getString(R.string.common_network_error, t.getMessage()));
+                showError(getString(NetworkFeedback.classify(LoginActivity.this)));
             }
         });
     }
@@ -94,7 +108,13 @@ public class LoginActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     UserInfo user = response.body().getData();
                     session.saveUser(user.getId(), user.getUsername(), user.getDisplayName(), user.getRole());
+                    // 登录成功：复位离线标记（重连后回到在线模式）
+                    session.saveOffline(false);
                     Toast.makeText(LoginActivity.this, getString(R.string.login_success), Toast.LENGTH_SHORT).show();
+                    // 登录成功：调度同步 + 本地模式笔记上传询问
+                    SyncWorker.schedule(LoginActivity.this);
+                    SyncWorker.requestNow(LoginActivity.this);
+                    maybePromptUploadLocal();
                     Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                     startActivity(intent);
                     finish();
@@ -105,9 +125,24 @@ public class LoginActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<ApiResponse<UserInfo>> call, Throwable t) {
-                showError(getString(R.string.common_network_error, t.getMessage()));
+                showError(getString(NetworkFeedback.classify(LoginActivity.this)));
             }
         });
+    }
+
+    /** 本地模式创建的笔记 → 首次登录「上传前询问」 */
+    private void maybePromptUploadLocal() {
+        int count = AppDatabase.get(this).noteDao().countLocalOnly();
+        if (count == 0) return;
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.offline_upload_prompt_title))
+                .setMessage(getString(R.string.offline_upload_prompt_message, count))
+                .setPositiveButton(getString(R.string.offline_upload_yes), (d, w) -> {
+                    SyncService.migrateLocalNotes(this);
+                    SyncWorker.requestNow(this);
+                })
+                .setNegativeButton(getString(R.string.offline_upload_no), null)
+                .show();
     }
 
     private void showError(String msg) {

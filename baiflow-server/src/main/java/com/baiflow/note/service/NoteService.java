@@ -15,18 +15,22 @@ import java.util.Map;
 public interface NoteService {
 
     /**
-     * 分页列出笔记（仅 ACTIVE）。
+     * 分页列出笔记。
+     * <p>
+     * 传 {@code updatedAfter} 时为增量同步模式：返回该时间之后更新的笔记，且**包含软删除**
+     * （客户端据此同步删除）；不传时仅返回 ACTIVE 笔记（普通列表）。
      *
-     * @param userId      调用者 ID
-     * @param isAdmin     是否 ADMIN
-     * @param viewUserId  管理员视角切换（可空）
-     * @param keyword     标题/正文模糊搜索（可空）
-     * @param page        页码（从 1 开始）
-     * @param size        每页数量
+     * @param userId        调用者 ID
+     * @param isAdmin       是否 ADMIN
+     * @param viewUserId    管理员视角切换（可空）
+     * @param keyword       标题/正文模糊搜索（可空）
+     * @param page          页码（从 1 开始）
+     * @param size          每页数量
+     * @param updatedAfter  增量基准时间（ISO，可空）
      * @return 笔记列表（不含正文），按更新时间倒序
      */
     IPage<NoteSummary> listNotes(String userId, boolean isAdmin, String viewUserId,
-                                 String keyword, int page, int size);
+                                 String keyword, int page, int size, String updatedAfter);
 
     /**
      * 新建笔记。

@@ -65,8 +65,94 @@ public class SessionManager {
     public String getDisplayName() { return prefs.getString(KEY_DISPLAY_NAME, null); }
     public String getRole() { return prefs.getString(KEY_ROLE, null); }
 
+    // ---- 离线模式（三态）----
+
+    /** 本地模式分区键（未配服务器） */
+    public static final String PARTITION_LOCAL = "LOCAL";
+
+    private static final String KEY_OFFLINE = "offline";
+    private static final String KEY_LAST_SYNC_AT = "last_sync_at";
+    private static final String KEY_GUIDE_SHOWN = "guide_shown";
+
+    /** 首次启动引导页是否已展示（设置服务器 / 先本地用 二选一） */
+    public boolean isGuideShown() {
+        return prefs.getBoolean(KEY_GUIDE_SHOWN, false);
+    }
+
+    public void saveGuideShown() {
+        prefs.edit().putBoolean(KEY_GUIDE_SHOWN, true).apply();
+    }
+
+    /** 进离线：清 token + 用户，但保留服务器地址与离线标记（本地笔记可继续用） */
+    public void enterOfflineMode() {
+        prefs.edit()
+                .remove(KEY_TOKEN)
+                .remove(KEY_USER_ID)
+                .remove(KEY_USERNAME)
+                .remove(KEY_DISPLAY_NAME)
+                .remove(KEY_ROLE)
+                .putBoolean(KEY_OFFLINE, true)
+                .apply();
+    }
+
+    public void saveOffline(boolean offline) {
+        prefs.edit().putBoolean(KEY_OFFLINE, offline).apply();
+    }
+
+    public boolean isOffline() {
+        return prefs.getBoolean(KEY_OFFLINE, false);
+    }
+
+    public String getLastSyncAt() {
+        return prefs.getString(KEY_LAST_SYNC_AT, null);
+    }
+
+    public void saveLastSyncAt(String iso) {
+        prefs.edit().putString(KEY_LAST_SYNC_AT, iso != null ? iso : "").apply();
+    }
+
+    // ---- 三态判断（见 docs/12-android-offline-mode.md §4）----
+
+    /** 本地模式：未配服务器，免登录纯本地 */
+    public boolean isLocalMode() {
+        return getServerUrl() == null;
+    }
+
+    /** 在线模式：服务器 + token + 非离线 */
+    public boolean isOnlineMode() {
+        return getServerUrl() != null && isLoggedIn() && !isOffline();
+    }
+
+    /**
+     * 离线模式：已配服务器且主动离线标记。
+     * 注意：已配服务器但未登录且未离线 ≠ 离线模式——那是登录门槛（进登录页）。
+     * 成功登录会复位离线标记（见 LoginActivity）。
+     */
+    public boolean isOfflineMode() {
+        return getServerUrl() != null && isOffline();
+    }
+
+    /** 本地笔记数据分区键：本地模式 = LOCAL；否则 = 服务器地址（缓存绑定服务器） */
+    public String getDataPartition() {
+        return isLocalMode() ? PARTITION_LOCAL : getServerUrl();
+    }
+
     // ---- Clear ----
+
+    /** 登出/401：清 token + 用户，保留服务器地址并复位离线标记（停在登录页） */
     public void clearSession() {
+        prefs.edit()
+                .remove(KEY_TOKEN)
+                .remove(KEY_USER_ID)
+                .remove(KEY_USERNAME)
+                .remove(KEY_DISPLAY_NAME)
+                .remove(KEY_ROLE)
+                .putBoolean(KEY_OFFLINE, false)
+                .apply();
+    }
+
+    /** 彻底清除（换服务器为本地模式 / 清除应用数据语义）：清全部 */
+    public void clearAll() {
         prefs.edit().clear().apply();
     }
 }

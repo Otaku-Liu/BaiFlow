@@ -48,10 +48,17 @@ import com.baiflow.android.editor.NoteOrderedSpan;
 import com.baiflow.android.editor.ParagraphHelper;
 import com.baiflow.android.editor.RichEditText;
 import com.baiflow.android.editor.SpanExtractor;
+import com.baiflow.android.data.AppDatabase;
+import com.baiflow.android.data.LocalNote;
+import com.baiflow.android.data.LocalNoteDao;
+import com.baiflow.android.data.MediaFiles;
+import com.baiflow.android.data.SyncService;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.NoteDetail;
 import com.baiflow.android.model.NoteMedia;
 import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.network.UiCallback;
+import com.baiflow.android.sync.SyncWorker;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -65,7 +72,6 @@ import java.util.concurrent.Executors;
 
 import okhttp3.ResponseBody;
 import retrofit2.Call;
-import retrofit2.Callback;
 import retrofit2.Response;
 
 /**
@@ -78,7 +84,7 @@ import retrofit2.Response;
  */
 public class NoteEditActivity extends AppCompatActivity {
 
-    public static final String EXTRA_NOTE_ID = "note_id";
+    public static final String EXTRA_LOCAL_ID = "local_id";
     public static final String EXTRA_TITLE = "note_title";
 
     private static final String TAG = "NoteEdit";
@@ -86,14 +92,14 @@ public class NoteEditActivity extends AppCompatActivity {
     private SessionManager session;
     private ApiClient client;
     private EditorStyle editorStyle;
+    private LocalNoteDao dao;
 
     private EditText etTitle;
     private RichEditText etContent;
 
     private NoteImageSpan replaceTarget;     // 替换旧图的目标 span
 
-    private String noteId;                   // null = 新建
-    private String noteUpdatedAt;            // 本次编辑基于的 updatedAt（乐观并发）
+    private LocalNote currentNote;           // 当前编辑的本地笔记（null = 新建）
     private boolean dirty = false;
     private boolean saving = false;
 
@@ -155,16 +161,17 @@ public class NoteEditActivity extends AppCompatActivity {
 
         session = SessionManager.getInstance(this);
         client = ApiClient.getInstance(session);
+        dao = AppDatabase.get(this).noteDao();
         editorStyle = new EditorStyle(this);
 
-        noteId = getIntent().getStringExtra(EXTRA_NOTE_ID);
+        long localId = getIntent().getLongExtra(EXTRA_LOCAL_ID, -1);
         String title = getIntent().getStringExtra(EXTRA_TITLE);
 
         etTitle = findViewById(R.id.etTitle);
         etContent = findViewById(R.id.etContent);
         moreRow = findViewById(R.id.moreRow);
         TextView headerTitle = findViewById(R.id.tvHeaderTitle);
-        headerTitle.setText(noteId == null ? getString(R.string.note_edit_new_title) : getString(R.string.note_edit_edit_title));
+        headerTitle.setText(localId < 0 ? getString(R.string.note_edit_new_title) : getString(R.string.note_edit_edit_title));
 
         wireToolbar();
         wireEditor();
@@ -188,8 +195,8 @@ public class NoteEditActivity extends AppCompatActivity {
 
         // 新建 / 编辑
         etTitle.setText(title != null ? title : "");
-        if (noteId != null) {
-            loadNote(noteId);
+        if (localId >= 0) {
+            loadNote(localId);
         } else {
             etTitle.requestFocus();
         }
@@ -436,35 +443,23 @@ public class NoteEditActivity extends AppCompatActivity {
 
     // ==================== 笔记加载 / 保存 ====================
 
-    private void loadNote(String id) {
-        client.getNote(id).enqueue(new Callback<ApiResponse<NoteDetail>>() {
-            @Override
-            public void onResponse(Call<ApiResponse<NoteDetail>> call,
-                                   Response<ApiResponse<NoteDetail>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
-                    NoteDetail detail = response.body().getData();
-                    if (detail == null) return;
-                    if (etTitle.getText().toString().isEmpty()) {
-                        etTitle.setText(detail.getTitle() != null ? detail.getTitle() : "");
-                    }
-                    SpannableStringBuilder sb = ModelToSpanned.toSpannable(
-                            MarkdownParser.parse(detail.getContent()), editorStyle);
-                    etContent.setText(sb);
-                    dirty = false;
-                    noteUpdatedAt = detail.getUpdatedAt();
-                    loadMediaImages();
-                    refreshToolbarState();
-                } else {
-                    String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_load_failed);
-                    Toast.makeText(NoteEditActivity.this, msg, Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<ApiResponse<NoteDetail>> call, Throwable t) {
-                Toast.makeText(NoteEditActivity.this, getString(R.string.common_network_error, t.getMessage()), Toast.LENGTH_SHORT).show();
-            }
-        });
+    private void loadNote(long localId) {
+        LocalNote n = dao.getById(localId);
+        if (n == null) { finish(); return; }
+        currentNote = n;
+        if (etTitle.getText().toString().isEmpty()) {
+            etTitle.setText(n.title != null ? n.title : "");
+        }
+        SpannableStringBuilder sb = ModelToSpanned.toSpannable(
+                MarkdownParser.parse(n.content != null ? n.content : ""), editorStyle);
+        etContent.setText(sb);
+        dirty = false;
+        loadMediaImages();
+        refreshToolbarState();
+        // 同步冲突标记 → 打开时提示「覆盖/重载」
+        if (n.conflict) {
+            showConflictDialog(false);
+        }
     }
 
     private void save(final boolean finishAfter) {
@@ -473,40 +468,29 @@ public class NoteEditActivity extends AppCompatActivity {
         String title = etTitle.getText().toString().trim();
         String content = MarkdownEmitter.emit(SpanExtractor.extract(etContent.getText()));
 
-        Callback<ApiResponse<NoteDetail>> cb = new Callback<ApiResponse<NoteDetail>>() {
-            @Override
-            public void onResponse(Call<ApiResponse<NoteDetail>> call,
-                                   Response<ApiResponse<NoteDetail>> response) {
-                saving = false;
-                if (response.isSuccessful() && response.body() != null && response.body().isOk()
-                        && response.body().getData() != null) {
-                    NoteDetail detail = response.body().getData();
-                    noteId = detail.getId();
-                    noteUpdatedAt = detail.getUpdatedAt();
-                    dirty = false;
-                    Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_saved), Toast.LENGTH_SHORT).show();
-                    if (finishAfter) finish();
-                } else if (response.body() != null && "NOTE_CONFLICT".equals(response.body().getCode())) {
-                    // 乐观并发冲突：让用户选择覆盖或重新加载
-                    showConflictDialog(finishAfter);
-                } else {
-                    String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_save_failed);
-                    Toast.makeText(NoteEditActivity.this, msg, Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<ApiResponse<NoteDetail>> call, Throwable t) {
-                saving = false;
-                Toast.makeText(NoteEditActivity.this, getString(R.string.common_save_failed_detail, t.getMessage()), Toast.LENGTH_SHORT).show();
-            }
-        };
-
-        if (noteId == null) {
-            client.createNote(title, content).enqueue(cb);
-        } else {
-            client.updateNote(noteId, title, content, noteUpdatedAt).enqueue(cb);
+        // 离线优先：写本地 Room（标 dirty），在线模式由同步推送 outbox
+        if (currentNote == null) {
+            currentNote = new LocalNote();
+            currentNote.serverUrl = session.getDataPartition();
+            currentNote.source = SyncService.SOURCE_LOCAL_ONLY;
+            currentNote.createdAt = System.currentTimeMillis();
         }
+        currentNote.title = title;
+        currentNote.content = content;
+        currentNote.updatedAt = System.currentTimeMillis();
+        currentNote.dirty = true;
+        if (currentNote.id == 0) {
+            currentNote.id = dao.insert(currentNote);
+        } else {
+            dao.update(currentNote);
+        }
+        saving = false;
+        dirty = false;
+        Toast.makeText(this, getString(R.string.note_edit_saved), Toast.LENGTH_SHORT).show();
+        if (session.isOnlineMode()) {
+            SyncWorker.requestNow(this);
+        }
+        if (finishAfter) finish();
     }
 
     /** 乐观并发冲突弹窗：覆盖（丢对方改动）/ 重新加载（丢本地改动） */
@@ -515,7 +499,10 @@ public class NoteEditActivity extends AppCompatActivity {
                 .setTitle(getString(R.string.note_edit_conflict_title))
                 .setMessage(getString(R.string.note_edit_conflict_message))
                 .setPositiveButton(getString(R.string.note_edit_overwrite), (d, w) -> {
-                    noteUpdatedAt = null;   // 不带 baseUpdatedAt 强制覆盖
+                    if (currentNote != null) {
+                        currentNote.baseUpdatedAt = null;   // 不带 baseUpdatedAt 强制覆盖
+                        currentNote.conflict = false;        // 覆盖即解决冲突，不再重复弹窗
+                    }
                     save(finishAfter);
                 })
                 .setNegativeButton(getString(R.string.note_edit_reload), (d, w) -> reloadNote(finishAfter))
@@ -523,37 +510,43 @@ public class NoteEditActivity extends AppCompatActivity {
                 .show();
     }
 
-    /** 重新加载服务端最新内容，放弃本地未保存改动 */
+    /** 重新加载服务端最新内容（冲突「重载」），并写回本地缓存 */
     private void reloadNote(final boolean finishAfter) {
-        if (noteId == null) {
+        if (currentNote == null || currentNote.serverId == null) {
             finish();
             return;
         }
-        client.getNote(noteId).enqueue(new Callback<ApiResponse<NoteDetail>>() {
+        client.getNote(currentNote.serverId).enqueue(new UiCallback<ApiResponse<NoteDetail>>(this) {
             @Override
-            public void onResponse(Call<ApiResponse<NoteDetail>> call,
-                                   Response<ApiResponse<NoteDetail>> response) {
+            protected void onUiResponse(Call<ApiResponse<NoteDetail>> call,
+                                        Response<ApiResponse<NoteDetail>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()
                         && response.body().getData() != null) {
                     NoteDetail detail = response.body().getData();
-                    noteUpdatedAt = detail.getUpdatedAt();
-                    etTitle.setText(detail.getTitle() != null ? detail.getTitle() : "");
+                    currentNote.title = detail.getTitle() != null ? detail.getTitle() : "";
+                    currentNote.content = detail.getContent() != null ? detail.getContent() : "";
+                    currentNote.baseUpdatedAt = detail.getUpdatedAt();
+                    currentNote.dirty = false;
+                    currentNote.conflict = false;
+                    currentNote.updatedAt = System.currentTimeMillis();
+                    dao.update(currentNote);
+                    etTitle.setText(currentNote.title);
                     etContent.setText(ModelToSpanned.toSpannable(
-                            MarkdownParser.parse(detail.getContent()), editorStyle));
+                            MarkdownParser.parse(currentNote.content), editorStyle));
                     dirty = false;
                     loadMediaImages();
                     refreshToolbarState();
                     Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_reloaded), Toast.LENGTH_SHORT).show();
                     if (finishAfter) finish();
-                } else {
+                } else if (response.code() < 500) {
                     String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_load_failed);
                     Toast.makeText(NoteEditActivity.this, msg, Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
-            public void onFailure(Call<ApiResponse<NoteDetail>> call, Throwable t) {
-                Toast.makeText(NoteEditActivity.this, getString(R.string.common_load_failed_detail, t.getMessage()), Toast.LENGTH_SHORT).show();
+            protected void onUiFailure(Call<ApiResponse<NoteDetail>> call, Throwable t) {
+                // 网络失败已由 UiCallback 统一提示
             }
         });
     }
@@ -590,33 +583,29 @@ public class NoteEditActivity extends AppCompatActivity {
         insertImageMedia(bytes, fileName, mime, mediaType, alt, null);
     }
 
-    /** 上传图片字节并插入 span（replace 非空则替换该 span 位置） */
+    /**
+     * 插入图片 span（离线优先）：图片存本地 note_media 目录，正文用 {@code local://} 引用，
+     * 同步时由 SyncService 上传并改写为服务端 URL。
+     */
     private void insertImageMedia(byte[] bytes, String fileName, String mime, String mediaType,
                                   String alt, NoteImageSpan replace) {
-        client.uploadNoteMedia(mediaType, bytes, fileName, mime)
-                .enqueue(new Callback<ApiResponse<NoteMedia>>() {
-                    @Override
-                    public void onResponse(Call<ApiResponse<NoteMedia>> call,
-                                           Response<ApiResponse<NoteMedia>> response) {
-                        if (response.isSuccessful() && response.body() != null && response.body().isOk()
-                                && response.body().getData() != null) {
-                            NoteMedia media = response.body().getData();
-                            Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                            if (replace != null) {
-                                replaceImageSpan(replace, media.getId(), media.getUrl(), alt, bmp);
-                            } else {
-                                insertImageSpan(media.getId(), media.getUrl(), alt, bmp);
-                            }
-                        } else {
-                            Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_image_upload_failed), Toast.LENGTH_SHORT).show();
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<ApiResponse<NoteMedia>> call, Throwable t) {
-                        Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_image_upload_failed), Toast.LENGTH_SHORT).show();
-                    }
-                });
+        try {
+            String unique = System.currentTimeMillis() + "_" + fileName;
+            File f = new File(MediaFiles.localMediaDir(this), unique);
+            try (FileOutputStream out = new FileOutputStream(f)) {
+                out.write(bytes);
+            }
+            Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            String url = MediaFiles.localUrl(unique);
+            if (replace != null) {
+                replaceImageSpan(replace, null, url, alt, bmp);
+            } else {
+                insertImageSpan(null, url, alt, bmp);
+            }
+            dirty = true;
+        } catch (IOException e) {
+            Toast.makeText(this, getString(R.string.note_edit_image_save_failed), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void insertImageSpan(String mediaId, String url, String alt, Bitmap bmp) {
@@ -740,26 +729,18 @@ public class NoteEditActivity extends AppCompatActivity {
         });
     }
 
+    /** 插入录音 span（离线优先）：存本地文件，正文用 local://?mediaType=audio 引用，同步时上传 */
     private void uploadAudioBytes(byte[] bytes) {
-        client.uploadNoteMedia("AUDIO", bytes, getString(R.string.note_edit_audio_filename), "audio/mp4")
-                .enqueue(new Callback<ApiResponse<NoteMedia>>() {
-                    @Override
-                    public void onResponse(Call<ApiResponse<NoteMedia>> call,
-                                           Response<ApiResponse<NoteMedia>> response) {
-                        if (response.isSuccessful() && response.body() != null && response.body().isOk()
-                                && response.body().getData() != null) {
-                            NoteMedia media = response.body().getData();
-                            insertAudioSpan(media.getId(), media.getUrl());
-                        } else {
-                            Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_recording_upload_failed), Toast.LENGTH_SHORT).show();
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<ApiResponse<NoteMedia>> call, Throwable t) {
-                        Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_recording_upload_failed), Toast.LENGTH_SHORT).show();
-                    }
-                });
+        try {
+            String fileName = System.currentTimeMillis() + "_recording.m4a";
+            File f = new File(MediaFiles.localMediaDir(this), fileName);
+            try (FileOutputStream out = new FileOutputStream(f)) {
+                out.write(bytes);
+            }
+            insertAudioSpan(null, MediaFiles.localUrl(fileName) + "?mediaType=audio");
+        } catch (IOException e) {
+            Toast.makeText(this, getString(R.string.note_edit_recording_upload_failed), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void insertAudioSpan(String mediaId, String url) {
@@ -808,9 +789,8 @@ public class NoteEditActivity extends AppCompatActivity {
     }
 
     private Bitmap bitmapOf(NoteImageSpan span) {
-        if (span != null && span.getMediaId() != null) {
-            Bitmap cached = bitmapCache.get(span.getMediaId());
-            if (cached != null) return cached;
+        if (span != null && span.getMediaUrl() != null) {
+            return bitmapCache.get(span.getMediaUrl());
         }
         return null;
     }
@@ -827,6 +807,12 @@ public class NoteEditActivity extends AppCompatActivity {
     }
 
     private void playAudio(NoteAudioSpan span) {
+        // 本地媒体文件优先（离线新建 / 同步缓存的音频）
+        File local = MediaFiles.resolveLocal(this, span.getMediaUrl());
+        if (local != null && local.exists()) {
+            startPlaying(local);
+            return;
+        }
         String mediaId = span.getMediaId();
         if (mediaId == null || mediaId.isEmpty()) return;
         if (audioPlayer != null) {
@@ -883,12 +869,25 @@ public class NoteEditActivity extends AppCompatActivity {
         Editable sp = etContent.getText();
         NoteImageSpan[] imgs = sp.getSpans(0, sp.length(), NoteImageSpan.class);
         for (NoteImageSpan img : imgs) {
-            String mid = img.getMediaId();
-            if (mid == null || mid.isEmpty()) continue;
-            if (bitmapCache.containsKey(mid)) {
-                img.setBitmap(bitmapCache.get(mid), this);
+            String url = img.getMediaUrl();
+            if (url == null) continue;
+            if (bitmapCache.containsKey(url)) {
+                img.setBitmap(bitmapCache.get(url), this);
                 continue;
             }
+            // 本地文件优先（离线新建 / 同步缓存的服务端媒体）
+            File local = MediaFiles.resolveLocal(this, url);
+            if (local != null && local.exists()) {
+                Bitmap bmp = BitmapFactory.decodeFile(local.getAbsolutePath());
+                if (bmp != null) {
+                    bitmapCache.put(url, bmp);
+                    img.setBitmap(bmp, this);
+                }
+                continue;
+            }
+            // 服务端媒体（在线）拉取
+            String mid = img.getMediaId();
+            if (mid == null || mid.isEmpty()) continue;
             ioExecutor.execute(() -> {
                 try {
                     Response<ResponseBody> resp = client.getNoteMedia(mid).execute();
@@ -896,12 +895,12 @@ public class NoteEditActivity extends AppCompatActivity {
                         byte[] bytes = resp.body().bytes();
                         Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                         if (bmp == null) return;
-                        bitmapCache.put(mid, bmp);
+                        bitmapCache.put(url, bmp);
                         mainHandler.post(() -> {
                             NoteImageSpan[] now = etContent.getText().getSpans(0, etContent.length(),
                                     NoteImageSpan.class);
                             for (NoteImageSpan cur : now) {
-                                if (mid.equals(cur.getMediaId())) {
+                                if (url.equals(cur.getMediaUrl())) {
                                     cur.setBitmap(bmp, NoteEditActivity.this);
                                 }
                             }
