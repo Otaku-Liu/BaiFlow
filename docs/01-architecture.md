@@ -4,7 +4,7 @@
 
 | 层面 | 技术 |
 |---|---|
-| 后端 | JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8 |
+| 后端 | JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8, Redis 7 |
 | Web | Vue 3, Vite, Vue Router, Pinia, Axios, Element Plus |
 | Android | Java, Retrofit, OkHttp, WorkManager, Foreground Service |
 | 部署 | Ubuntu 24, Docker Compose, Nginx, aria2 RPC |
@@ -20,10 +20,10 @@ Vue 3 Web 管理台          Android Java App
                   v
      Spring Boot 3 API Server
      (认证/文件/下载/传输/通知/设备)
-         |                |
-         v                v
-      MySQL 8         后台任务 (aria2 RPC)
-      (元数据)         (扫描/同步/通知)
+         |          |            |
+         v          v            v
+      MySQL 8    Redis 7      后台任务 (aria2 RPC)
+      (元数据)  (计数/登录锁)  (扫描/同步/通知)
          |
          v
    Storage Roots (本地磁盘 / NAS 挂载)
@@ -32,6 +32,7 @@ Vue 3 Web 管理台          Android Java App
 ## 模块边界
 
 - **baiflow-server**：核心业务、权限、数据库、文件操作、下载任务、随手记笔记、SSE 事件、对外 API。文件路径只在服务端存在。
+- **数据访问层**：每个实体有对应 `IService`（实体 Service），领域 Service `extends IService<主实体>` 或注入实体 Service；单表查询在 Service 层用 `lambdaQuery()` / `getOne` / `list` / `count` / `page`，Mapper 保持纯 `BaseMapper`；仅多表 JOIN / 特殊 SQL（审计登录日志、笔记进度 upsert）留在 XML Mapper（见 `docs/06-coding-standards.md`）
 - **baiflow-web**：Web 管理台，只通过 REST API 通信。
 - **baiflow-android**：移动端文件查看、上传、下载（随手记在线/离线阶段规划见 `docs/07-quick-notes.md`）。
 - **deploy**：Docker Compose、Nginx、环境变量。
@@ -72,6 +73,11 @@ Vue 3 Web 管理台          Android Java App
 ### Android
 - 登录、文件列表、上传、下载、任务状态
 - 前台通知
+
+### 多语言（i18n）
+- Web / Android 界面全量中英双语（语言设置在客户端"我的"页，Android 按应用语言发 `Accept-Language`）
+- 服务端错误消息按请求头 `Accept-Language` 返回中/英：以「中文文案即 key」组织词条（`i18n/messages*.properties`），`I18nUtil.translate()` 统一翻译，默认中文（`spring.messages.default-locale=zh_CN`）
+- 业务错误码为 5 位数字码（见 `docs/03-api.md` 错误码表），客户端按数字码区分业务分支而非解析文案
 
 ## 非目标
 
@@ -126,7 +132,7 @@ Vue 3 Web 管理台          Android Java App
 - 公开分享接口不返回服务器真实路径
 
 ### 外网访问
-- HTTPS + 强密码 + 登录失败限制 + 定期备份
+- HTTPS + 强密码 + 登录失败限制（Redis 滑动窗口：15 分钟内连续失败 5 次锁定 15 分钟，多实例共享）+ 定期备份
 
 ### 隐私与机密
 - 配置中避免出现真实用户路径/域名/硬编码凭据；每次代码调整涉及配置/路径/凭据时做隐私与机密核查，涉及隐私先确认「保留还是屏蔽 git」

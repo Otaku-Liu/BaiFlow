@@ -3,6 +3,7 @@ package com.baiflow.note.service.impl;
 import com.baiflow.auth.config.BaiflowProperties;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.common.util.I18nUtil;
 import com.baiflow.note.dto.response.NoteMediaInfo;
 import com.baiflow.note.entity.NoteMedia;
 import com.baiflow.note.enums.NoteMediaType;
@@ -52,6 +53,8 @@ public class NoteMediaServiceImpl implements NoteMediaService {
     private NoteMediaMapper mediaMapper;
     @Autowired
     private BaiflowProperties properties;
+    @Autowired
+    private I18nUtil i18nUtil;
 
     @Override
     @Transactional
@@ -87,7 +90,7 @@ public class NoteMediaServiceImpl implements NoteMediaService {
             file.transferTo(target.toFile());
         } catch (IOException e) {
             log.error("笔记媒体保存失败: userId={}, mediaId={}", userId, media.getId(), e);
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "媒体保存失败: " + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("媒体保存失败：") + e.getMessage());
         }
 
         log.info("笔记媒体已上传: userId={}, mediaId={}, type={}", userId, media.getId(), type);

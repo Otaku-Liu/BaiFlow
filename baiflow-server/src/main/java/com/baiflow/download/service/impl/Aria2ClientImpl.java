@@ -5,9 +5,11 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.common.util.I18nUtil;
 import com.baiflow.download.service.Aria2Client;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,9 @@ import java.util.UUID;
 public class Aria2ClientImpl implements Aria2Client {
 
     private static final String JSONRPC_VERSION = "2.0";
+
+    @Autowired
+    private I18nUtil i18nUtil;
 
     private RestTemplate restTemplate;
 
@@ -154,7 +159,7 @@ public class Aria2ClientImpl implements Aria2Client {
                 JSONObject err = root.getJSONObject("error");
                 String errMsg = err != null ? err.getString("message") : "aria2 RPC 错误";
                 log.error("aria2 RPC 返回错误: method={}, message={}", method, errMsg);
-                throw new BusinessException(ErrorCode.DOWNLOAD_ENGINE_ERROR, "下载引擎错误：" + errMsg);
+                throw new BusinessException(ErrorCode.DOWNLOAD_ENGINE_ERROR, i18nUtil.translate("下载引擎错误：") + errMsg);
             }
 
             return root;
@@ -164,7 +169,7 @@ public class Aria2ClientImpl implements Aria2Client {
         } catch (Exception e) {
             log.error("aria2 RPC 调用失败: method={}, error={}", method, e.getMessage());
             throw new BusinessException(ErrorCode.DOWNLOAD_ENGINE_ERROR,
-                    "无法连接下载引擎：" + e.getMessage());
+                    i18nUtil.translate("无法连接下载引擎：") + e.getMessage());
         }
     }
 }

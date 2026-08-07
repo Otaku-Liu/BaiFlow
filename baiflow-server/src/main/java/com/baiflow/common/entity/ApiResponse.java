@@ -2,7 +2,7 @@ package com.baiflow.common.entity;
 
 import com.baiflow.common.constant.ErrorCode;
 
-public record ApiResponse<T>(String code, String message, T data, String traceId) {
+public record ApiResponse<T>(int code, String message, T data, String traceId) {
 
     public static <T> ApiResponse<T> success(T data) {
         return new ApiResponse<>(ErrorCode.OK, "success", data, null);
@@ -12,11 +12,11 @@ public record ApiResponse<T>(String code, String message, T data, String traceId
         return new ApiResponse<>(ErrorCode.OK, "success", data, traceId);
     }
 
-    public static <T> ApiResponse<T> error(String code, String message) {
+    public static <T> ApiResponse<T> error(int code, String message) {
         return new ApiResponse<>(code, message, null, null);
     }
 
-    public static <T> ApiResponse<T> error(String code, String message, String traceId) {
+    public static <T> ApiResponse<T> error(int code, String message, String traceId) {
         return new ApiResponse<>(code, message, null, traceId);
     }
 

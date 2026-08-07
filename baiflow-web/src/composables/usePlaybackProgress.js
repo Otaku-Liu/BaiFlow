@@ -17,7 +17,7 @@ export function usePlaybackProgress(fileId, positionType) {
   async function checkProgress() {
     try {
       const { data } = await getProgress(fileId)
-      if (data.code === 'OK' && data.data) {
+      if (data.code === 0 && data.data) {
         savedPosition.value = data.data.positionValue
         return {
           positionType: data.data.positionType,

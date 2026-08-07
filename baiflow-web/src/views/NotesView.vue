@@ -209,7 +209,7 @@ async function saveNow() {
     if (isCreating.value) {
       const { data } = await createNote(body)
       const detail = data?.data
-      if (data?.code !== 'OK' || !detail) {
+      if (data?.code !== 0 || !detail) {
         ElMessage.error(data?.message || t('notes.saveFailed'))
         return
       }
@@ -218,8 +218,8 @@ async function saveNow() {
       noteUpdatedAt = detail.updatedAt
     } else {
       const { data } = await updateNote(currentId.value, { ...body, baseUpdatedAt: noteUpdatedAt })
-      if (data?.code !== 'OK') {
-        if (data?.code === 'NOTE_CONFLICT') {
+      if (data?.code !== 0) {
+        if (data?.code === 40901) {
           handleConflict()
         } else {
           ElMessage.error(data?.message || t('notes.saveFailed'))

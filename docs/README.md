@@ -40,4 +40,8 @@ cd deploy && docker compose up -d
 | [06-coding-standards.md](06-coding-standards.md) | 编码规范（后端/前端/Android） |
 | [07-quick-notes.md](07-quick-notes.md) | ADR：随手记（便签/笔记）方案与三阶段实施计划 |
 | [08-ios-design-system.md](08-ios-design-system.md) | ADR：Android iOS 风格设计系统（集中式 styles） |
+| [09-auth-sessions.md](09-auth-sessions.md) | 登录会话与设备管理（认证模型 2） |
+| [10-web-connection-timeout.md](10-web-connection-timeout.md) | Web 连接超时检测与恢复 |
+| [11-android-network-error.md](11-android-network-error.md) | Android 网络错误处理 |
+| [12-android-offline-mode.md](12-android-offline-mode.md) | Android 离线模式与随手记同步 |
 | [glossary.md](glossary.md) | 术语表 |

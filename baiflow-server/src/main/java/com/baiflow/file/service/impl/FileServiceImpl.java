@@ -2,6 +2,7 @@ package com.baiflow.file.service.impl;
 
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.common.util.I18nUtil;
 import com.baiflow.file.dto.request.CreateFolderRequest;
 import com.baiflow.file.dto.request.MoveRequest;
 import com.baiflow.file.dto.request.RenameRequest;
@@ -15,18 +16,21 @@ import com.baiflow.file.enums.FileItemStatus;
 import com.baiflow.file.enums.ItemType;
 import com.baiflow.file.enums.PrivacyMode;
 import com.baiflow.file.mapper.FileItemMapper;
-import com.baiflow.file.mapper.PlaybackProgressMapper;
-import com.baiflow.file.mapper.PrivateFolderAccessMapper;
 import com.baiflow.file.service.FileConvertService;
 import com.baiflow.file.service.FileService;
+import com.baiflow.file.service.PlaybackProgressService;
+import com.baiflow.file.service.PrivateFolderAccessService;
 import com.baiflow.storage.entity.StorageRoot;
+import com.baiflow.storage.entity.UserStoragePermission;
 import com.baiflow.storage.enums.StorageRootStatus;
-import com.baiflow.storage.mapper.UserStoragePermissionMapper;
 import com.baiflow.storage.service.StorageService;
+import com.baiflow.storage.service.UserStoragePermissionService;
 import com.baiflow.user.entity.User;
 import com.baiflow.user.mapper.UserMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
@@ -57,26 +61,26 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-public class FileServiceImpl implements FileService {
+public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> implements FileService {
 
     private static final int ACCESS_TOKEN_BYTES = 32;
     /** 隐私文件夹访问会话有效期（分钟） */
     private static final int ACCESS_SESSION_MINUTES = 30;
 
     @Autowired
-    private FileItemMapper fileItemMapper;
+    private I18nUtil i18nUtil;
     @Autowired
     private StorageService storageService;
     @Autowired
-    private UserStoragePermissionMapper permMapper;
+    private UserStoragePermissionService userStoragePermissionService;
     @Autowired
-    private PrivateFolderAccessMapper pfaMapper;
+    private PrivateFolderAccessService privateFolderAccessService;
     @Autowired
     private PasswordEncoder passwordEncoder;
     @Autowired
     private UserMapper userMapper;
     @Autowired
-    private PlaybackProgressMapper progressMapper;
+    private PlaybackProgressService playbackProgressService;
     @Autowired
     private FileConvertService convertService;
 
@@ -107,12 +111,10 @@ public class FileServiceImpl implements FileService {
         List<FileItem> items;
         if (!isAdmin || viewUserId != null) {
             // 限定到指定用户的文件
-            items = fileItemMapper.selectChildrenByOwner(
-                    rootId, parentOrNull(parentId), effectiveOwner, FileItemStatus.ACTIVE.name());
+            items = list(childrenWrapper(rootId, parentId, effectiveOwner, FileItemStatus.ACTIVE.name()));
         } else {
             // 管理员查看所有文件
-            items = fileItemMapper.selectChildren(
-                    rootId, parentOrNull(parentId), FileItemStatus.ACTIVE.name());
+            items = list(childrenWrapper(rootId, parentId, null, FileItemStatus.ACTIVE.name()));
         }
 
         int total = items.size();
@@ -144,8 +146,8 @@ public class FileServiceImpl implements FileService {
         String rel = buildPath(parentId, safe);
 
         // 检查同名文件
-        if (fileItemMapper.selectByPath(rootId, rel) != null) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件已存在：" + safe);
+        if (findByPath(rootId, rel) != null) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("文件已存在：") + safe);
         }
 
         // 解析目标路径并执行路径穿越校验
@@ -157,7 +159,7 @@ public class FileServiceImpl implements FileService {
         try {
             Files.createDirectories(target.getParent());
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "无法创建父目录：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("无法创建父目录：") + e.getMessage());
         }
 
         // 写入文件并计算 SHA-256 哈希
@@ -166,7 +168,7 @@ public class FileServiceImpl implements FileService {
             Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
             sha = hash(target);
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件写入失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("文件写入失败：") + e.getMessage());
         }
 
         // 持久化元数据（磁盘写入成功后才写库）
@@ -182,7 +184,7 @@ public class FileServiceImpl implements FileService {
         f.setHashSha256(sha);
         f.setPrivacyMode(PrivacyMode.NORMAL);
         f.setStatus(FileItemStatus.ACTIVE);
-        fileItemMapper.insert(f);
+        save(f);
 
         return FileItemInfo.from(f);
     }
@@ -190,7 +192,7 @@ public class FileServiceImpl implements FileService {
     @Override
     public Resource downloadFile(String fileId, String userId, boolean isAdmin, String privacyAccessToken) {
         // 检查元数据是否存在且为 FILE（不支持直接下载目录）
-        FileItem f = fileItemMapper.selectById(fileId);
+        FileItem f = getById(fileId);
         if (f == null || f.getStatus() != FileItemStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "文件不存在");
         }
@@ -231,8 +233,8 @@ public class FileServiceImpl implements FileService {
         String safe = sanitize(req.name());
         String rel = buildPath(effectiveParentId, safe);
 
-        if (fileItemMapper.selectByPath(req.storageRootId(), rel) != null) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件夹已存在：" + safe);
+        if (findByPath(req.storageRootId(), rel) != null) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("文件夹已存在：") + safe);
         }
 
         // 解析并校验路径，在磁盘上创建目录
@@ -241,7 +243,7 @@ public class FileServiceImpl implements FileService {
         try {
             Files.createDirectories(target);
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "无法创建文件夹：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("无法创建文件夹：") + e.getMessage());
         }
 
         // 持久化元数据
@@ -255,7 +257,7 @@ public class FileServiceImpl implements FileService {
         f.setSizeBytes(0L);
         f.setPrivacyMode(PrivacyMode.NORMAL);
         f.setStatus(FileItemStatus.ACTIVE);
-        fileItemMapper.insert(f);
+        save(f);
 
         return FileItemInfo.from(f);
     }
@@ -282,13 +284,13 @@ public class FileServiceImpl implements FileService {
         try {
             Files.move(old, np);
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "重命名失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("重命名失败：") + e.getMessage());
         }
 
         // 更新元数据
         f.setName(nn);
         f.setRelativePath(nr);
-        fileItemMapper.updateById(f);
+        updateById(f);
         return FileItemInfo.from(f);
     }
 
@@ -317,14 +319,14 @@ public class FileServiceImpl implements FileService {
             Files.createDirectories(np.getParent());
             Files.move(old, np);
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "移动失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("移动失败：") + e.getMessage());
         }
 
         // 更新元数据中的存储根和父节点
         f.setStorageRootId(req.targetStorageRootId());
         f.setParentId(blankNull(req.targetParentId()));
         f.setRelativePath(nr);
-        fileItemMapper.updateById(f);
+        updateById(f);
         return FileItemInfo.from(f);
     }
 
@@ -343,7 +345,7 @@ public class FileServiceImpl implements FileService {
         // 如果磁盘删除失败，元数据已安全标记，后续可由清理任务修复
         f.setStatus(FileItemStatus.DELETED);
         f.setDeletedAt(LocalDateTime.now());
-        fileItemMapper.updateById(f);
+        updateById(f);
 
         StorageRoot root = storageService.getByIdOrThrow(f.getStorageRootId());
         Path p = storageService.resolveRootPath(root).resolve(f.getRelativePath()).normalize();
@@ -385,10 +387,11 @@ public class FileServiceImpl implements FileService {
         // BCrypt 哈希后存储密码
         f.setPrivacyMode(PrivacyMode.PRIVATE);
         f.setPrivacyPasswordHash(passwordEncoder.encode(req.password()));
-        fileItemMapper.updateById(f);
+        updateById(f);
 
         // 更新密码后使旧访问会话失效
-        pfaMapper.deleteByFileItemId(id);
+        privateFolderAccessService.remove(new LambdaQueryWrapper<PrivateFolderAccess>()
+                .eq(PrivateFolderAccess::getFileItemId, id));
 
         return FileItemInfo.from(f);
     }
@@ -400,10 +403,11 @@ public class FileServiceImpl implements FileService {
         // 清除隐私模式和密码哈希
         f.setPrivacyMode(PrivacyMode.NORMAL);
         f.setPrivacyPasswordHash("");
-        fileItemMapper.updateById(f);
+        updateById(f);
 
         // 清除所有访问会话——取消隐私后不再需要验证
-        pfaMapper.deleteByFileItemId(id);
+        privateFolderAccessService.remove(new LambdaQueryWrapper<PrivateFolderAccess>()
+                .eq(PrivateFolderAccess::getFileItemId, id));
 
         return FileItemInfo.from(f);
     }
@@ -423,7 +427,8 @@ public class FileServiceImpl implements FileService {
         }
 
         // 清理过期会话
-        pfaMapper.deleteExpired();
+        privateFolderAccessService.remove(new LambdaQueryWrapper<PrivateFolderAccess>()
+                .le(PrivateFolderAccess::getExpiresAt, LocalDateTime.now()));
 
         // 生成短期访问令牌（随机字节，哈希后存储）
         byte[] tokenBytes = new byte[ACCESS_TOKEN_BYTES];
@@ -437,7 +442,7 @@ public class FileServiceImpl implements FileService {
         access.setAccessTokenHash(tokenHash);
         // 设置 30 分钟过期
         access.setExpiresAt(LocalDateTime.now().plusMinutes(ACCESS_SESSION_MINUTES));
-        pfaMapper.insert(access);
+        privateFolderAccessService.save(access);
 
         return Map.of(
                 "accessToken", rawToken,
@@ -478,7 +483,11 @@ public class FileServiceImpl implements FileService {
      * 非管理员必须持有对应 {@code user_storage_permission} 记录。
      */
     private void verifyAccess(String userId, String rootId) {
-        if (permMapper.selectByUserAndRoot(userId, rootId) == null) {
+        if (userStoragePermissionService.getOne(new LambdaQueryWrapper<UserStoragePermission>()
+                .eq(UserStoragePermission::getUserId, userId)
+                .eq(UserStoragePermission::getStorageRootId, rootId)
+                .isNull(UserStoragePermission::getFileItemId)
+                .last("LIMIT 1")) == null) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问此存储");
         }
     }
@@ -490,7 +499,7 @@ public class FileServiceImpl implements FileService {
     private void requireStorageAvailable(StorageRoot root) {
         if (root.getStatus() == StorageRootStatus.OFFLINE) {
             throw new BusinessException(ErrorCode.STORAGE_ROOT_OFFLINE,
-                    "存储根目录不可用（NAS 可能已离线）：" + root.getName());
+                    i18nUtil.translate("存储根目录不可用（NAS 可能已离线）：") + root.getName());
         }
     }
 
@@ -514,7 +523,7 @@ public class FileServiceImpl implements FileService {
         // 向上遍历父目录链，查找隐私文件夹
         String cursorId = fileItemId;
         while (cursorId != null) {
-            FileItem cursor = fileItemMapper.selectById(cursorId);
+            FileItem cursor = getById(cursorId);
             if (cursor == null) {
                 break;
             }
@@ -545,7 +554,11 @@ public class FileServiceImpl implements FileService {
                     "此文件夹受隐私保护，请先验证隐私密码");
         }
 
-        List<PrivateFolderAccess> sessions = pfaMapper.selectValidByUserAndFolder(userId, fileItemId);
+        List<PrivateFolderAccess> sessions = privateFolderAccessService.list(new LambdaQueryWrapper<PrivateFolderAccess>()
+                .eq(PrivateFolderAccess::getUserId, userId)
+                .eq(PrivateFolderAccess::getFileItemId, fileItemId)
+                .gt(PrivateFolderAccess::getExpiresAt, LocalDateTime.now())
+                .orderByDesc(PrivateFolderAccess::getCreatedAt));
         boolean matched = false;
         for (PrivateFolderAccess s : sessions) {
             if (passwordEncoder.matches(accessToken, s.getAccessTokenHash())) {
@@ -573,7 +586,7 @@ public class FileServiceImpl implements FileService {
         if (parentId == null || parentId.isBlank()) {
             return name;
         }
-        FileItem p = fileItemMapper.selectById(parentId);
+        FileItem p = getById(parentId);
         if (p == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "父文件夹不存在");
         }
@@ -614,10 +627,41 @@ public class FileServiceImpl implements FileService {
     }
 
     /**
+     * 子项查询公共条件：根目录 + 父目录（空视为根）+ 可选所有者/状态筛选，排序「目录优先、名称升序」。
+     */
+    private LambdaQueryWrapper<FileItem> childrenWrapper(String rootId, String parentId,
+                                                         String ownerUserId, String status) {
+        LambdaQueryWrapper<FileItem> wrapper = new LambdaQueryWrapper<FileItem>()
+                .eq(FileItem::getStorageRootId, rootId)
+                .eq(ownerUserId != null, FileItem::getOwnerUserId, ownerUserId)
+                .eq(status != null, FileItem::getStatus, status)
+                .orderByDesc(FileItem::getItemType)
+                .orderByAsc(FileItem::getName);
+        String p = parentOrNull(parentId);
+        if (p == null) {
+            wrapper.isNull(FileItem::getParentId);
+        } else {
+            wrapper.eq(FileItem::getParentId, p);
+        }
+        return wrapper;
+    }
+
+    /**
+     * 按存储根目录和相对路径精确查找活跃文件项。
+     */
+    private FileItem findByPath(String rootId, String relativePath) {
+        return getOne(new LambdaQueryWrapper<FileItem>()
+                .eq(FileItem::getStorageRootId, rootId)
+                .eq(FileItem::getRelativePath, relativePath)
+                .eq(FileItem::getStatus, "ACTIVE")
+                .last("LIMIT 1"));
+    }
+
+    /**
      * 根据 ID 检查文件项是否存在且为 ACTIVE 状态。
      */
     private FileItem checkActive(String id) {
-        FileItem f = fileItemMapper.selectById(id);
+        FileItem f = getById(id);
         if (f == null || f.getStatus() != FileItemStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "文件项不存在");
         }
@@ -647,7 +691,7 @@ public class FileServiceImpl implements FileService {
      */
     private String getOrCreateHomeFolder(String rootId, String userId, String username) {
         String relativePath = username;
-        FileItem existing = fileItemMapper.selectByPath(rootId, relativePath);
+        FileItem existing = findByPath(rootId, relativePath);
         if (existing != null && existing.getStatus() == FileItemStatus.ACTIVE) {
             return existing.getId();
         }
@@ -660,7 +704,7 @@ public class FileServiceImpl implements FileService {
             Files.createDirectories(homePath);
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
-                    "无法创建用户主目录：" + e.getMessage());
+                    i18nUtil.translate("无法创建用户主目录：") + e.getMessage());
         }
 
         FileItem home = new FileItem();
@@ -673,7 +717,7 @@ public class FileServiceImpl implements FileService {
         home.setSizeBytes(0L);
         home.setPrivacyMode(PrivacyMode.NORMAL);
         home.setStatus(FileItemStatus.ACTIVE);
-        fileItemMapper.insert(home);
+        save(home);
 
         log.info("已为用户 {} 创建主目录: {} (root={})", username, relativePath, rootId);
         return home.getId();
@@ -687,7 +731,7 @@ public class FileServiceImpl implements FileService {
         Resource original = downloadFile(fileId, userId, isAdmin, privacyAccessToken);
 
         // Office 文件自动转换为 PDF 后返回
-        FileItem file = fileItemMapper.selectById(fileId);
+        FileItem file = getById(fileId);
         if (file != null && convertService.needsConversion(file)) {
             Path pdfPath = convertService.convertToPdf(file);
             if (pdfPath != null && Files.exists(pdfPath)) {
@@ -699,7 +743,10 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public Map<String, Object> getProgress(String fileId, String userId) {
-        PlaybackProgress p = progressMapper.selectByUserAndFile(userId, fileId);
+        PlaybackProgress p = playbackProgressService.getOne(new LambdaQueryWrapper<PlaybackProgress>()
+                .eq(PlaybackProgress::getUserId, userId)
+                .eq(PlaybackProgress::getFileItemId, fileId)
+                .last("LIMIT 1"));
         if (p == null) return null;
         return Map.of(
                 "fileId", p.getFileItemId(),
@@ -711,18 +758,21 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public void saveProgress(String fileId, String userId, String positionType, Double positionValue) {
-        PlaybackProgress existing = progressMapper.selectByUserAndFile(userId, fileId);
+        PlaybackProgress existing = playbackProgressService.getOne(new LambdaQueryWrapper<PlaybackProgress>()
+                .eq(PlaybackProgress::getUserId, userId)
+                .eq(PlaybackProgress::getFileItemId, fileId)
+                .last("LIMIT 1"));
         if (existing != null) {
             existing.setPositionType(positionType != null ? positionType : "SECONDS");
             existing.setPositionValue(positionValue != null ? positionValue : 0);
-            progressMapper.updateById(existing);
+            playbackProgressService.updateById(existing);
         } else {
             PlaybackProgress p = new PlaybackProgress();
             p.setUserId(userId);
             p.setFileItemId(fileId);
             p.setPositionType(positionType != null ? positionType : "SECONDS");
             p.setPositionValue(positionValue != null ? positionValue : 0);
-            progressMapper.insert(p);
+            playbackProgressService.save(p);
         }
     }
 }

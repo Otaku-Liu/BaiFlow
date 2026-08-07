@@ -1,12 +1,14 @@
 package com.baiflow.transfer.service;
 
 import com.baiflow.transfer.dto.response.NotificationInfo;
+import com.baiflow.transfer.entity.Notification;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 
 /**
  * 通知服务接口 — 管理用户级别的系统通知。
  */
-public interface NotificationService {
+public interface NotificationService extends IService<Notification> {
 
     /**
      * 分页查询当前用户的通知，支持按阅读状态筛选。

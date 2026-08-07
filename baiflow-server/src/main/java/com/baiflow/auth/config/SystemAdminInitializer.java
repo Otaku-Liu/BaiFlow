@@ -4,6 +4,8 @@ import com.baiflow.user.entity.User;
 import com.baiflow.user.enums.UserRole;
 import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.UserMapper;
+import com.baiflow.user.service.UserService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -26,6 +28,9 @@ public class SystemAdminInitializer implements CommandLineRunner {
     private UserMapper userMapper;
 
     @Autowired
+    private UserService userService;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -37,7 +42,9 @@ public class SystemAdminInitializer implements CommandLineRunner {
 
         User existing;
         try {
-            existing = userMapper.selectByUsername(username);
+            existing = userService.getOne(new LambdaQueryWrapper<User>()
+                    .eq(User::getUsername, username)
+                    .last("LIMIT 1"));
         } catch (Exception e) {
             log.warn("无法查询管理员用户（数据库表可能尚未创建，请先执行 db/migration/ 下的 DDL 脚本）: {}",
                     e.getMessage());

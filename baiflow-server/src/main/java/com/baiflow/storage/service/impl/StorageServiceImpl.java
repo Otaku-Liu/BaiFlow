@@ -2,6 +2,7 @@ package com.baiflow.storage.service.impl;
 
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.common.util.I18nUtil;
 import com.baiflow.storage.dto.request.CreateStorageRootRequest;
 import com.baiflow.storage.dto.request.UpdateStorageRootRequest;
 import com.baiflow.storage.dto.response.NasCheckResult;
@@ -13,6 +14,7 @@ import com.baiflow.storage.mapper.StorageRootMapper;
 import com.baiflow.storage.service.StorageService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,10 +26,10 @@ import java.util.List;
  * 存储根目录管理服务实现。
  */
 @Service
-public class StorageServiceImpl implements StorageService {
+public class StorageServiceImpl extends ServiceImpl<StorageRootMapper, StorageRoot> implements StorageService {
 
     @Autowired
-    private StorageRootMapper mapper;
+    private I18nUtil i18nUtil;
 
     @Override
     public StorageRootInfo createRoot(CreateStorageRootRequest req) {
@@ -55,17 +57,19 @@ public class StorageServiceImpl implements StorageService {
                 Files.createDirectories(resolveRootPath(r));
             } catch (Exception e) {
                 throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
-                        "无法创建存储根目录：" + resolveRootPath(r));
+                        i18nUtil.translate("无法创建存储根目录：") + resolveRootPath(r));
             }
         }
 
-        mapper.insert(r);
+        save(r);
         return StorageRootInfo.from(r);
     }
 
     @Override
     public IPage<StorageRootInfo> listRoots(int page, int size) {
-        List<StorageRoot> all = mapper.selectAllOrdered(null);
+        List<StorageRoot> all = lambdaQuery()
+                .orderByDesc(StorageRoot::getCreatedAt)
+                .list();
         int total = all.size();
         int from = Math.min((page - 1) * size, total);
         int to = Math.min(from + size, total);
@@ -79,8 +83,10 @@ public class StorageServiceImpl implements StorageService {
     @Override
     public List<StorageRootInfo> listActiveRoots() {
         // 仅返回 ACTIVE 状态的根目录，供文件列表页面的根目录选择器使用
-        return mapper.selectAllOrdered(StorageRootStatus.ACTIVE.name())
-                .stream().map(StorageRootInfo::from).toList();
+        return lambdaQuery()
+                .eq(StorageRoot::getStatus, StorageRootStatus.ACTIVE.name())
+                .orderByDesc(StorageRoot::getCreatedAt)
+                .list().stream().map(StorageRootInfo::from).toList();
     }
 
     @Override
@@ -89,16 +95,16 @@ public class StorageServiceImpl implements StorageService {
         if (req.name() != null) { r.setName(req.name()); }
         if (req.status() != null) { r.setStatus(StorageRootStatus.valueOf(req.status())); }
         if (req.readonly() != null) { r.setReadonly(req.readonly()); }
-        mapper.updateById(r);
+        updateById(r);
         return StorageRootInfo.from(r);
     }
 
     @Override
     public StorageRoot getByIdOrThrow(String id) {
-        StorageRoot r = mapper.selectById(id);
+        StorageRoot r = getById(id);
         if (r == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "存储根目录不存在"); }
         if (r.getStatus() == StorageRootStatus.DISABLED) {
-            throw new BusinessException(ErrorCode.STORAGE_ROOT_OFFLINE, "存储根目录已禁用：" + r.getName());
+            throw new BusinessException(ErrorCode.STORAGE_ROOT_OFFLINE, i18nUtil.translate("存储根目录已禁用：") + r.getName());
         }
         // OFFLINE 状态仅记录 NAS 暂不可用，仍允许返回实体以支持元数据浏览
         return r;
@@ -121,7 +127,7 @@ public class StorageServiceImpl implements StorageService {
 
     @Override
     public NasCheckResult checkNasAccessibility(String rootId) {
-        StorageRoot root = mapper.selectById(rootId);
+        StorageRoot root = getById(rootId);
         if (root == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "存储根目录不存在"); }
 
         Path path = resolveRootPath(root);
@@ -141,7 +147,7 @@ public class StorageServiceImpl implements StorageService {
         if (root.getStatus() != StorageRootStatus.DISABLED
                 && root.getStatus() != newStatus) {
             root.setStatus(newStatus);
-            mapper.updateById(root);
+            updateById(root);
         }
 
         return new NasCheckResult(root.getId(), root.getName(), path.toString(),
@@ -151,7 +157,10 @@ public class StorageServiceImpl implements StorageService {
     @Override
     public int checkAllNasRoots() {
         // 查询所有 NAS_MOUNT 类型的存储根目录
-        List<StorageRoot> nasRoots = mapper.selectByType(StorageRootType.NAS_MOUNT.name());
+        List<StorageRoot> nasRoots = lambdaQuery()
+                .eq(StorageRoot::getType, StorageRootType.NAS_MOUNT.name())
+                .orderByDesc(StorageRoot::getCreatedAt)
+                .list();
         int updated = 0;
         for (StorageRoot root : nasRoots) {
             if (root.getStatus() == StorageRootStatus.DISABLED) { continue; }
@@ -162,7 +171,7 @@ public class StorageServiceImpl implements StorageService {
             StorageRootStatus expected = accessible ? StorageRootStatus.ACTIVE : StorageRootStatus.OFFLINE;
             if (root.getStatus() != expected) {
                 root.setStatus(expected);
-                mapper.updateById(root);
+                updateById(root);
                 updated++;
             }
         }

@@ -109,12 +109,12 @@ public final class SyncService {
                     n.conflict = false;
                     dao.update(n);
                 } else if (resp.isSuccessful() && resp.body() != null
-                        && "NOTE_CONFLICT".equals(resp.body().getCode())) {
+                        && resp.body().getCode() == 40901) {
                     // 冲突：标记并保留本地改动；用户打开时选「覆盖」(清 base) 或「重载」(拉服务端)
                     n.conflict = true;
                     dao.update(n);
                 } else if (resp.isSuccessful() && resp.body() != null
-                        && "NOT_FOUND".equals(resp.body().getCode())) {
+                        && resp.body().getCode() == 40401) {
                     // 服务端已删该笔记：清 serverId 转新建，本地内容保留为新笔记
                     n.serverId = null;
                     needCreate = true;

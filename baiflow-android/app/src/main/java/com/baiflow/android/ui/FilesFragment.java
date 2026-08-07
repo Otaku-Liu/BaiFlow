@@ -336,8 +336,8 @@ public class FilesFragment extends Fragment {
 
     // ---- 错误处理 ----
     private void handleError(ApiResponse<?> resp) {
-        String code = resp.getCode();
-        if ("PRIVATE_PASSWORD_REQUIRED".equals(code) || "PRIVATE_PASSWORD_INVALID".equals(code)) {
+        int code = resp.getCode();
+        if (code == 40105 || code == 40106) {
             showPrivacyPasswordDialog();
         } else {
             Toast.makeText(requireContext(), resp.getMessage(), Toast.LENGTH_SHORT).show();

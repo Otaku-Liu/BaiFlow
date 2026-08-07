@@ -32,13 +32,19 @@ BaiFlow 涉及的关键术语速查。按字母序。
 
 ## I
 
+- **I18nUtil**
+  服务端语言工具类（`com.baiflow.common.util.I18nUtil`）：`translate(String)` 以「中文文案即 key」在 `i18n/messages*.properties` 查词条，按当前请求 `Accept-Language` 返回中/英，找不到（如动态拼接内容）原样返回中文。全局异常处理器用它统一翻译 `BusinessException` 的 `message`。
+- **错误码（ErrorCode）**
+  5 位数字业务错误码（`0` 成功 / `400xx` 参数 / `401xx` 认证 / `403xx` 权限 / `404xx` 不存在 / `409xx` 冲突 / `410xx` 过期 / `423xx` 锁定 / `429xx` 超限 / `500xx` 内部），定义见后端 `ErrorCode.java`，客户端按数字码区分业务分支。见 `docs/03-api.md` 错误码表。
 - **增量同步（incremental sync）**
   客户端用 `GET /api/notes?updatedAfter=<时间戳>` 只拉取更新的记录，配合本地缓存做增量合并，是 Android 离线同步的基础。
 
 ## L
 
 - **乐观并发（Optimistic Concurrency）**
-  冲突处理策略：保存携带 `baseUpdatedAt`，服务端比对——若被其他设备改过则返回 `NOTE_CONFLICT`，客户端弹「覆盖 / 重新加载」由用户决定，不再静默丢改动。取代了早期「后写覆盖（last-write-wins）」。
+  冲突处理策略：保存携带 `baseUpdatedAt`，服务端比对——若被其他设备改过则返回 `40901`（NOTE_CONFLICT），客户端弹「覆盖 / 重新加载」由用户决定，不再静默丢改动。取代了早期「后写覆盖（last-write-wins）」。
+- **登录失败锁定（Login Lock）**
+  防暴力破解：Redis 滑动窗口（15 分钟内连续失败 5 次锁定 15 分钟），多实例共享；Redis 不可用时 fail-open 降级（跳过锁定，保证登录可用）。原基于内存 `ConcurrentHashMap` 的实现已迁移至 Redis。
 
 ## M
 

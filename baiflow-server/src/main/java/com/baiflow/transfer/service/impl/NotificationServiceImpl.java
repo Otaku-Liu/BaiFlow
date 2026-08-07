@@ -10,7 +10,7 @@ import com.baiflow.transfer.mapper.NotificationMapper;
 import com.baiflow.transfer.service.NotificationService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -20,14 +20,15 @@ import java.util.List;
  * 通知服务实现。
  */
 @Service
-public class NotificationServiceImpl implements NotificationService {
-
-    @Autowired
-    private NotificationMapper mapper;
+public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Notification> implements NotificationService {
 
     @Override
     public IPage<NotificationInfo> listNotifications(String userId, String readStatus, int page, int size) {
-        List<Notification> all = mapper.selectByUser(userId, readStatus);
+        List<Notification> all = lambdaQuery()
+                .eq(Notification::getUserId, userId)
+                .eq(readStatus != null && !readStatus.isBlank(), Notification::getReadStatus, readStatus)
+                .orderByDesc(Notification::getCreatedAt)
+                .list();
         int total = all.size();
         int from = Math.min((page - 1) * size, total);
         int to = Math.min(from + size, total);
@@ -40,12 +41,15 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public long countUnread(String userId) {
-        return mapper.countUnread(userId);
+        return lambdaQuery()
+                .eq(Notification::getUserId, userId)
+                .eq(Notification::getReadStatus, "UNREAD")
+                .count();
     }
 
     @Override
     public void markAsRead(String notificationId, String userId) {
-        Notification n = mapper.selectById(notificationId);
+        Notification n = getById(notificationId);
         if (n == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "通知不存在"); }
         // 校验通知归属
         if (!n.getUserId().equals(userId)) {
@@ -55,7 +59,7 @@ public class NotificationServiceImpl implements NotificationService {
         if (n.getReadStatus() == ReadStatus.READ) { return; }
         n.setReadStatus(ReadStatus.READ);
         n.setReadAt(LocalDateTime.now());
-        mapper.updateById(n);
+        updateById(n);
     }
 
     @Override
@@ -66,7 +70,7 @@ public class NotificationServiceImpl implements NotificationService {
         n.setTitle(title);
         n.setContent(content);
         n.setReadStatus(ReadStatus.UNREAD);
-        mapper.insert(n);
+        save(n);
         return NotificationInfo.from(n);
     }
 }

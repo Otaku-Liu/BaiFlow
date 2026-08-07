@@ -2,11 +2,10 @@ package com.baiflow.common.config;
 
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.common.util.I18nUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -14,20 +13,25 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Locale;
 import java.util.UUID;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** 兜底错误文案（BusinessException 消息为空时使用） */
+    private static final String GENERIC_ERROR_MSG = "服务器内部错误，请稍后再试";
+
     @Autowired
-    private MessageSource messageSource;
+    private I18nUtil i18nUtil;
 
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<Object> handleBusinessException(BusinessException ex, HttpServletRequest request) {
-        String message = resolveMessage(ex.getCode(), ex.getMessage());
+        String message = i18nUtil.translate(ex.getMessage());
+        if (message == null || message.isBlank()) {
+            message = i18nUtil.translate(GENERIC_ERROR_MSG);
+        }
         return ApiResponse.error(ex.getCode(), message, resolveTraceId(request));
     }
 
@@ -44,7 +48,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Object> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
-        String message = resolveMessage("access_denied", "Insufficient privileges");
+        String message = i18nUtil.translate("权限不足");
         return ApiResponse.forbidden(message);
     }
 
@@ -53,26 +57,8 @@ public class GlobalExceptionHandler {
     public ApiResponse<Object> handleException(Exception ex, HttpServletRequest request) {
         String traceId = resolveTraceId(request);
         log.error("Unhandled exception traceId={}", traceId, ex);
-        String message = resolveMessage("unexpected_error", "Unexpected server error");
+        String message = i18nUtil.translate(GENERIC_ERROR_MSG);
         return ApiResponse.internalError(message, traceId);
-    }
-
-    /**
-     * 解析 i18n 消息。
-     * <p>优先使用异常自带的详细消息（fallback）；仅在 fallback 为空时根据
-     * 错误码从资源文件中查找翻译。这样可以保留代码中动态拼接的具体描述
-     * （如"文件夹已存在：xxx"），而非用 code 对应的通用文本覆盖。</p>
-     */
-    private String resolveMessage(String code, String fallback) {
-        if (fallback != null && !fallback.isBlank()) {
-            return fallback;
-        }
-        try {
-            Locale locale = LocaleContextHolder.getLocale();
-            return messageSource.getMessage(code, null, "Unexpected server error", locale);
-        } catch (Exception ignored) {
-            return "Unexpected server error";
-        }
     }
 
     private String resolveTraceId(HttpServletRequest request) {

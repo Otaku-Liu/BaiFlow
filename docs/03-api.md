@@ -13,14 +13,38 @@
 ## 统一响应
 
 ```json
-{ "code": "OK", "message": "success", "data": {}, "traceId": "..." }
+{ "code": 0, "message": "success", "data": {}, "traceId": "..." }
 ```
 
 分页响应：`{ "records": [], "page": 1, "size": 20, "total": 0 }`
 
 ## 错误码
 
-`OK` · `UNAUTHORIZED` · `FORBIDDEN` · `VALIDATION_ERROR` · `NOT_FOUND` · `FILE_OPERATION_FAILED` · `STORAGE_ROOT_OFFLINE` · `DOWNLOAD_ENGINE_ERROR` · `SHARE_LINK_INVALID` · `SHARE_LINK_EXPIRED` · `SHARE_LIMIT_EXCEEDED` · `EXTRACTION_CODE_REQUIRED` · `EXTRACTION_CODE_INVALID` · `PRIVATE_PASSWORD_REQUIRED` · `PRIVATE_PASSWORD_INVALID` · `NOTE_CONFLICT` · `INTERNAL_ERROR`
+`code` 为 5 位数字错误码，按错误域分组（定义见后端 `ErrorCode.java`）；`message` 按请求头 `Accept-Language`（`zh-CN` 默认 / `en`）返回对应语言文案。
+
+| 错误码 | 含义 |
+|---|---|
+| 0 | 成功 |
+| 40001 | 请求参数校验失败 |
+| 40101 | 未登录或 token 无效 |
+| 40102 | 用户名或密码错误 |
+| 40103 | 需要提取码 |
+| 40104 | 提取码错误 |
+| 40105 | 需要隐私文件夹密码 |
+| 40106 | 隐私文件夹密码错误 |
+| 40301 | 无权限 |
+| 40401 | 资源不存在 |
+| 40402 | 分享链接无效 |
+| 40901 | 笔记已被其他设备修改（乐观并发冲突） |
+| 40902 | 用户名已存在 |
+| 41001 | 分享链接已过期 |
+| 42301 | 账号已被锁定 |
+| 42302 | 账号已被禁用 |
+| 42901 | 分享访问或下载次数已达上限 |
+| 50000 | 服务端内部错误 |
+| 50001 | 文件操作失败 |
+| 50002 | 存储根目录不可用 |
+| 50003 | 下载引擎错误 |
 
 ## 接口清单
 
@@ -85,7 +109,7 @@
 - `GET /api/notes?page=&size=&keyword=&viewUserId=` — 分页列出笔记（不含正文，按更新时间倒序）；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换
 - `POST /api/notes` — 新建 `{ title, content }`（content 为 Markdown）
 - `GET /api/notes/{id}` — 详情（含 Markdown 正文）
-- `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt? }`，服务端刷新 `updated_at`；`baseUpdatedAt` 为乐观并发依据，早于服务端当前 `updated_at` 时返回业务码 `NOTE_CONFLICT`（客户端可选覆盖/重新加载）
+- `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt? }`，服务端刷新 `updated_at`；`baseUpdatedAt` 为乐观并发依据，早于服务端当前 `updated_at` 时返回业务码 `40901`（NOTE_CONFLICT，客户端可选覆盖/重新加载）
 - `DELETE /api/notes/{id}` — 软删除（status=DELETED）
 - `GET /api/notes/{id}/progress` — 查询当前用户对笔记的阅读进度 `{ positionType, positionValue, updatedAt }`
 - `PUT /api/notes/{id}/progress` — 保存阅读进度 `{ positionValue }`（滚动百分比 0~1）

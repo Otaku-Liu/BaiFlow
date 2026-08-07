@@ -10,7 +10,7 @@ import com.baiflow.transfer.mapper.TransferTaskMapper;
 import com.baiflow.transfer.service.TransferService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,14 +19,16 @@ import java.util.List;
  * 传输任务服务实现。
  */
 @Service
-public class TransferServiceImpl implements TransferService {
-
-    @Autowired
-    private TransferTaskMapper mapper;
+public class TransferServiceImpl extends ServiceImpl<TransferTaskMapper, TransferTask> implements TransferService {
 
     @Override
     public IPage<TransferTaskInfo> listTasks(String userId, String taskType, String status, int page, int size) {
-        List<TransferTask> all = mapper.selectByUser(userId, taskType, status);
+        List<TransferTask> all = lambdaQuery()
+                .eq(TransferTask::getCreatedBy, userId)
+                .eq(taskType != null && !taskType.isBlank(), TransferTask::getTaskType, taskType)
+                .eq(status != null && !status.isBlank(), TransferTask::getStatus, status)
+                .orderByDesc(TransferTask::getCreatedAt)
+                .list();
         int total = all.size();
         int from = Math.min((page - 1) * size, total);
         int to = Math.min(from + size, total);
@@ -39,7 +41,7 @@ public class TransferServiceImpl implements TransferService {
 
     @Override
     public TransferTaskInfo getTask(String taskId, String userId) {
-        TransferTask t = mapper.selectById(taskId);
+        TransferTask t = getById(taskId);
         if (t == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "传输任务不存在"); }
         // 校验任务归属：用户只能查看自己的任务
         if (!t.getCreatedBy().equals(userId)) {
@@ -57,36 +59,36 @@ public class TransferServiceImpl implements TransferService {
         t.setTargetType(target);
         t.setStatus(TransferTaskStatus.WAITING);
         t.setProgress(0);
-        mapper.insert(t);
+        save(t);
         return TransferTaskInfo.from(t);
     }
 
     @Override
     public void updateProgress(String taskId, int progress) {
-        TransferTask t = mapper.selectById(taskId);
+        TransferTask t = getById(taskId);
         if (t == null) { return; }
         t.setProgress(Math.max(0, Math.min(100, progress)));
         if (progress > 0 && t.getStatus() == TransferTaskStatus.WAITING) {
             t.setStatus(TransferTaskStatus.RUNNING);
         }
-        mapper.updateById(t);
+        updateById(t);
     }
 
     @Override
     public void markCompleted(String taskId) {
-        TransferTask t = mapper.selectById(taskId);
+        TransferTask t = getById(taskId);
         if (t == null) { return; }
         t.setStatus(TransferTaskStatus.COMPLETED);
         t.setProgress(100);
-        mapper.updateById(t);
+        updateById(t);
     }
 
     @Override
     public void markFailed(String taskId, String errorMessage) {
-        TransferTask t = mapper.selectById(taskId);
+        TransferTask t = getById(taskId);
         if (t == null) { return; }
         t.setStatus(TransferTaskStatus.FAILED);
         t.setErrorMessage(errorMessage);
-        mapper.updateById(t);
+        updateById(t);
     }
 }

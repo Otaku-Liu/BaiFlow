@@ -1,12 +1,14 @@
 package com.baiflow.transfer.service;
 
 import com.baiflow.transfer.dto.response.TransferTaskInfo;
+import com.baiflow.transfer.entity.TransferTask;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 
 /**
  * 传输任务服务接口 — 统一管理上传、下载、设备流转任务。
  */
-public interface TransferService {
+public interface TransferService extends IService<TransferTask> {
 
     /**
      * 分页查询当前用户的传输任务，支持按任务类型和状态筛选。

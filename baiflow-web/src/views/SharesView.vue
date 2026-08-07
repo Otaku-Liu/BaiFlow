@@ -147,7 +147,7 @@ async function loadShares() {
   loading.value = true
   try {
     const { data } = await listShares({ status: filterStatus.value||undefined, page: page.value, size: size.value })
-    if (data.code==='OK') { shares.value = data.data.records||[]; total.value = data.data.total||0 }
+    if (data.code === 0) { shares.value = data.data.records||[]; total.value = data.data.total||0 }
   } catch(e) { ElMessage.error(t('shares.loadFailed')) } finally { loading.value = false }
 }
 
@@ -162,7 +162,7 @@ async function doCreateShare() {
       maxViews: createForm.maxViews, maxDownloads: createForm.maxDownloads,
       extractionCode: createForm.extractionCode || null
     })
-    if (data.code==='OK' && data.data.token) {
+    if (data.code === 0 && data.data.token) {
       const url = buildShareUrl(data.data.token)
       shareResult.value = url
       loadShares()
@@ -195,7 +195,7 @@ async function showAnalytics(row) {
   analyticsLogs.value = []
   try {
     const { data } = await getShareAnalytics(row.id)
-    if (data.code === 'OK') {
+    if (data.code === 0) {
       analyticsLogs.value = data.data?.records || []
     }
   } catch (e) {

@@ -4,14 +4,16 @@ import com.baiflow.user.dto.request.CreateUserRequest;
 import com.baiflow.user.dto.request.ResetPasswordRequest;
 import com.baiflow.user.dto.request.UpdateUserRequest;
 import com.baiflow.user.dto.response.UserInfo;
+import com.baiflow.user.entity.User;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.List;
 
 /**
  * 用户管理服务 — 仅限 ADMIN 角色使用。
  */
-public interface UserService {
+public interface UserService extends IService<User> {
 
     /**
      * 创建新用户，指定角色和初始密码。密码在存储前进行 BCrypt 哈希处理。

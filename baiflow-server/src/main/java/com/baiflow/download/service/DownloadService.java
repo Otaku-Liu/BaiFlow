@@ -2,7 +2,9 @@ package com.baiflow.download.service;
 
 import com.baiflow.download.dto.request.CreateDownloadRequest;
 import com.baiflow.download.dto.response.DownloadTaskInfo;
+import com.baiflow.download.entity.DownloadTask;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.Map;
 
@@ -12,7 +14,7 @@ import java.util.Map;
  * 提供下载任务的创建、查询、暂停、恢复和删除能力。
  * 下载进度和状态的同步由后台定时任务驱动（{@code Aria2SyncScheduler}）。
  */
-public interface DownloadService {
+public interface DownloadService extends IService<DownloadTask> {
 
     /**
      * 创建下载任务：校验存储根目录和路径，通过 aria2 RPC 提交下载，

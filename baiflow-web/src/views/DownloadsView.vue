@@ -149,7 +149,7 @@ onMounted(async () => {
   loadTasks()
   try {
     const { data } = await listStorageRoots()
-    if (data.code === 'OK') roots.value = data.data || []
+    if (data.code === 0) roots.value = data.data || []
   } catch { /* ignore */ }
 })
 
@@ -162,7 +162,7 @@ async function loadTasks() {
       page: page.value,
       size: size.value
     })
-    if (data.code === 'OK') {
+    if (data.code === 0) {
       tasks.value = data.data.records || []
       total.value = data.data.total || 0
     } else {

@@ -68,7 +68,7 @@ async function handleLogin() {
 
   try {
     const { data: loginRes } = await login(form.username, form.password)
-    if (loginRes.code !== 'OK') {
+    if (loginRes.code !== 0) {
       errorMsg.value = loginRes.message || '登录失败'
       return
     }
@@ -77,7 +77,7 @@ async function handleLogin() {
 
     // 获取用户信息
     const { data: meRes } = await getCurrentUser()
-    if (meRes.code === 'OK') {
+    if (meRes.code === 0) {
       authStore.setSession(token, meRes.data)
     }
 
@@ -95,12 +95,12 @@ async function handleReconnect() {
   reconnecting.value = true
   try {
     const { data: healthRes } = await getHealth()
-    if (healthRes.code !== 'OK') {
+    if (healthRes.code !== 0) {
       ElMessage.warning('服务器未就绪，请稍后重试')
       return
     }
     const { data: meRes } = await getCurrentUser()
-    if (meRes.code === 'OK') {
+    if (meRes.code === 0) {
       // 会话仍有效：setSession 已清超时标志并重启检测，直接回主界面
       authStore.setSession(authStore.token, meRes.data)
       router.push('/')

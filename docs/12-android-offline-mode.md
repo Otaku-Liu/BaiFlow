@@ -93,7 +93,7 @@
 重连/登录成功 → **立即同步**：
 1. **推 outbox**：`dirty` 笔记 create/update（带 `baseUpdatedAt`）；`TOMBSTONE` → `DELETE server_id`。
 2. **拉增量**：`GET /api/notes?updatedAfter=<最近同步时间>`（需后端扩展），含删除标记；合并进 `SYNCED` 分区。
-3. **冲突**：返回 `NOTE_CONFLICT` → 笔记标记为冲突；打开时复用现有「覆盖/重载」弹窗，用户决定。
+3. **冲突**：返回 `40901`（NOTE_CONFLICT） → 笔记标记为冲突；打开时复用现有「覆盖/重载」弹窗，用户决定。
 4. **媒体**：离线上传的媒体先传（`POST /api/notes/media`）回填 URL；服务器媒体按需下载缓存到本地文件。
 5. 更新 `base_updated_at`、清 `dirty`。
 

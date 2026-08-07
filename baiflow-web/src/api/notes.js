@@ -20,7 +20,7 @@ export function getNote(id, viewUserId) {
   return http.get(`/notes/${id}`, { params })
 }
 
-/** 更新笔记（baseUpdatedAt 为乐观并发依据：早于服务端当前值则返回 NOTE_CONFLICT） */
+/** 更新笔记（baseUpdatedAt 为乐观并发依据：早于服务端当前值则返回 40901（NOTE_CONFLICT）） */
 export function updateNote(id, { title, content, baseUpdatedAt }, viewUserId) {
   const params = {}
   if (viewUserId) params.viewUserId = viewUserId

@@ -6,6 +6,7 @@ import com.baiflow.storage.dto.response.StorageRootInfo;
 import com.baiflow.storage.dto.response.NasCheckResult;
 import com.baiflow.storage.entity.StorageRoot;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -15,7 +16,7 @@ import java.util.List;
  * <p>
  * 同时提供共享的路径解析和边界校验工具方法，供文件层调用以防止路径穿越攻击。
  */
-public interface StorageService {
+public interface StorageService extends IService<StorageRoot> {
 
     /**
      * 创建新的存储根目录，并确保磁盘目录存在。

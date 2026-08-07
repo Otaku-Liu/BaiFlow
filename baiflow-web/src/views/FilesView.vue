@@ -245,7 +245,7 @@ onMounted(async () => {
   // 处理存储根目录
   if (rootsResult.status === 'fulfilled') {
     const { data } = rootsResult.value
-    if (data.code === 'OK' && data.data?.length > 0) {
+    if (data.code === 0 && data.data?.length > 0) {
       roots.value = data.data
       rootId.value = data.data[0].id
       fileStore.setCurrentRoot(rootId.value)
@@ -260,7 +260,7 @@ onMounted(async () => {
   // 管理员加载用户列表（用于空间切换），默认选中当前登录用户
   if (authStore.isAdmin && usersResult.status === 'fulfilled' && usersResult.value) {
     const res = usersResult.value
-    if (res.data.code === 'OK') {
+    if (res.data.code === 0) {
       viewUsers.value = res.data.data?.records || []
       // 默认选中当前登录用户，避免展示所有用户的文件
       if (authStore.user?.id) {
@@ -301,7 +301,7 @@ async function loadFiles() {
       params.viewUserId = viewUserId.value
     }
     const { data } = await listFiles(params, token)
-    if (data.code === 'OK') {
+    if (data.code === 0) {
       fileStore.items = data.data.records || []
       fileStore.total = data.data.total || 0
     } else {
@@ -364,7 +364,7 @@ async function doUpload() {
         file: f.raw,
         viewUserId: authStore.isAdmin && viewUserId.value ? viewUserId.value : undefined
       }, token)
-      if (data.code !== 'OK') {
+      if (data.code !== 0) {
         ElMessage.error(data.message || t('files.uploadFailed'))
         uploading.value = false
         return
@@ -410,7 +410,7 @@ async function doCreateFolder() {
       name: newFolderName.value.trim(),
       viewUserId: authStore.isAdmin && viewUserId.value ? viewUserId.value : undefined
     }, token)
-    if (data.code === 'OK') {
+    if (data.code === 0) {
       ElMessage.success(t('files.folderCreated'))
       showNewFolderDialog.value = false
       newFolderName.value = ''
@@ -520,12 +520,12 @@ async function doRemovePrivacy(row) {
  */
 async function checkParentPrivacy(fileItemId, currentToken, callback) {
   // 简化处理：使用当前目录令牌尝试访问
-  // 如果后端返回 PRIVATE_PASSWORD_REQUIRED，则弹出验证
+  // 如果后端返回 40105（PRIVATE_PASSWORD_REQUIRED），则弹出验证
   try {
     await callback(currentToken)
   } catch (e) {
     const code = e.response?.data?.code
-    if (code === 'PRIVATE_PASSWORD_REQUIRED' || code === 'PRIVATE_PASSWORD_INVALID') {
+    if (code === 40105 || code === 40106) {
       // 需要验证隐私密码——弹出验证对话框
       privacyPendingFolderId.value = fileItemId
       privacyPendingCallback.value = () => {
@@ -550,7 +550,7 @@ async function doVerifyPrivacy() {
   privacyError.value = ''
   try {
     const { data } = await verifyPrivacy(privacyPendingFolderId.value, privacyPendingPassword.value)
-    if (data.code === 'OK') {
+    if (data.code === 0) {
       // 保存访问令牌
       fileStore.savePrivacyToken(privacyPendingFolderId.value, data.data.accessToken)
       ElMessage.success(t('files.verifySuccess'))
@@ -577,7 +577,7 @@ function cancelPrivacyVerify() {
 
 // ---- 错误处理 ----
 function handleApiError(data) {
-  if (data.code === 'PRIVATE_PASSWORD_REQUIRED' || data.code === 'PRIVATE_PASSWORD_INVALID') {
+  if (data.code === 40105 || data.code === 40106) {
     showPrivacyVerify.value = true
     privacyPendingPassword.value = ''
     privacyError.value = data.message || ''
@@ -589,7 +589,7 @@ function handleApiError(data) {
 
 function handleHttpError(e) {
   const code = e.response?.data?.code
-  if (code === 'PRIVATE_PASSWORD_REQUIRED' || code === 'PRIVATE_PASSWORD_INVALID') {
+  if (code === 40105 || code === 40106) {
     showPrivacyVerify.value = true
     privacyPendingPassword.value = ''
     privacyError.value = e.response?.data?.message || ''

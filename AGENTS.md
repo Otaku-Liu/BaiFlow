@@ -6,13 +6,12 @@ BaiFlow（小白流转）是一个个人服务器上的下载与文件协同中�
 ## Read First
 Before planning or coding, read:
 1. `SKILL.md`
-2. `docs/01-requirements.md`
-3. `docs/02-architecture.md`
-4. `docs/08-development-roadmap.md`
-5. The module-specific `SKILL.md` for the area being changed.
+2. `docs/01-architecture.md`
+3. `docs/README.md`
+4. The module-specific `SKILL.md` for the area being changed.
 
 ## Fixed Technical Choices
-- Backend: JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8.
+- Backend: JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8, Redis 7.
 - Web: Vue 3, Vite, Vue Router, Pinia, Axios.
 - Android: Java, Retrofit, OkHttp, WorkManager, Foreground Service.
 - Deployment: Ubuntu 24, Docker Compose, Nginx, aria2 RPC.

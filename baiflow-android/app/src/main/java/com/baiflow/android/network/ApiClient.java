@@ -2,6 +2,8 @@ package com.baiflow.android.network;
 
 import android.os.Build;
 import android.util.Log;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.os.LocaleListCompat;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.model.*;
 import okhttp3.*;
@@ -94,6 +96,10 @@ public class ApiClient {
             // 设备标识（登录时服务端据此建会话，供 Web 端设备管理/强制下线）
             builder.header("X-Device-Type", "ANDROID");
             builder.header("X-Device-Name", deviceName());
+            // 服务端 i18n：按应用语言偏好发 Accept-Language（未设置时默认 zh-CN）
+            LocaleListCompat locales = AppCompatDelegate.getApplicationLocales();
+            String lang = locales.isEmpty() ? "zh" : locales.get(0).getLanguage();
+            builder.header("Accept-Language", "en".equals(lang) ? "en" : "zh-CN");
             Request request = builder.build();
 
             long start = System.currentTimeMillis();
@@ -334,7 +340,7 @@ public class ApiClient {
             if (!response.isSuccessful()) return false;
             String body = response.body() != null ? response.body().string() : "";
             try {
-                return "OK".equals(new JSONObject(body).optString("code"));
+                return new JSONObject(body).optInt("code") == 0;
             } catch (org.json.JSONException e) {
                 return false;
             }

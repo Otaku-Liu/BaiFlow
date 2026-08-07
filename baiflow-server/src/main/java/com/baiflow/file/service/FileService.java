@@ -6,7 +6,9 @@ import com.baiflow.file.dto.request.RenameRequest;
 import com.baiflow.file.dto.request.SetPrivacyRequest;
 import com.baiflow.file.dto.request.VerifyPrivacyRequest;
 import com.baiflow.file.dto.response.FileItemInfo;
+import com.baiflow.file.entity.FileItem;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,7 +26,7 @@ import java.util.Map;
  *       即使对 ADMIN 和已授权用户也不豁免。</li>
  * </ul>
  */
-public interface FileService {
+public interface FileService extends IService<FileItem> {
 
     /**
      * 列出指定存储根目录或文件夹下的子文件/子目录。目录排在文件前面。

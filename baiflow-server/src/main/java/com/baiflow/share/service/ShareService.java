@@ -4,8 +4,10 @@ import com.baiflow.share.dto.request.CreateShareRequest;
 import com.baiflow.share.dto.request.UpdateShareRequest;
 import com.baiflow.share.dto.response.ShareLinkInfo;
 import com.baiflow.share.entity.ShareAccessLog;
+import com.baiflow.share.entity.ShareLink;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
 import java.util.Map;
@@ -13,7 +15,7 @@ import java.util.Map;
 /**
  * 分享服务接口 — 分享链接的创建、管理、公开访问。
  */
-public interface ShareService {
+public interface ShareService extends IService<ShareLink> {
 
     /** 创建分享链接（管理员或文件所有者） */
     ShareLinkInfo createShare(CreateShareRequest req, String userId);

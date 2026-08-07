@@ -4,7 +4,6 @@ import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.file.entity.FileItem;
-import com.baiflow.file.mapper.FileItemMapper;
 import com.baiflow.file.service.FileService;
 import com.baiflow.share.dto.request.CreateShareRequest;
 import com.baiflow.share.dto.request.UpdateShareRequest;
@@ -24,6 +23,7 @@ import com.baiflow.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,15 +42,13 @@ import java.util.*;
 
 @Slf4j
 @Service
-public class ShareServiceImpl implements ShareService {
+public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> implements ShareService {
     private static final String REDIS_SHARE_VIEW_KEY = "share:view:";
 
     @Autowired
-    private ShareLinkMapper shareMapper;
-    @Autowired
     private ShareAccessLogMapper logMapper;
     @Autowired
-    private FileItemMapper fileItemMapper;
+    private FileService fileService;
     @Autowired
     private StorageService storageService;
     @Autowired
@@ -68,7 +66,7 @@ public class ShareServiceImpl implements ShareService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "用户不存在或已被禁用");
         }
 
-        FileItem target = fileItemMapper.selectById(req.targetFileItemId());
+        FileItem target = fileService.getById(req.targetFileItemId());
         if (target == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "文件/文件夹不存在"); }
 
         // 生成不可预测 token，只存 hash
@@ -96,7 +94,7 @@ public class ShareServiceImpl implements ShareService {
         sl.setRequirePrivatePassword(
                 "PRIVATE".equals(target.getPrivacyMode().name()));
         sl.setStatus(ShareStatus.ACTIVE);
-        shareMapper.insert(sl);
+        save(sl);
 
         // 返回时附加 rawToken（仅创建时可见）
         log.info("分享链接已创建: token={}, target={}", rawToken.substring(0, 8) + "...", req.targetFileItemId());
@@ -105,16 +103,35 @@ public class ShareServiceImpl implements ShareService {
 
     @Override public IPage<ShareLinkInfo> listShares(String userId, boolean isAdmin, String status, int page, int size) {
         int offset = (page - 1) * size;
-        List<ShareLink> list; int total;
-        if (isAdmin) { list = shareMapper.selectAll(status, offset, size); total = shareMapper.countAll(status); }
-        else { list = shareMapper.selectByCreator(userId, status, offset, size); total = shareMapper.countByCreator(userId, status); }
+        List<ShareLink> list; long total;
+        if (isAdmin) {
+            list = lambdaQuery()
+                    .eq(status != null && !status.isBlank(), ShareLink::getStatus, status)
+                    .orderByDesc(ShareLink::getCreatedAt)
+                    .last("LIMIT " + offset + ", " + size)
+                    .list();
+            total = lambdaQuery()
+                    .eq(status != null && !status.isBlank(), ShareLink::getStatus, status)
+                    .count();
+        } else {
+            list = lambdaQuery()
+                    .eq(ShareLink::getCreatedBy, userId)
+                    .eq(status != null && !status.isBlank(), ShareLink::getStatus, status)
+                    .orderByDesc(ShareLink::getCreatedAt)
+                    .last("LIMIT " + offset + ", " + size)
+                    .list();
+            total = lambdaQuery()
+                    .eq(ShareLink::getCreatedBy, userId)
+                    .eq(status != null && !status.isBlank(), ShareLink::getStatus, status)
+                    .count();
+        }
         IPage<ShareLinkInfo> r = new Page<>(page, size, total);
         r.setRecords(list.stream().map(ShareLinkInfo::from).toList());
         return r;
     }
 
     @Override public ShareLinkInfo getShare(String id, String userId, boolean isAdmin) {
-        ShareLink sl = shareMapper.selectById(id);
+        ShareLink sl = getById(id);
         if (sl == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "分享链接不存在"); }
         if (!isAdmin && !sl.getCreatedBy().equals(userId)) { throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看"); }
         return ShareLinkInfo.from(sl);
@@ -122,7 +139,7 @@ public class ShareServiceImpl implements ShareService {
 
     @Override @Transactional
     public ShareLinkInfo updateShare(String id, UpdateShareRequest req, String userId, boolean isAdmin) {
-        ShareLink sl = shareMapper.selectById(id);
+        ShareLink sl = getById(id);
         if (sl == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "分享链接不存在"); }
         if (!isAdmin && !sl.getCreatedBy().equals(userId)) { throw new BusinessException(ErrorCode.FORBIDDEN, "无权修改"); }
         if (req.status() != null) { sl.setStatus(ShareStatus.valueOf(req.status())); }
@@ -132,17 +149,17 @@ public class ShareServiceImpl implements ShareService {
         if (req.extractionCode() != null && !req.extractionCode().isBlank()) {
             sl.setExtractionCodeHash(passwordEncoder.encode(req.extractionCode()));
         }
-        shareMapper.updateById(sl);
+        updateById(sl);
         return ShareLinkInfo.from(sl);
     }
 
     @Override @Transactional
     public void revokeShare(String id, String userId, boolean isAdmin) {
-        ShareLink sl = shareMapper.selectById(id);
+        ShareLink sl = getById(id);
         if (sl == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "分享链接不存在"); }
         if (!isAdmin && !sl.getCreatedBy().equals(userId)) { throw new BusinessException(ErrorCode.FORBIDDEN, "无权撤销"); }
         sl.setStatus(ShareStatus.REVOKED);
-        shareMapper.updateById(sl);
+        updateById(sl);
     }
 
     // ===================== 公开访问 =====================
@@ -179,7 +196,7 @@ public class ShareServiceImpl implements ShareService {
         if (!sl.getRequirePrivatePassword()) {
             return Map.of("valid", true, "message", "不需要隐私密码");
         }
-        FileItem target = fileItemMapper.selectById(sl.getTargetFileItemId());
+        FileItem target = fileService.getById(sl.getTargetFileItemId());
         if (target == null || target.getPrivacyPasswordHash() == null || target.getPrivacyPasswordHash().isEmpty()) {
             recordLog(sl, "VERIFY_CODE", request, false, "隐私密码未设置");
             throw new BusinessException(ErrorCode.PRIVATE_PASSWORD_INVALID, "隐私密码未设置");
@@ -206,14 +223,18 @@ public class ShareServiceImpl implements ShareService {
         String folderId = sl.getTargetFileItemId();
         if (parentId != null && !parentId.isBlank()) {
             // 验证 parent 在分享目标子树内（简化：仅允许在分享文件夹内浏览）
-            FileItem parent = fileItemMapper.selectById(parentId);
+            FileItem parent = fileService.getById(parentId);
             if (parent == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "文件夹不存在"); }
             folderId = parentId;
         }
         // 使用 file list 逻辑但不做权限校验
-        List<FileItem> items = fileItemMapper.selectChildren(
-                fileItemMapper.selectById(sl.getTargetFileItemId()).getStorageRootId(),
-                folderId, "ACTIVE");
+        FileItem shareTarget = fileService.getById(sl.getTargetFileItemId());
+        List<FileItem> items = fileService.list(new LambdaQueryWrapper<FileItem>()
+                .eq(FileItem::getStorageRootId, shareTarget.getStorageRootId())
+                .eq(FileItem::getParentId, folderId)
+                .eq(FileItem::getStatus, "ACTIVE")
+                .orderByDesc(FileItem::getItemType)
+                .orderByAsc(FileItem::getName));
         int total = items.size();
         int from = Math.min((page-1)*size, total);
         int to = Math.min(from+size, total);
@@ -233,7 +254,7 @@ public class ShareServiceImpl implements ShareService {
         if (sl.getMaxDownloads() > 0 && sl.getDownloadCount() >= sl.getMaxDownloads()) {
             throw new BusinessException(ErrorCode.SHARE_LIMIT_EXCEEDED, "下载次数已达上限");
         }
-        FileItem file = fileItemMapper.selectById(fileId);
+        FileItem file = fileService.getById(fileId);
         if (file == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "文件不存在"); }
         // 检查文件在分享目标范围内
         if (!fileId.equals(sl.getTargetFileItemId())) {
@@ -248,7 +269,7 @@ public class ShareServiceImpl implements ShareService {
         if (!Files.exists(fp)) { throw new BusinessException(ErrorCode.NOT_FOUND, "磁盘文件不存在"); }
         // 更新下载计数
         sl.setDownloadCount(sl.getDownloadCount() + 1);
-        shareMapper.updateById(sl);
+        updateById(sl);
         recordLog(sl, "DOWNLOAD", request, true, "");
         return new FileSystemResource(fp);
     }
@@ -267,12 +288,16 @@ public class ShareServiceImpl implements ShareService {
         // MVP 实现：由于 token_hash 是 BCrypt 的，无法反向查询，改用更简单的实现
         // 我们使用一种折中：通过记录的详情中包含部分 token 信息来匹配
         // 实际生产应使用其他机制（如用 SHA-256 作为额外索引列）
-        List<ShareLink> all = shareMapper.selectAll(ShareStatus.ACTIVE.name(), 0, 10000);
+        List<ShareLink> all = lambdaQuery()
+                .eq(ShareLink::getStatus, ShareStatus.ACTIVE.name())
+                .orderByDesc(ShareLink::getCreatedAt)
+                .list();
         for (ShareLink sl : all) {
             if (passwordEncoder.matches(token, sl.getTokenHash())) {
                 // 检查过期
                 if (sl.getExpiresAt() != null && sl.getExpiresAt().isBefore(LocalDateTime.now())) {
-                    sl.setStatus(ShareStatus.EXPIRED); shareMapper.updateById(sl);
+                    sl.setStatus(ShareStatus.EXPIRED); 
+                    updateById(sl);
                     recordLog(sl, action, request, false, "链接已过期");
                     throw new BusinessException(ErrorCode.SHARE_LINK_EXPIRED, "分享链接已过期");
                 }

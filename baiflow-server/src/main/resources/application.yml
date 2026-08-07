@@ -6,6 +6,7 @@ spring:
   messages:
     basename: i18n/messages
     encoding: UTF-8
+    default-locale: zh_CN
   datasource:
     url: ${BAIFLOW_DB_URL:jdbc:mysql://127.0.0.1:3306/baiflow?connectionTimeZone=Asia/Shanghai}
     username: ${BAIFLOW_DB_USERNAME:root}

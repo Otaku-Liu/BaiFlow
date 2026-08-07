@@ -2,6 +2,7 @@ package com.baiflow.user.service.impl;
 
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.common.util.I18nUtil;
 import com.baiflow.file.entity.FileItem;
 import com.baiflow.file.mapper.FileItemMapper;
 import com.baiflow.storage.entity.StorageRoot;
@@ -17,6 +18,7 @@ import com.baiflow.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,22 +34,22 @@ import java.util.List;
  */
 @Slf4j
 @Service
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
-    @Autowired
-    private UserMapper userMapper;
     @Autowired
     private PasswordEncoder passwordEncoder;
     @Autowired
     private FileItemMapper fileItemMapper;
     @Autowired
     private StorageService storageService;
+    @Autowired
+    private I18nUtil i18nUtil;
 
     @Override
     public UserInfo createUser(CreateUserRequest req) {
         // 用户名重复检查
-        if (userMapper.selectByUsername(req.username()) != null) {
-            throw new BusinessException(ErrorCode.USERNAME_EXISTS, "用户名已存在：" + req.username());
+        if (getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, req.username()).last("LIMIT 1")) != null) {
+            throw new BusinessException(ErrorCode.USERNAME_EXISTS, i18nUtil.translate("用户名已存在：") + req.username());
         }
 
         User u = new User();
@@ -57,16 +59,18 @@ public class UserServiceImpl implements UserService {
         u.setDisplayName(req.displayName() != null ? req.displayName() : "");
         u.setRole(req.role());
         u.setStatus(UserStatus.NORMAL);
-        userMapper.insert(u);
+        save(u);
         return UserInfo.from(u);
     }
 
     @Override
     public IPage<UserInfo> listUsers(int page, int size, String role, String status, String displayName) {
         // 使用 MyBatis-Plus 分页插件进行数据库级分页
-        Page<User> userPage = userMapper.selectPage(
-                new Page<>(page, size),
-                role, status, displayName);
+        IPage<User> userPage = page(new Page<>(page, size), new LambdaQueryWrapper<User>()
+                .eq(role != null && !role.isBlank(), User::getRole, role)
+                .eq(status != null && !status.isBlank(), User::getStatus, status)
+                .like(displayName != null && !displayName.isBlank(), User::getDisplayName, displayName)
+                .orderByDesc(User::getCreatedAt));
         // 转换为 UserInfo 分页结果
         IPage<UserInfo> r = new Page<>(page, size, userPage.getTotal());
         r.setRecords(userPage.getRecords().stream().map(UserInfo::from).toList());
@@ -75,30 +79,30 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserInfo getUser(String id) {
-        User u = userMapper.selectById(id);
+        User u = getById(id);
         if (u == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"); }
         return UserInfo.from(u);
     }
 
     @Override
     public UserInfo updateUser(String id, UpdateUserRequest req) {
-        User u = userMapper.selectById(id);
+        User u = getById(id);
         if (u == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"); }
         // 仅更新实际传入的字段
         if (req.displayName() != null) { u.setDisplayName(req.displayName()); }
         if (req.role() != null) { u.setRole(req.role()); }
         if (req.status() != null) { u.setStatus(req.status()); }
-        userMapper.updateById(u);
+        updateById(u);
         return UserInfo.from(u);
     }
 
     @Override
     public void resetPassword(String id, ResetPasswordRequest req) {
-        User u = userMapper.selectById(id);
+        User u = getById(id);
         if (u == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"); }
         // 新密码重新 BCrypt 哈希，完全覆盖旧密码
         u.setPasswordHash(passwordEncoder.encode(req.newPassword()));
-        userMapper.updateById(u);
+        updateById(u);
     }
 
     /** 系统内置管理员用户名，禁止被删除 */
@@ -113,7 +117,7 @@ public class UserServiceImpl implements UserService {
         }
 
         for (String userId : ids) {
-            User u = userMapper.selectById(userId);
+            User u = getById(userId);
             if (u == null) {
                 log.warn("批量删除：用户 {} 不存在，跳过", userId);
                 continue;
@@ -125,9 +129,8 @@ public class UserServiceImpl implements UserService {
             }
 
             // 删除该用户拥有的所有文件（磁盘 + 数据库）
-            LambdaQueryWrapper<FileItem> qw = new LambdaQueryWrapper<>();
-            qw.eq(FileItem::getOwnerUserId, userId);
-            List<FileItem> ownedFiles = fileItemMapper.selectList(qw);
+            List<FileItem> ownedFiles = fileItemMapper.selectList(
+                    new LambdaQueryWrapper<FileItem>().eq(FileItem::getOwnerUserId, userId));
             for (FileItem file : ownedFiles) {
                 try {
                     StorageRoot root = storageService.getByIdOrThrow(file.getStorageRootId());
@@ -144,7 +147,7 @@ public class UserServiceImpl implements UserService {
             log.info("已删除用户 {} ({}) 的 {} 个文件", u.getUsername(), userId, ownedFiles.size());
 
             // 删除用户记录（下载/分享记录因 denormalized owner 字段保留）
-            userMapper.deleteById(userId);
+            removeById(userId);
         }
     }
 }

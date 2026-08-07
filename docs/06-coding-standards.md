@@ -5,7 +5,7 @@
 - JDK 17，包名 `com.baiflow`
 - Controller → HTTP 映射与请求/响应转换，不写业务逻辑
 - Service → 业务逻辑、权限校验、事务边界、文件操作
-- Mapper → 只做 SQL
+- Mapper → 纯 `BaseMapper`，不写自定义查询方法（单表查询在 Service 层 IService 完成）
 - DTO / VO / Entity / Request 分离
 - 统一返回 `{ code, message, data, traceId }`
 - 异常通过全局异常处理器转换
@@ -15,7 +15,7 @@
 - Service 接口方法 → Javadoc（参数、返回值、业务含义），使用中文
 - Service 实现复杂逻辑 → 中文行内注释说明意图
 - Controller 方法 → 注释说明接口用途
-- 用户可见消息 → 中文
+- 用户可见消息 → 中文文案（作为 i18n key，经 `I18nUtil.translate()` 按 `Accept-Language` 返回中/英；动态拼接消息的前缀也走 `translate("前缀：")`）
 - 源文件 UTF-8 编码
 
 ### Lombok
@@ -28,7 +28,10 @@
 - 依赖注入用 `@Autowired` 字段注入
 
 ## MyBatis Plus
-- 简单 CRUD → BaseMapper，复杂查询 → XML Mapper
+- 每个实体有对应 `IService`（实体 Service）；领域 Service 可 `extends IService<主实体>` 或注入实体 Service
+- 单表查询在 Service 层用 `lambdaQuery()` / `getOne` / `list` / `count` / `page` / `remove`，尽量不手写 SQL
+- Mapper 保持纯 `BaseMapper<T>`（不写自定义查询方法）
+- 多表 JOIN / 特殊 SQL（如 MySQL `ON DUPLICATE KEY UPDATE`）→ XML Mapper（仅剩审计登录日志 JOIN 与笔记进度 upsert）
 - 分页用 MyBatis Plus 分页插件
 - SQL 关键字大写、列名表名小写下划线、多行格式化、子句独占一行
 - 逻辑删除字段统一 `deleted`
@@ -69,7 +72,7 @@
 - 单个：`GET/PATCH/DELETE /api/items/{id}`
 - 批量：`DELETE /api/items?ids=id1,id2`
 - 分页：`page` / `size`
-- 错误响应必须含 `code` 和 `message`
+- 错误响应必须含数字 `code`（5 位错误码，见 `docs/03-api.md` 错误码表）和 `message`
 
 ## Git
 - 提交信息：`feat:` / `fix:` / `docs:` / `test:` / `chore:`

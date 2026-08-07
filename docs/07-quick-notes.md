@@ -21,7 +21,7 @@
 | 内容同步 | SSE 推送 `NOTE_UPDATED` + 打开时拉取 |
 | 阅读进度 | 新表 `bf_note_progress`（复用 SCROLL_PERCENT 思路） |
 | Android 离线 | Room 本地缓存 + WorkManager 后台同步 |
-| 冲突策略 | **乐观并发**：保存携带 `baseUpdatedAt`，若被其他设备改过返回 `NOTE_CONFLICT`，客户端弹「覆盖 / 重新加载」让用户选择（不再是静默后写覆盖） |
+| 冲突策略 | **乐观并发**：保存携带 `baseUpdatedAt`，若被其他设备改过返回 `40901`（NOTE_CONFLICT），客户端弹「覆盖 / 重新加载」让用户选择（不再是静默后写覆盖） |
 | 管理范围 | 最小集：标题 + 正文 + 时间 + 搜索 + 删除 |
 | 实施节奏 | 分三阶段（①后端+Web ②Android 在线 ③Android 离线+同步） |
 
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 ### 同步协议（Android 离线，Phase 3）
 - **拉取**：`GET /api/notes?updatedAfter=<本地最新时间>` 增量合并进 Room
 - **推送**：离线编辑写入本地 outbox（待同步队列），恢复联网后逐个 `PATCH`
-- **冲突**：乐观并发（保存携带 `baseUpdatedAt`，被改过返回 `NOTE_CONFLICT`，客户端选覆盖 / 重新加载）
+- **冲突**：乐观并发（保存携带 `baseUpdatedAt`，被改过返回 `40901`（NOTE_CONFLICT），客户端选覆盖 / 重新加载）
 - **删除**：软删除标记随增量拉取同步
 
 ## 6. 后端改动（Phase 1）

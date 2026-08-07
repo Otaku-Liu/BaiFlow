@@ -15,8 +15,12 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.baiflow.auth.security.SessionAuthenticationFilter;
+import com.baiflow.common.constant.ErrorCode;
+import com.baiflow.common.util.I18nUtil;
 
 import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.web.servlet.LocaleResolver;
 
 /**
  * Spring Security 配置。
@@ -34,6 +38,10 @@ public class SecurityConfig {
 
     @Autowired
     private SessionAuthenticationFilter sessionAuthenticationFilter;
+    @Autowired
+    private I18nUtil i18nUtil;
+    @Autowired
+    private LocaleResolver localeResolver;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -45,7 +53,9 @@ public class SecurityConfig {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json;charset=UTF-8");
                     response.getWriter().write(
-                            "{\"code\":\"UNAUTHORIZED\",\"message\":\"登录已过期，请重新登录\"}");
+                            "{\"code\":" + ErrorCode.UNAUTHORIZED
+                                    + ",\"message\":\"" + i18nUtil.translate("登录已过期，请重新登录", localeResolver.resolveLocale(request))
+                                    + "\"}");
                 }))
                 .authorizeHttpRequests(auth -> auth
                         // 无需登录

@@ -11,7 +11,9 @@ import com.baiflow.note.entity.NoteProgress;
 import com.baiflow.note.enums.NoteStatus;
 import com.baiflow.note.mapper.NoteMapper;
 import com.baiflow.note.mapper.NoteProgressMapper;
+import com.baiflow.note.service.NoteProgressService;
 import com.baiflow.note.service.NoteService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -36,6 +38,8 @@ public class NoteServiceImpl implements NoteService {
     private NoteMapper noteMapper;
     @Autowired
     private NoteProgressMapper progressMapper;
+    @Autowired
+    private NoteProgressService noteProgressService;
     @Autowired
     private SseService sseService;
 
@@ -132,7 +136,10 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public Map<String, Object> getNoteProgress(String noteId, String userId) {
-        NoteProgress p = progressMapper.selectByUserAndNote(userId, noteId);
+        NoteProgress p = noteProgressService.getOne(new LambdaQueryWrapper<NoteProgress>()
+                .eq(NoteProgress::getUserId, userId)
+                .eq(NoteProgress::getNoteId, noteId)
+                .last("LIMIT 1"));
         if (p == null) return null;
         return Map.of(
                 "noteId", p.getNoteId(),

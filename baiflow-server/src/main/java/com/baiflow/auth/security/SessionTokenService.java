@@ -2,7 +2,8 @@ package com.baiflow.auth.security;
 
 import com.baiflow.auth.config.BaiflowProperties;
 import com.baiflow.auth.entity.AuthSession;
-import com.baiflow.auth.mapper.AuthSessionMapper;
+import com.baiflow.auth.service.AuthSessionService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +32,7 @@ public class SessionTokenService {
     private static final Duration ANDROID_TOUCH_INTERVAL = Duration.ofHours(1);
 
     @Autowired
-    private AuthSessionMapper sessionMapper;
+    private AuthSessionService authSessionService;
     @Autowired
     private BaiflowProperties properties;
 
@@ -63,7 +64,7 @@ public class SessionTokenService {
         session.setCreatedAt(now);
         session.setLastUsedAt(now);
         session.setExpiresAt(now.plus(expiryFor(session.getDeviceType())));
-        sessionMapper.insert(session);
+        authSessionService.save(session);
         return new CreatedSession(token, session.getId(), session.getExpiresAt());
     }
 
@@ -72,15 +73,17 @@ public class SessionTokenService {
         if (token == null || token.isEmpty()) {
             return null;
         }
-        return sessionMapper.selectByTokenHash(sha256Hex(token));
+        return authSessionService.getOne(new LambdaQueryWrapper<AuthSession>()
+                .eq(AuthSession::getTokenHash, sha256Hex(token))
+                .last("LIMIT 1"));
     }
 
     /** 吊销指定会话（登出 / 强制下线） */
     public void revoke(String sessionId) {
-        AuthSession session = sessionMapper.selectById(sessionId);
+        AuthSession session = authSessionService.getById(sessionId);
         if (session != null && session.getRevokedAt() == null) {
             session.setRevokedAt(LocalDateTime.now());
-            sessionMapper.updateById(session);
+            authSessionService.updateById(session);
         }
     }
 
@@ -102,7 +105,7 @@ public class SessionTokenService {
         }
         AuthSession upd = new AuthSession();
         upd.setRevokedAt(LocalDateTime.now());
-        sessionMapper.update(upd, wrapper);
+        authSessionService.update(upd, wrapper);
     }
 
     /** ANDROID 滑动续期：更新 last_used_at 并把 expires_at 顺延到 now + androidDays */
@@ -110,7 +113,7 @@ public class SessionTokenService {
         LocalDateTime now = LocalDateTime.now();
         session.setLastUsedAt(now);
         session.setExpiresAt(now.plus(Duration.ofDays(properties.getAuthSession().getAndroidDays())));
-        sessionMapper.updateById(session);
+        authSessionService.updateById(session);
     }
 
     /** ANDROID 滑动续期写库节流间隔 */

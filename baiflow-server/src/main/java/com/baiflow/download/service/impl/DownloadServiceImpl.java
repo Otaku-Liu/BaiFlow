@@ -2,6 +2,7 @@ package com.baiflow.download.service.impl;
 
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.common.util.I18nUtil;
 import com.baiflow.download.dto.request.CreateDownloadRequest;
 import com.baiflow.download.dto.response.DownloadTaskInfo;
 import com.baiflow.download.entity.DownloadTask;
@@ -13,14 +14,16 @@ import com.baiflow.file.entity.FileItem;
 import com.baiflow.file.enums.FileItemStatus;
 import com.baiflow.file.enums.ItemType;
 import com.baiflow.file.enums.PrivacyMode;
-import com.baiflow.file.mapper.FileItemMapper;
+import com.baiflow.file.service.FileService;
 import com.baiflow.storage.entity.StorageRoot;
 import com.baiflow.storage.service.StorageService;
 import com.baiflow.user.entity.User;
 import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.UserMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -48,18 +51,18 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-public class DownloadServiceImpl implements DownloadService {
+public class DownloadServiceImpl extends ServiceImpl<DownloadTaskMapper, DownloadTask> implements DownloadService {
 
-    @Autowired
-    private DownloadTaskMapper taskMapper;
     @Autowired
     private Aria2Client aria2Client;
     @Autowired
     private StorageService storageService;
     @Autowired
-    private FileItemMapper fileItemMapper;
+    private FileService fileService;
     @Autowired
     private UserMapper userMapper;
+    @Autowired
+    private I18nUtil i18nUtil;
 
     @Override
     @Transactional
@@ -85,7 +88,7 @@ public class DownloadServiceImpl implements DownloadService {
 
         // 确保目标目录存在
         try { Files.createDirectories(targetDir); } catch (Exception e) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "无法创建下载目标目录：" + e.getMessage());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("无法创建下载目标目录：") + e.getMessage());
         }
 
         // 通过 aria2 RPC 提交下载任务
@@ -107,7 +110,7 @@ public class DownloadServiceImpl implements DownloadService {
         task.setTotalBytes(0L);
         task.setCompletedBytes(0L);
         task.setSpeedBytesPerSecond(0L);
-        taskMapper.insert(task);
+        save(task);
 
         log.info("下载任务已创建: id={}, url={}, gid={}, user={}", task.getId(), req.sourceUrl(), gid, userId);
         return DownloadTaskInfo.from(task);
@@ -117,27 +120,34 @@ public class DownloadServiceImpl implements DownloadService {
     public IPage<DownloadTaskInfo> listDownloads(String userId, boolean isAdmin, String status,
                                                   int page, int size) {
         // 非管理员只能查看自己的任务
-        String queryUserId = isAdmin ? null : userId;
         int offset = (page - 1) * size;
 
         List<DownloadTask> tasks;
-        int total;
+        long total;
 
         if (isAdmin) {
-            // 管理员查看所有：先取所有活跃的，再内存筛选
-            List<DownloadTask> all = taskMapper.selectByUser(null, null, 0, 10000);
+            // 管理员查看所有：先取全部，再内存筛选状态
+            List<DownloadTask> all = lambdaQuery()
+                    .orderByDesc(DownloadTask::getCreatedAt)
+                    .list();
             if (status != null && !status.isBlank()) {
                 all = all.stream().filter(t -> t.getStatus().name().equals(status)).toList();
             }
-            // 按创建时间倒序
-            all = all.stream().sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())).toList();
             total = all.size();
-            int from = Math.min(offset, total);
-            int to = Math.min(from + size, total);
-            tasks = from < total ? all.subList(from, to) : List.of();
+            int from = Math.min(offset, all.size());
+            int to = Math.min(from + size, all.size());
+            tasks = from < all.size() ? all.subList(from, to) : List.of();
         } else {
-            total = taskMapper.countByUser(userId, status);
-            tasks = taskMapper.selectByUser(userId, status, offset, size);
+            total = lambdaQuery()
+                    .eq(DownloadTask::getCreatedBy, userId)
+                    .eq(status != null && !status.isBlank(), DownloadTask::getStatus, status)
+                    .count();
+            tasks = lambdaQuery()
+                    .eq(DownloadTask::getCreatedBy, userId)
+                    .eq(status != null && !status.isBlank(), DownloadTask::getStatus, status)
+                    .orderByDesc(DownloadTask::getCreatedAt)
+                    .last("LIMIT " + offset + ", " + size)
+                    .list();
         }
 
         IPage<DownloadTaskInfo> result = new Page<>(page, size, total);
@@ -147,13 +157,7 @@ public class DownloadServiceImpl implements DownloadService {
 
     @Override
     public DownloadTaskInfo getById(String taskId, String userId, boolean isAdmin) {
-        DownloadTask task = taskMapper.selectById(taskId);
-        if (task == null || task.getStatus() == DownloadTaskStatus.DELETED) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "下载任务不存在");
-        }
-        if (!isAdmin && !task.getCreatedBy().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看此下载任务");
-        }
+        DownloadTask task = checkOwnership(taskId, userId, isAdmin);
         return DownloadTaskInfo.from(task);
     }
 
@@ -164,7 +168,7 @@ public class DownloadServiceImpl implements DownloadService {
 
         if (task.getStatus() != DownloadTaskStatus.WAITING
                 && task.getStatus() != DownloadTaskStatus.RUNNING) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "当前状态不允许暂停：" + task.getStatus());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("当前状态不允许暂停：") + task.getStatus());
         }
 
         // 通过 aria2 RPC 暂停
@@ -174,7 +178,7 @@ public class DownloadServiceImpl implements DownloadService {
 
         // 更新本地状态
         task.setStatus(DownloadTaskStatus.PAUSED);
-        taskMapper.updateById(task);
+        updateById(task);
 
         return DownloadTaskInfo.from(task);
     }
@@ -185,7 +189,7 @@ public class DownloadServiceImpl implements DownloadService {
         DownloadTask task = checkOwnership(taskId, userId, isAdmin);
 
         if (task.getStatus() != DownloadTaskStatus.PAUSED) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "当前状态不允许恢复：" + task.getStatus());
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("当前状态不允许恢复：") + task.getStatus());
         }
 
         // 通过 aria2 RPC 恢复
@@ -193,7 +197,7 @@ public class DownloadServiceImpl implements DownloadService {
 
         // 更新本地状态
         task.setStatus(DownloadTaskStatus.RUNNING);
-        taskMapper.updateById(task);
+        updateById(task);
 
         return DownloadTaskInfo.from(task);
     }
@@ -216,14 +220,16 @@ public class DownloadServiceImpl implements DownloadService {
         }
 
         task.setStatus(DownloadTaskStatus.DELETED);
-        taskMapper.updateById(task);
+        updateById(task);
     }
 
     @Override
     @Transactional
     public int syncActiveTasks() {
         // 查询所有活跃任务
-        List<DownloadTask> activeTasks = taskMapper.selectActive();
+        List<DownloadTask> activeTasks = lambdaQuery()
+                .in(DownloadTask::getStatus, "WAITING", "RUNNING", "PAUSED")
+                .list();
         if (activeTasks.isEmpty()) { return 0; }
 
         int updatedCount = 0;
@@ -254,7 +260,7 @@ public class DownloadServiceImpl implements DownloadService {
             if (task.getStatus() != DownloadTaskStatus.FAILED) {
                 task.setStatus(DownloadTaskStatus.FAILED);
                 task.setErrorMessage("aria2 返回错误：" + e.getMessage());
-                taskMapper.updateById(task);
+                updateById(task);
                 return 1;
             }
             return 0;
@@ -314,7 +320,7 @@ public class DownloadServiceImpl implements DownloadService {
             changed = true;
         }
 
-        if (changed) { taskMapper.updateById(task); }
+        if (changed) { updateById(task); }
         return changed ? 1 : 0;
     }
 
@@ -323,7 +329,11 @@ public class DownloadServiceImpl implements DownloadService {
      */
     private void createFileItemForCompletedTask(DownloadTask task, Map<String, Object> ariaStatus) {
         // 检查是否已存在文件记录（幂等性）
-        if (fileItemMapper.selectByPath(task.getTargetStorageRootId(), task.getTargetRelativePath()) != null) {
+        if (fileService.getOne(new LambdaQueryWrapper<FileItem>()
+                .eq(FileItem::getStorageRootId, task.getTargetStorageRootId())
+                .eq(FileItem::getRelativePath, task.getTargetRelativePath())
+                .eq(FileItem::getStatus, "ACTIVE")
+                .last("LIMIT 1")) != null) {
             return;
         }
 
@@ -349,7 +359,7 @@ public class DownloadServiceImpl implements DownloadService {
         item.setPrivacyMode(PrivacyMode.NORMAL);
         item.setStatus(FileItemStatus.ACTIVE);
 
-        fileItemMapper.insert(item);
+        fileService.save(item);
         log.info("下载完成，已创建文件记录: fileName={}, size={}", item.getName(), fileSize);
     }
 
@@ -371,7 +381,7 @@ public class DownloadServiceImpl implements DownloadService {
      * 校验任务归属：非管理员只能操作自己的任务。
      */
     private DownloadTask checkOwnership(String taskId, String userId, boolean isAdmin) {
-        DownloadTask task = taskMapper.selectById(taskId);
+        DownloadTask task = getById(taskId);
         if (task == null || task.getStatus() == DownloadTaskStatus.DELETED) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "下载任务不存在");
         }
