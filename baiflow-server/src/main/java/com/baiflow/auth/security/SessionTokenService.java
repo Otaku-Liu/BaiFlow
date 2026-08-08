@@ -18,7 +18,8 @@ import java.util.Base64;
 /**
  * 会话 token 服务 — 签发（随机 256-bit，只存 SHA-256 哈希）、校验、吊销、滑动续期。
  * <p>
- * 认证模型 2：登录建一条会话，每次请求按 token 哈希查会话校验；吊销即时生效。
+ * 认证模型 2：登录建一条会话，每次请求按 token 哈希查会话校验；吊销即硬删会话记录（即时生效），
+ * 历史由审计日志留痕（见 {@code AuthServiceImpl} 的 LOGOUT / FORCE_LOGOUT / PASSWORD_CHANGED）。
  * ANDROID 会话滑动续期（每次使用顺延到 now + androidDays，180 天不活跃自动失效）；
  * WEB 会话固定短时（webHours，不滑动）。
  */
@@ -78,34 +79,28 @@ public class SessionTokenService {
                 .last("LIMIT 1"));
     }
 
-    /** 吊销指定会话（登出 / 强制下线） */
+    /** 吊销指定会话（登出 / 强制下线）— 硬删会话记录；审计留痕见 {@code AuthServiceImpl} */
     public void revoke(String sessionId) {
-        AuthSession session = authSessionService.getById(sessionId);
-        if (session != null && session.getRevokedAt() == null) {
-            session.setRevokedAt(LocalDateTime.now());
-            authSessionService.updateById(session);
-        }
+        authSessionService.removeById(sessionId);
     }
 
-    /** 吊销某用户全部会话（重置密码时调用，所有设备强制下线重新登录） */
+    /** 吊销某用户全部会话（重置密码时调用，所有设备强制下线重新登录）— 硬删 */
     public void revokeAll(String userId) {
         revokeAllExcept(userId, null);
     }
 
     /**
-     * 吊销某用户全部未吊销会话，保留指定会话。
+     * 吊销某用户全部会话，保留指定会话 — 硬删记录。
      *
      * @param keepSessionId 保留的会话 ID（可空 = 全部吊销）
      */
     public void revokeAllExcept(String userId, String keepSessionId) {
-        var wrapper = new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<AuthSession>()
-                .eq("user_id", userId).isNull("revoked_at");
+        LambdaQueryWrapper<AuthSession> wrapper = new LambdaQueryWrapper<AuthSession>()
+                .eq(AuthSession::getUserId, userId);
         if (keepSessionId != null && !keepSessionId.isEmpty()) {
-            wrapper.ne("id", keepSessionId);
+            wrapper.ne(AuthSession::getId, keepSessionId);
         }
-        AuthSession upd = new AuthSession();
-        upd.setRevokedAt(LocalDateTime.now());
-        authSessionService.update(upd, wrapper);
+        authSessionService.remove(wrapper);
     }
 
     /** ANDROID 滑动续期：更新 last_used_at 并把 expires_at 顺延到 now + androidDays */

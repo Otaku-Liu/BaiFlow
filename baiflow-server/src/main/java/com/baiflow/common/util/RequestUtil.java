@@ -15,7 +15,7 @@ public final class RequestUtil {
     /** 客户端 IP：优先 X-Forwarded-For 首个值（反代场景），否则 RemoteAddr */
     public static String getClientIp() {
         try {
-            var attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs != null) {
                 HttpServletRequest req = attrs.getRequest();
                 String forwarded = req.getHeader("X-Forwarded-For");
@@ -37,7 +37,7 @@ public final class RequestUtil {
     /** 读取当前请求的指定请求头（不存在返回空串） */
     public static String getHeader(String name) {
         try {
-            var attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs != null) {
                 String v = attrs.getRequest().getHeader(name);
                 return v != null ? v : "";

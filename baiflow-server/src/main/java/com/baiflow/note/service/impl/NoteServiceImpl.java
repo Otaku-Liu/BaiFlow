@@ -14,7 +14,6 @@ import com.baiflow.note.mapper.NoteProgressMapper;
 import com.baiflow.note.service.NoteProgressService;
 import com.baiflow.note.service.NoteService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
@@ -46,25 +45,25 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public IPage<NoteSummary> listNotes(String userId, boolean isAdmin, String viewUserId,
                                         String keyword, int page, int size, String updatedAfter) {
-        QueryWrapper<Note> wrapper = new QueryWrapper<>();
+        LambdaQueryWrapper<Note> wrapper = new LambdaQueryWrapper<>();
         // 非管理员始终限定本人；管理员不传 viewUserId 则看全部
         if (!isAdmin || viewUserId != null) {
-            wrapper.eq("user_id", isAdmin ? viewUserId : userId);
+            wrapper.eq(Note::getUserId, isAdmin ? viewUserId : userId);
         }
         // 增量同步模式：只取该时间之后的更新，并包含软删除（客户端据此同步删除）
         boolean incremental = updatedAfter != null && !updatedAfter.isBlank();
         if (incremental) {
             LocalDateTime ts = parseBaseTimestamp(updatedAfter);
             if (ts != null) {
-                wrapper.gt("updated_at", ts);
+                wrapper.gt(Note::getUpdatedAt, ts);
             }
         } else {
-            wrapper.eq("status", NoteStatus.ACTIVE.name());
+            wrapper.eq(Note::getStatus, NoteStatus.ACTIVE);
         }
         if (keyword != null && !keyword.isBlank()) {
-            wrapper.and(w -> w.like("title", keyword).or().like("content", keyword));
+            wrapper.and(w -> w.like(Note::getTitle, keyword).or().like(Note::getContent, keyword));
         }
-        wrapper.orderByDesc("updated_at");
+        wrapper.orderByDesc(Note::getUpdatedAt);
 
         IPage<Note> pageResult = noteMapper.selectPage(new Page<>(page, size), wrapper);
         return pageResult.convert(NoteSummary::from);

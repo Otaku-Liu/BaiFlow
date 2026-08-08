@@ -1,10 +1,13 @@
 package com.baiflow.user.controller;
 
+import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.entity.ApiResponse;
+import com.baiflow.common.exception.BusinessException;
 import com.baiflow.user.dto.request.CreateUserRequest;
 import com.baiflow.user.dto.request.ResetPasswordRequest;
 import com.baiflow.user.dto.request.UpdateUserRequest;
 import com.baiflow.user.dto.response.UserInfo;
+import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.service.UserService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
@@ -60,6 +63,27 @@ public class UserController {
     @PatchMapping("/{id}")
     public ApiResponse<UserInfo> update(@PathVariable String id, @RequestBody UpdateUserRequest req) {
         return ApiResponse.success(userService.updateUser(id, req));
+    }
+
+    /**
+     * 批量设置用户状态（禁用/启用）— 仅支持 NORMAL / DISABLED，目标仅限 USER 角色。
+     * 将锁定中的用户改为其他状态时，服务端会清除其 Redis 登录锁定。
+     */
+    @PatchMapping
+    public ApiResponse<Map<String, Object>> batchUpdateStatus(@RequestParam String ids,
+                                                             @RequestParam String status) {
+        List<String> idList = Arrays.stream(ids.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        UserStatus target;
+        try {
+            target = UserStatus.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "非法的用户状态: " + status);
+        }
+        userService.batchUpdateStatus(idList, target);
+        return ApiResponse.success(Map.of("result", "已更新 " + idList.size() + " 个用户状态"));
     }
 
     /**

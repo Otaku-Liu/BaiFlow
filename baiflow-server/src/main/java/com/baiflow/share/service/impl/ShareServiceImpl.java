@@ -16,6 +16,7 @@ import com.baiflow.share.enums.ShareType;
 import com.baiflow.share.mapper.ShareAccessLogMapper;
 import com.baiflow.share.mapper.ShareLinkMapper;
 import com.baiflow.share.service.ShareService;
+import com.baiflow.storage.entity.StorageRoot;
 import com.baiflow.storage.service.StorageService;
 import com.baiflow.user.entity.User;
 import com.baiflow.user.enums.UserStatus;
@@ -263,7 +264,7 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
             throw new BusinessException(ErrorCode.FORBIDDEN, "仅可下载分享目标文件");
         }
         // 解析磁盘路径
-        var root = storageService.getByIdOrThrow(file.getStorageRootId());
+        StorageRoot root = storageService.getByIdOrThrow(file.getStorageRootId());
         Path fp = storageService.resolveRootPath(root).resolve(file.getRelativePath()).normalize();
         storageService.verifyPathInRoot(root, fp);
         if (!Files.exists(fp)) { throw new BusinessException(ErrorCode.NOT_FOUND, "磁盘文件不存在"); }

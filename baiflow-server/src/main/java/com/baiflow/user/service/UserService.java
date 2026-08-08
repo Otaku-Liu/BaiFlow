@@ -5,6 +5,7 @@ import com.baiflow.user.dto.request.ResetPasswordRequest;
 import com.baiflow.user.dto.request.UpdateUserRequest;
 import com.baiflow.user.dto.response.UserInfo;
 import com.baiflow.user.entity.User;
+import com.baiflow.user.enums.UserStatus;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -47,13 +48,28 @@ public interface UserService extends IService<User> {
 
     /**
      * 更新用户的显示名称、角色或状态。仅更新传入的非空字段。
+     * <p>状态仅支持 {@code NORMAL} / {@code DISABLED}：管理员不支持手动锁定，
+     * {@code LOCKED} 由登录失败自动锁定维护，锁键到期后自动恢复为 NORMAL。
      *
      * @param id      目标用户 ID
-     * @param request 需要更新的字段（均为可选）
+     * @param request 需要更新的字段（均为可选，status 不可为 LOCKED）
      * @return 更新后的用户信息
      * @throws com.baiflow.common.exception.BusinessException NOT_FOUND 用户不存在
+     * @throws com.baiflow.common.exception.BusinessException VALIDATION_ERROR 尝试手动设置 LOCKED
      */
     UserInfo updateUser(String id, UpdateUserRequest request);
+
+    /**
+     * 批量设置用户状态（禁用/启用）。仅 ADMIN 可调用，目标仅限 USER 角色。
+     * <p>将锁定中的用户改为其他状态时，会同时清除其 Redis 登录锁定，避免残留锁键拦截登录。
+     *
+     * @param ids    目标用户 ID 列表
+     * @param status 目标状态，仅支持 NORMAL / DISABLED（LOCKED 由登录失败自动锁定维护）
+     * @throws com.baiflow.common.exception.BusinessException NOT_FOUND 目标用户不存在
+     * @throws com.baiflow.common.exception.BusinessException FORBIDDEN 目标含 ADMIN 角色用户
+     * @throws com.baiflow.common.exception.BusinessException VALIDATION_ERROR 目标状态为 LOCKED
+     */
+    void batchUpdateStatus(List<String> ids, UserStatus status);
 
     /**
      * 重置用户密码（BCrypt 哈希存储）。

@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 登录会话实体 — 长会话 token（只存 SHA-256 哈希）+ 设备信息。
  * <p>
- * 认证模型 2：每次请求校验本表（未吊销 && 未过期），吊销即时生效；
+ * 认证模型 2：每次请求校验本表（记录存在 && 未过期），吊销即删除记录；
  * ANDROID 会话滑动续期（180 天不活跃兜底），WEB 会话固定短时（约 2h）。
  */
 @Data
@@ -45,7 +45,4 @@ public class AuthSession {
     private LocalDateTime lastUsedAt;
 
     private LocalDateTime createdAt;
-
-    /** 吊销时间（非空 = 已登出 / 被强制下线） */
-    private LocalDateTime revokedAt;
 }

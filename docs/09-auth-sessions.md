@@ -4,6 +4,8 @@
 > 实施要点：`bf_auth_session` 并入统一可重复迁移 `db/R__V1_init.sql`（项目约定不单独建迁移脚本）；`SessionAuthenticationFilter` 替换 `JwtAuthenticationFilter`（保留 Bearer + `?token=`）；`AuthController` 增 `GET/DELETE /api/auth/sessions`、logout 改为吊销会话；Android 登录带设备头（长期会话）；Web 个人资料弹窗增「登录设备」列表 + 强制下线
 > 类型：架构决策记录（ADR）
 > 相关：`docs/01-architecture.md`、`docs/02-database.md`、`docs/03-api.md`、`docs/04-frontend.md`、`docs/05-android.md`
+>
+> 变更（2026-08-09）：吊销由「软删（置 `revoked_at`）」改为「**硬删会话记录**并移除该字段」，历史由审计日志留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`）；登录日志视图扩展为登录与会话操作日志。
 
 ## 1. 背景与目标
 
@@ -45,14 +47,13 @@ token_hash    VARCHAR(64)  -- SHA-256(token)
 expires_at    TIMESTAMP    -- 会话到期（WEB 短 / ANDROID 长）
 last_used_at  TIMESTAMP    -- 最近使用（滑动续期的基准）
 created_at    TIMESTAMP
-revoked_at    TIMESTAMP NULL -- 非空 = 已吊销
 ```
 
 ## 5. 认证流程
 
 - **登录**：`POST /api/auth/login`（请求可带 `X-Device-Type` / `X-Device-Name` 头）→ 建会话（`expires_at`：ANDROID 长期、WEB 短期）→ 返回 `{ token, sessionId, expiresAt, user }`。
-- **每次请求**：过滤器取 token（Bearer 或 `?token=`）→ SHA-256 → 查 `bf_auth_session` → 校验「未吊销 && 未过 expires_at && last_used_at 在 180 天兜底内」→ 更新 `last_used_at`（节流，距上次使用 >1h 才写库）→ 注入身份。
-- **登出 / 强制下线 / 改密码** → 置 `revoked_at` → 立即失效。
+- **每次请求**：过滤器取 token（Bearer 或 `?token=`）→ SHA-256 → 查 `bf_auth_session` → 校验「记录存在 && 未过 expires_at」→ 更新 `last_used_at`（节流，距上次使用 >1h 才写库）→ 注入身份。
+- **登出 / 强制下线 / 改密码** → **删除**会话记录（即时失效），审计日志留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`）。
 
 ## 6. API 变更
 
@@ -73,10 +74,12 @@ revoked_at    TIMESTAMP NULL -- 非空 = 已吊销
 - token 只存哈希，数据库泄露不直接暴露可用 token；吊销即时生效。
 - 180 天不活跃兜底防「永不失效」的长期会话堆积。
 - 重置密码吊销**全部**会话（含当前，所有设备强制下线重新登录）；强制下线即时。
+- 吊销即硬删记录，登出/强制下线/改密操作均写审计日志留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`）。
 - `?token=` 媒体/SSE 通道沿用（token 变为会话 token，渲染时取当前值）。
 
 ## 9. 范围与边界
 
-- **本期不做**：推送设备注册（`bf_device` 通知概念）、多设备登录冲突提示/挤线、会话审计展示增强。
+- **本期不做**：推送设备注册（`bf_device` 通知概念）、多设备登录冲突提示/挤线。
+- 会话审计：已实现硬删 + 审计留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`），登录日志视图按操作类型展示与筛选（2026-08-09 追加）。
 - Web 不做长期免登录（用户已确认）。
 - 每次请求一次 DB 查询（个人服务器可接受）。

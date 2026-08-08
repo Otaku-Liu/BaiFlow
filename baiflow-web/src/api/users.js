@@ -25,6 +25,11 @@ export function batchDeleteUsers(ids) {
   return http.delete('/users', { params: { ids } })
 }
 
+/** 批量设置用户状态（禁用/启用，仅 USER 角色；ids 逗号分隔，通过查询参数传递） */
+export function batchUpdateUsersStatus(ids, status) {
+  return http.patch('/users', null, { params: { ids, status } })
+}
+
 /** 重置用户密码 */
 export function resetPassword(id, newPassword) {
   return http.post(`/users/${id}/reset-password`, { newPassword })

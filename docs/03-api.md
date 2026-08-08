@@ -53,6 +53,7 @@
 
 ### 认证
 - `POST /api/auth/login` — 登录建会话，返回 `{ token, sessionId, expiresAt, user }`；设备类型/名称走 `X-Device-Type` / `X-Device-Name` 请求头（ANDROID 长期 / WEB 短期）
+  - 登录失败锁定：15 分钟内连续失败 5 次返回 `42301`，用户状态持久化为 `LOCKED`；锁键到期后由定时任务（每 60s）或登录兜底判定自动恢复为 `NORMAL`
 - `POST /api/auth/logout` — 吊销当前请求 token 对应的会话（立即生效）
 - `GET /api/auth/me`
 - `PATCH /api/auth/profile`
@@ -64,7 +65,10 @@
 ### 用户（管理员）
 - `GET/POST /api/users` · `PATCH /api/users/{id}` · `POST /api/users/{id}/reset-password`
 - `DELETE /api/users?ids=id1,id2`（批量删除）
+- `PATCH /api/users?ids=id1,id2&status=DISABLED`（批量禁用/启用，仅 ADMIN，目标仅限 USER 角色；拒绝 `LOCKED` 目标）
 - `GET/PUT /api/users/{id}/permissions`
+- 用户状态仅支持 `NORMAL` / `DISABLED`（管理员禁用）；`LOCKED` 由登录失败自动锁定维护，不可手动设置，锁键到期自动恢复
+- 将锁定中的用户改为其他状态（如禁用）时，服务端会清除其 Redis 登录锁定键，避免残留锁键拦截登录
 
 ### 存储根目录
 - `GET /api/storage-roots/active`（返回所有 ACTIVE 状态的存储根目录，供文件中心选择器使用）
@@ -122,7 +126,7 @@
 笔记独立于文件系统，不受存储根目录/隐私文件夹约束。Android 离线增量同步（`updatedAfter`）随客户端离线阶段落地。笔记媒体独立存储，不进文件中心列表。
 
 ### 审计日志（管理员）
-- `GET /api/admin/audit-logs/login` — 分页查询登录日志，支持用户名模糊搜索、登录结果和日期范围筛选
+- `GET /api/admin/audit-logs/login` — 分页查询登录与会话操作日志（`LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED` / `ACCOUNT_LOCKED` / `ACCOUNT_UNLOCKED`），支持用户名模糊搜索、操作类型和日期范围筛选
 
 ### 下载
 - `POST/GET /api/downloads` · `GET /api/downloads/{id}`

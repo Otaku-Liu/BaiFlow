@@ -45,19 +45,26 @@ export default {
     logout: '退出'
   },
   loginLog: {
-    title: '登录日志',
+    title: '登录与会话日志',
     username: '用户名',
     displayName: '展示名',
-    loginResult: '登录结果',
-    loginTime: '登录时间',
-    success: '成功',
-    failed: '失败',
+    actionLabel: '操作类型',
+    loginTime: '时间',
     searchUsername: '搜索用户名',
     startDate: '开始日期',
     endDate: '结束日期',
-    filterStatus: '登录结果',
-    noLogs: '暂无登录日志',
-    loadFailed: '加载登录日志失败'
+    filterStatus: '操作类型',
+    noLogs: '暂无日志',
+    loadFailed: '加载日志失败',
+    action: {
+      loginSuccess: '登录成功',
+      loginFailed: '登录失败',
+      logout: '登出',
+      forceLogout: '强制下线',
+      passwordChanged: '修改密码',
+      accountLocked: '账号锁定',
+      accountUnlocked: '账号解锁'
+    }
   },
   files: {
     title: '文件中心',
@@ -234,7 +241,25 @@ export default {
       normal: '正常',
       disabled: '已禁用',
       locked: '已锁定'
-    }
+    },
+    lockedAutoHint: '该账号因登录失败次数过多被自动锁定：可改为禁用；不操作则锁定期结束后自动恢复',
+    disable: '禁用',
+    enable: '启用',
+    batchDisable: '批量禁用',
+    batchEnable: '批量启用',
+    disableConfirmTitle: '确认禁用',
+    disableConfirmMsg: '确定要禁用用户 "{name}" 吗？',
+    enableConfirmTitle: '确认启用',
+    enableConfirmMsg: '确定要启用用户 "{name}" 吗？',
+    batchDisableConfirmTitle: '批量禁用确认',
+    batchDisableConfirmMsg: '确定要禁用选中的 {count} 个用户吗？',
+    batchEnableConfirmTitle: '批量启用确认',
+    batchEnableConfirmMsg: '确定要启用选中的 {count} 个用户吗？',
+    disabled: '用户已禁用',
+    enabled: '用户已启用',
+    batchDisabled: '已禁用 {count} 个用户',
+    batchEnabled: '已启用 {count} 个用户',
+    statusUpdateFailed: '状态更新失败'
   },
   preview: {
     preview: '预览',
@@ -242,7 +267,7 @@ export default {
   },
   menu: {
     logs: '操作日志',
-    loginLogs: '登录日志',
+    loginLogs: '登录与会话日志',
     files: '文件中心',
     downloads: '下载中心',
     notes: '随手记',

@@ -18,6 +18,12 @@
       </div>
       <div class="action-row">
         <el-button type="primary" @click="showCreateDialog">{{ t('users.createUser') }}</el-button>
+        <el-button v-if="authStore.isAdmin && selectedUserIds.length > 0" type="warning" :disabled="batchUpdating" @click="handleBatchStatus('DISABLED')">
+          {{ t('users.batchDisable') }} ({{ selectedUserIds.length }})
+        </el-button>
+        <el-button v-if="authStore.isAdmin && selectedUserIds.length > 0" type="success" :disabled="batchUpdating" @click="handleBatchStatus('NORMAL')">
+          {{ t('users.batchEnable') }} ({{ selectedUserIds.length }})
+        </el-button>
         <el-button v-if="selectedIds.length > 0" type="danger" @click="handleBatchDelete" :disabled="batchDeleting">
           {{ t('users.batchDelete') }} ({{ selectedIds.length }})
         </el-button>
@@ -45,9 +51,15 @@
       <el-table-column prop="createdAt" :label="t('common.createdAt')" min-width="160">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column :label="t('common.actions')" width="260" fixed="right">
+      <el-table-column :label="t('common.actions')" width="330" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="showEditDialog(row)">{{ t('common.edit') }}</el-button>
+          <el-button v-if="authStore.isAdmin && row.role === 'USER' && row.status !== 'DISABLED'" size="small" type="warning" @click="handleToggleStatus(row, 'DISABLED')">
+            {{ t('users.disable') }}
+          </el-button>
+          <el-button v-if="authStore.isAdmin && row.role === 'USER' && row.status === 'DISABLED'" size="small" type="success" @click="handleToggleStatus(row, 'NORMAL')">
+            {{ t('users.enable') }}
+          </el-button>
           <el-button size="small" @click="showResetPwdDialog(row)">{{ t('users.resetPassword') }}</el-button>
           <el-button v-if="canDelete(row)" size="small" type="danger" @click="handleDelete(row)">{{ t('common.delete') }}</el-button>
         </template>
@@ -106,10 +118,9 @@
         </el-form-item>
         <el-form-item :label="t('common.status')">
           <el-select v-model="editForm.status" style="width: 100%">
-            <el-option :label="t('users.status.normal')" value="NORMAL" />
-            <el-option :label="t('users.status.disabled')" value="DISABLED" />
-            <el-option :label="t('users.status.locked')" value="LOCKED" />
+            <el-option v-for="opt in statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
+          <div v-if="isEditingLocked" class="status-lock-hint">{{ t('users.lockedAutoHint') }}</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -138,7 +149,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
-import { listUsers, createUser, updateUser, batchDeleteUsers, resetPassword } from '../api/users'
+import { listUsers, createUser, updateUser, batchDeleteUsers, batchUpdateUsersStatus, resetPassword } from '../api/users'
 import { formatDateTime } from '../utils/format'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
@@ -173,6 +184,21 @@ const editDialogVisible = ref(false)
 const updating = ref(false)
 const editFormRef = ref(null)
 const editForm = reactive({ id: '', username: '', displayName: '', role: 'USER', status: 'NORMAL' })
+/** 编辑中的用户是否处于自动锁定状态：可改为禁用，不允许设为正常 */
+const isEditingLocked = computed(() => editForm.status === 'LOCKED')
+/** 编辑弹窗状态下拉：锁定用户仅可在「保持锁定 / 禁用」间选择，正常/禁用用户仅可互切 */
+const statusOptions = computed(() => {
+  if (editForm.status === 'LOCKED') {
+    return [
+      { label: t('users.status.locked'), value: 'LOCKED' },
+      { label: t('users.status.disabled'), value: 'DISABLED' }
+    ]
+  }
+  return [
+    { label: t('users.status.normal'), value: 'NORMAL' },
+    { label: t('users.status.disabled'), value: 'DISABLED' }
+  ]
+})
 
 // 重置密码弹窗
 const resetPwdDialogVisible = ref(false)
@@ -185,6 +211,13 @@ const resetPwdRules = computed(() => ({
 
 // 批量删除
 const batchDeleting = ref(false)
+// 批量禁用/启用
+const batchUpdating = ref(false)
+/** 选中项中仅 USER 角色用户（禁用/启用仅作用于 USER 角色） */
+const selectedUserIds = computed(() => selectedIds.value.filter(id => {
+  const row = users.value.find(u => u.id === id)
+  return row && row.role === 'USER'
+}))
 
 function statusTagType(status) {
   return { 'NORMAL': 'success', 'DISABLED': 'warning', 'LOCKED': 'danger' }[status] || 'info'
@@ -282,7 +315,10 @@ function showEditDialog(row) {
 async function handleUpdate() {
   updating.value = true
   try {
-    await updateUser(editForm.id, { displayName: editForm.displayName, role: editForm.role, status: editForm.status })
+    // LOCKED 仅由登录失败自动锁定维护，手动编辑锁定用户时跳过 status 字段，避免误提交
+    const payload = { displayName: editForm.displayName, role: editForm.role }
+    if (editForm.status !== 'LOCKED') payload.status = editForm.status
+    await updateUser(editForm.id, payload)
     ElMessage.success(t('users.userUpdated'))
     editDialogVisible.value = false
     fetchUsers()
@@ -351,6 +387,48 @@ async function handleBatchDelete() {
   }
 }
 
+/** 单个用户禁用/启用（仅 USER 角色；禁用锁定用户时后端会清除其 Redis 锁键） */
+async function handleToggleStatus(row, status) {
+  const isDisable = status === 'DISABLED'
+  try {
+    await confirm({
+      title: t(isDisable ? 'users.disableConfirmTitle' : 'users.enableConfirmTitle'),
+      message: t(isDisable ? 'users.disableConfirmMsg' : 'users.enableConfirmMsg', { name: row.displayName || row.username }),
+      confirmText: t(isDisable ? 'users.disable' : 'users.enable'),
+      type: isDisable ? 'danger' : 'warning'
+    })
+    await updateUser(row.id, { status })
+    ElMessage.success(t(isDisable ? 'users.disabled' : 'users.enabled'))
+    fetchUsers()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('users.statusUpdateFailed'))
+  }
+}
+
+/** 批量禁用/启用（仅作用于选中的 USER 角色用户） */
+async function handleBatchStatus(status) {
+  const ids = selectedUserIds.value
+  if (ids.length === 0) return
+  const isDisable = status === 'DISABLED'
+  try {
+    await confirm({
+      title: t(isDisable ? 'users.batchDisableConfirmTitle' : 'users.batchEnableConfirmTitle'),
+      message: t(isDisable ? 'users.batchDisableConfirmMsg' : 'users.batchEnableConfirmMsg', { count: ids.length }),
+      confirmText: t(isDisable ? 'users.disable' : 'users.enable'),
+      type: isDisable ? 'danger' : 'warning'
+    })
+    batchUpdating.value = true
+    await batchUpdateUsersStatus(ids.join(','), status)
+    ElMessage.success(t(isDisable ? 'users.batchDisabled' : 'users.batchEnabled', { count: ids.length }))
+    selectedIds.value = []
+    fetchUsers()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('users.statusUpdateFailed'))
+  } finally {
+    batchUpdating.value = false
+  }
+}
+
 onMounted(fetchUsers)
 </script>
 
@@ -377,5 +455,11 @@ onMounted(fetchUsers)
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.status-lock-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>

@@ -14,7 +14,12 @@
 ## 核心表
 
 ### user — 系统用户
-`id, username, password_hash, display_name, avatar_url, role(ADMIN/USER/GUEST), status(ACTIVE/DISABLED/LOCKED), last_login_at, created_at, updated_at`
+`id, username, password_hash, display_name, avatar_url, role(ADMIN/USER/GUEST), status(NORMAL/DISABLED/LOCKED), last_login_at, created_at, updated_at`
+
+> `status` 说明：
+> - `NORMAL` 正常 · `DISABLED` 禁用（管理员可设置）· `LOCKED` 锁定
+> - `LOCKED` 仅由登录失败自动锁定维护（15 分钟内连续失败 5 次），同时写入 Redis 锁键 `login:lock:<username>`（TTL 15 分钟）；锁键到期后由定时任务/登录兜底判定自动恢复为 `NORMAL`
+> - 管理员仅支持设置 `NORMAL` / `DISABLED`，不支持手动锁定
 
 ### user_storage_permission — 用户存储权限
 `id, user_id, storage_root_id, file_item_id, permission(READ/WRITE/MANAGE), created_by, created_at, updated_at`
@@ -74,9 +79,9 @@
 Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体落磁盘（`baiflow.notes.media-path` 专用目录，文件名 `<mediaId>.<ext>`），独立于文件中心、不参与 `/api/files` 列表；正文通过 Markdown 引用（`![…](/api/notes/media/{id})` / `[录音](…?mediaType=audio)`）关联媒体。
 
 ### auth_session — 登录会话
-`id, user_id, device_name, device_type(ANDROID/WEB), ip, user_agent, token_hash(SHA-256), expires_at, last_used_at, created_at, revoked_at`
+`id, user_id, device_name, device_type(ANDROID/WEB), ip, user_agent, token_hash(SHA-256), expires_at, last_used_at, created_at`
 
-登录会话（模型 2）：每次请求按 `token_hash` 精确查询校验（未吊销/未过期），吊销即时生效。ANDROID 会话滑动续期（180 天不活跃兜底），WEB 会话固定短时。`token_hash` 只存哈希，数据库泄露不暴露可用 token。详见 `docs/09-auth-sessions.md`。
+登录会话（模型 2）：每次请求按 `token_hash` 精确查询校验（记录存在 && 未过期），吊销即**删除记录**（即时生效），历史由审计日志留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`）。ANDROID 会话滑动续期（180 天不活跃兜底），WEB 会话固定短时。`token_hash` 只存哈希，数据库泄露不暴露可用 token。详见 `docs/09-auth-sessions.md`。
 
 > 以上 5 张表统一由可重复迁移 `db/R__V1_init.sql` 创建（**项目约定：新表一律追加进 `R__V1_init.sql`，不单独建迁移脚本**；可重复迁移文件有改动即自动重新执行，全表 `IF NOT EXISTS` 幂等），**所有表与字段均带 COMMENT 注释**，便于管理与理解。
 

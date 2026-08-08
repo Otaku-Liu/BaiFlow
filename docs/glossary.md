@@ -44,7 +44,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 - **乐观并发（Optimistic Concurrency）**
   冲突处理策略：保存携带 `baseUpdatedAt`，服务端比对——若被其他设备改过则返回 `40901`（NOTE_CONFLICT），客户端弹「覆盖 / 重新加载」由用户决定，不再静默丢改动。取代了早期「后写覆盖（last-write-wins）」。
 - **登录失败锁定（Login Lock）**
-  防暴力破解：Redis 滑动窗口（15 分钟内连续失败 5 次锁定 15 分钟），多实例共享；Redis 不可用时 fail-open 降级（跳过锁定，保证登录可用）。原基于内存 `ConcurrentHashMap` 的实现已迁移至 Redis。
+  防暴力破解：Redis 滑动窗口（15 分钟内连续失败 5 次锁定 15 分钟），多实例共享。登录时的锁定检查 Redis 不可用时 fail-open 降级（跳过锁定，保证登录可用）；但解锁判定（恢复 `NORMAL`）为 fail-closed——Redis 不可用时保守按仍锁定处理，避免误解锁。达到阈值时除写入 Redis 锁键外，同时将用户状态持久化为 `LOCKED`；锁键到期后由定时任务（`LoginLockScheduler`，每 60s 扫描）或登录时的兜底判定恢复为 `NORMAL`。`LOCKED` 仅由自动锁定维护，管理员仅支持禁用。原基于内存 `ConcurrentHashMap` 的实现已迁移至 Redis。
 
 ## M
 

@@ -26,10 +26,12 @@
 ### 代码风格
 - if/for/while 必须用大括号（即使一行）
 - 依赖注入用 `@Autowired` 字段注入
+- **不用 `var`，变量声明一律写明确类型**（泛型 + 链式调用时 `var` 可能推断出意外类型，显式类型更清晰、编译期可控）
 
 ## MyBatis Plus
 - 每个实体有对应 `IService`（实体 Service）；领域 Service 可 `extends IService<主实体>` 或注入实体 Service
 - 单表查询在 Service 层用 `lambdaQuery()` / `getOne` / `list` / `count` / `page` / `remove`，尽量不手写 SQL
+- 条件构造器优先用 `LambdaQueryWrapper` / `LambdaUpdateWrapper`（列名走方法引用，编译期类型安全、重命名字段不炸），**不使用字符串列名的 `QueryWrapper`**
 - Mapper 保持纯 `BaseMapper<T>`（不写自定义查询方法）
 - 多表 JOIN / 特殊 SQL（如 MySQL `ON DUPLICATE KEY UPDATE`）→ XML Mapper（仅剩审计登录日志 JOIN 与笔记进度 upsert）
 - 分页用 MyBatis Plus 分页插件

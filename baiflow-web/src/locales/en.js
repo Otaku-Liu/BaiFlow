@@ -45,19 +45,26 @@ export default {
     logout: 'Logout'
   },
   loginLog: {
-    title: 'Login Logs',
+    title: 'Login & Session Logs',
     username: 'Username',
     displayName: 'Display Name',
-    loginResult: 'Result',
-    loginTime: 'Login Time',
-    success: 'Success',
-    failed: 'Failed',
+    actionLabel: 'Action',
+    loginTime: 'Time',
     searchUsername: 'Search username',
     startDate: 'Start date',
     endDate: 'End date',
-    filterStatus: 'Result',
-    noLogs: 'No login logs',
-    loadFailed: 'Failed to load login logs'
+    filterStatus: 'Action',
+    noLogs: 'No logs',
+    loadFailed: 'Failed to load logs',
+    action: {
+      loginSuccess: 'Login success',
+      loginFailed: 'Login failed',
+      logout: 'Logout',
+      forceLogout: 'Force logout',
+      passwordChanged: 'Password changed',
+      accountLocked: 'Account locked',
+      accountUnlocked: 'Account unlocked'
+    }
   },
   files: {
     title: 'Files',
@@ -234,7 +241,25 @@ export default {
       normal: 'Normal',
       disabled: 'Disabled',
       locked: 'Locked'
-    }
+    },
+    lockedAutoHint: 'This account was locked automatically after repeated login failures. You may disable it, or it will restore automatically after the lock period',
+    disable: 'Disable',
+    enable: 'Enable',
+    batchDisable: 'Batch Disable',
+    batchEnable: 'Batch Enable',
+    disableConfirmTitle: 'Confirm Disable',
+    disableConfirmMsg: 'Disable user "{name}"?',
+    enableConfirmTitle: 'Confirm Enable',
+    enableConfirmMsg: 'Enable user "{name}"?',
+    batchDisableConfirmTitle: 'Batch Disable Confirmation',
+    batchDisableConfirmMsg: 'Disable {count} selected users?',
+    batchEnableConfirmTitle: 'Batch Enable Confirmation',
+    batchEnableConfirmMsg: 'Enable {count} selected users?',
+    disabled: 'User disabled',
+    enabled: 'User enabled',
+    batchDisabled: '{count} users disabled',
+    batchEnabled: '{count} users enabled',
+    statusUpdateFailed: 'Failed to update status'
   },
   preview: {
     preview: 'Preview',
@@ -242,7 +267,7 @@ export default {
   },
   menu: {
     logs: 'Audit Logs',
-    loginLogs: 'Login Logs',
+    loginLogs: 'Login & Session Logs',
     files: 'Files',
     downloads: 'Downloads',
     notes: 'Notes',

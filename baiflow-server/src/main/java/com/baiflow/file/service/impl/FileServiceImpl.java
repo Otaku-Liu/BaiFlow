@@ -52,6 +52,7 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * 文件服务实现 — 所有文件操作均强制遵循存储根目录边界约束和用户权限校验。
@@ -354,7 +355,7 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         try {
             if (Files.isDirectory(p)) {
                 // 递归删除目录树
-                try (var s = Files.walk(p)) {
+                try (Stream<Path> s = Files.walk(p)) {
                     s.sorted(Comparator.reverseOrder())
                             .forEach(x -> {
                                 try {

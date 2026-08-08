@@ -15,9 +15,8 @@
           :default-time="[new Date(2000, 0, 1, 0, 0, 0), new Date(2000, 0, 1, 23, 59, 59)]"
           style="width: 380px"
         />
-        <el-select v-model="filterStatus" :placeholder="t('loginLog.filterStatus')" clearable style="width: 120px">
-          <el-option :label="t('loginLog.success')" value="LOGIN_SUCCESS" />
-          <el-option :label="t('loginLog.failed')" value="LOGIN_FAILED" />
+        <el-select v-model="filterStatus" :placeholder="t('loginLog.filterStatus')" clearable style="width: 150px">
+          <el-option v-for="opt in actionOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
         <el-button type="primary" @click="handleSearch">{{ t('common.search') }}</el-button>
         <el-button @click="handleReset">{{ t('common.reset') }}</el-button>
@@ -32,11 +31,9 @@
           {{ row.displayName || '-' }}
         </template>
       </el-table-column>
-      <el-table-column :label="t('loginLog.loginResult')" width="90">
+      <el-table-column :label="t('loginLog.actionLabel')" width="110">
         <template #default="{ row }">
-          <el-tag :type="row.action === 'LOGIN_SUCCESS' ? 'success' : 'danger'" size="small">
-            {{ row.action === 'LOGIN_SUCCESS' ? t('loginLog.success') : t('loginLog.failed') }}
-          </el-tag>
+          <el-tag :type="actionTagType(row.action)" size="small">{{ actionLabel(row.action) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="ipAddress" :label="t('common.ipAddress')" min-width="140" />
@@ -64,13 +61,51 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { getLoginLogs } from '../api/logs'
 import { formatDateTime } from '../utils/format'
 
 const { t } = useI18n()
+
+/** 登录与会话操作的类型选项（用于筛选下拉） */
+const actionOptions = computed(() => [
+  { value: 'LOGIN_SUCCESS', label: t('loginLog.action.loginSuccess') },
+  { value: 'LOGIN_FAILED', label: t('loginLog.action.loginFailed') },
+  { value: 'LOGOUT', label: t('loginLog.action.logout') },
+  { value: 'FORCE_LOGOUT', label: t('loginLog.action.forceLogout') },
+  { value: 'PASSWORD_CHANGED', label: t('loginLog.action.passwordChanged') },
+  { value: 'ACCOUNT_LOCKED', label: t('loginLog.action.accountLocked') },
+  { value: 'ACCOUNT_UNLOCKED', label: t('loginLog.action.accountUnlocked') }
+])
+
+/** 审计动作 → 展示文案 */
+function actionLabel(action) {
+  const map = {
+    LOGIN_SUCCESS: t('loginLog.action.loginSuccess'),
+    LOGIN_FAILED: t('loginLog.action.loginFailed'),
+    LOGOUT: t('loginLog.action.logout'),
+    FORCE_LOGOUT: t('loginLog.action.forceLogout'),
+    PASSWORD_CHANGED: t('loginLog.action.passwordChanged'),
+    ACCOUNT_LOCKED: t('loginLog.action.accountLocked'),
+    ACCOUNT_UNLOCKED: t('loginLog.action.accountUnlocked')
+  }
+  return map[action] || action
+}
+
+/** 审计动作 → 标签颜色 */
+function actionTagType(action) {
+  return {
+    LOGIN_SUCCESS: 'success',
+    LOGIN_FAILED: 'danger',
+    LOGOUT: 'info',
+    FORCE_LOGOUT: 'warning',
+    PASSWORD_CHANGED: 'warning',
+    ACCOUNT_LOCKED: 'danger',
+    ACCOUNT_UNLOCKED: 'success'
+  }[action] || 'info'
+}
 
 // 列表状态
 const loading = ref(false)

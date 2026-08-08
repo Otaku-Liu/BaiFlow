@@ -25,7 +25,7 @@ import java.util.List;
  * <p>
  * 支持 Bearer 头与 {@code ?token=} 查询参数（后者供 {@code <img>/<video>}/SSE 等
  * 浏览器直接请求，沿旧 JWT 过滤器的双通道）。
- * 校验：未吊销 && 未过期；ANDROID 会话做滑动续期（节流 1h 写库）；role 取用户表当前值。
+ * 校验：记录存在 && 未过期；ANDROID 会话做滑动续期（节流 1h 写库）；role 取用户表当前值。
  */
 @Component
 public class SessionAuthenticationFilter extends OncePerRequestFilter {
@@ -42,7 +42,7 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
         if (token != null) {
             AuthSession session = sessionTokenService.findByToken(token);
             LocalDateTime now = LocalDateTime.now();
-            if (session != null && session.getRevokedAt() == null
+            if (session != null
                     && session.getExpiresAt() != null && session.getExpiresAt().isAfter(now)) {
                 User user = userMapper.selectById(session.getUserId());
                 if (user != null) {

@@ -304,7 +304,6 @@ CREATE TABLE IF NOT EXISTS `bf_auth_session` (
     `expires_at`    TIMESTAMP    NOT NULL COMMENT '会话到期时间（ANDROID 滑动续期 / WEB 固定）',
     `last_used_at`  TIMESTAMP    NOT NULL COMMENT '最近使用时间（滑动续期基准）',
     `created_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `revoked_at`    TIMESTAMP    NULL COMMENT '吊销时间（非空 = 已登出 / 被强制下线）',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_token_hash` (`token_hash`),
     KEY `idx_user` (`user_id`, `created_at`)
