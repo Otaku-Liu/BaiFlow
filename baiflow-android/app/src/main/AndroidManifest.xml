@@ -35,7 +35,8 @@
         <activity android:name=".ui.GuideActivity"
             android:exported="false" />
         <activity android:name=".ui.PreviewActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
         <activity android:name=".ui.NoteEditActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />

@@ -9,7 +9,7 @@ import com.baiflow.auth.dto.response.UserDeviceInfo;
 import com.baiflow.auth.entity.AuthSession;
 import com.baiflow.auth.entity.UserDevice;
 import com.baiflow.auth.mapper.AuthSessionMapper;
-import com.baiflow.auth.security.SessionTokenService;
+import com.baiflow.auth.service.SessionTokenService;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.auth.service.UserDeviceService;
 import com.baiflow.audit.service.AuditService;

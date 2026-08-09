@@ -1,9 +1,11 @@
 package com.baiflow.android.ui;
 
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.pdf.PdfRenderer;
+import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
@@ -209,6 +211,10 @@ public class PreviewActivity extends AppCompatActivity {
     private void renderVideo(byte[] bytes) {
         try {
             File f = writeTemp(bytes, fileName);
+            // 横屏视频（旋转元数据 90/270）自动横屏播放
+            if (isLandscapeVideo(f)) {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            }
             VideoView vv = new VideoView(this);
             MediaController mc = new MediaController(this);
             vv.setMediaController(mc);
@@ -218,6 +224,21 @@ public class PreviewActivity extends AppCompatActivity {
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         } catch (Exception e) {
             showError();
+        }
+    }
+
+    /** 通过视频旋转元数据判断是否为横屏视频（90/270 为横屏，0/180 为竖屏） */
+    private boolean isLandscapeVideo(File f) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(f.getAbsolutePath());
+            String rot = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+            return "90".equals(rot) || "270".equals(rot);
+        } catch (Exception e) {
+            // 无法读取元数据时按竖屏处理，不强制旋转
+            return false;
+        } finally {
+            try { retriever.release(); } catch (Exception ignored) { }
         }
     }
 

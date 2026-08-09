@@ -1,6 +1,7 @@
 package com.baiflow.auth.security;
 
 import com.baiflow.auth.entity.AuthSession;
+import com.baiflow.auth.service.SessionTokenService;
 import com.baiflow.user.entity.User;
 import com.baiflow.user.mapper.UserMapper;
 import jakarta.servlet.FilterChain;
