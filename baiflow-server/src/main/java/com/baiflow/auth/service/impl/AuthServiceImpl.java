@@ -5,10 +5,13 @@ import com.baiflow.auth.config.BaiflowProperties;
 import com.baiflow.auth.dto.request.LoginRequest;
 import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
+import com.baiflow.auth.dto.response.UserDeviceInfo;
 import com.baiflow.auth.entity.AuthSession;
+import com.baiflow.auth.entity.UserDevice;
 import com.baiflow.auth.mapper.AuthSessionMapper;
 import com.baiflow.auth.security.SessionTokenService;
 import com.baiflow.auth.service.AuthService;
+import com.baiflow.auth.service.UserDeviceService;
 import com.baiflow.audit.service.AuditService;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
@@ -33,6 +36,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +67,8 @@ public class AuthServiceImpl implements AuthService {
     private UserService userService;
     @Autowired
     private SessionTokenService sessionTokenService;
+    @Autowired
+    private UserDeviceService userDeviceService;
     @Autowired
     private AuthSessionMapper sessionMapper;
     @Autowired
@@ -130,6 +136,8 @@ public class AuthServiceImpl implements AuthService {
         String deviceName = resolveDeviceName(deviceType, RequestUtil.getHeader("X-Device-Name"), ua);
         SessionTokenService.CreatedSession created = sessionTokenService.create(
                 user.getId(), deviceType, deviceName, ip, ua);
+        // 登记登录过的设备（user + device_name 唯一，登出不删，保留历史）
+        userDeviceService.recordLogin(user.getId(), deviceName, deviceType);
         return new LoginResponse(created.token(), created.sessionId(), created.expiresAt(), UserInfo.from(user));
     }
 
@@ -165,6 +173,36 @@ public class AuthServiceImpl implements AuthService {
         return sessions.stream()
                 .map(s -> AuthSessionInfo.from(s, s.getId().equals(currentId)))
                 .toList();
+    }
+
+    @Override
+    public List<UserDeviceInfo> listDevices(String userId, String currentToken) {
+        AuthSession current = sessionTokenService.findByToken(currentToken);
+        String currentDevice = current != null ? current.getDeviceName() : null;
+
+        // 登录历史：登出不删，保留曾登录过的设备
+        List<UserDevice> devices = userDeviceService.list(new LambdaQueryWrapper<UserDevice>()
+                .eq(UserDevice::getUserId, userId)
+                .orderByDesc(UserDevice::getLastLoginAt));
+
+        // 在线 = 当前存在未过期会话（登出/被踢即删会话 → 离线）
+        LocalDateTime now = LocalDateTime.now();
+        List<AuthSession> active = sessionMapper.selectList(new LambdaQueryWrapper<AuthSession>()
+                .eq(AuthSession::getUserId, userId)
+                .gt(AuthSession::getExpiresAt, now));
+
+        return devices.stream().map(d -> {
+            AuthSession online = active.stream()
+                    .filter(s -> d.getDeviceName().equals(s.getDeviceName()))
+                    .max(Comparator.comparing(AuthSession::getLastUsedAt))
+                    .orElse(null);
+            boolean isOnline = online != null;
+            return new UserDeviceInfo(d.getDeviceName(), d.getDeviceType(), d.getFirstLoginAt(),
+                    d.getLastLoginAt(),
+                    isOnline ? online.getLastUsedAt() : d.getLastLoginAt(),
+                    isOnline, d.getDeviceName().equals(currentDevice),
+                    isOnline ? online.getId() : null);
+        }).toList();
     }
 
     @Override

@@ -299,3 +299,19 @@ CREATE TABLE IF NOT EXISTS `bf_download_record` (
     KEY `idx_dr_user` (`downloader_user_id`, `created_at`),
     KEY `idx_dr_share` (`share_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件下载记录表';
+
+-- -----------------------------------------------------------
+-- 用户登录设备表（登录历史 + 在线状态；登出不删，保留曾登录过的设备）
+-- -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_user_device` (
+    `id`             VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
+    `user_id`        VARCHAR(32)  NOT NULL COMMENT '归属用户 ID',
+    `device_name`    VARCHAR(128) NOT NULL COMMENT '设备名（App 机型 / Web 浏览器摘要），作为设备身份',
+    `device_type`    VARCHAR(16)  NOT NULL DEFAULT 'WEB' COMMENT '设备类型：ANDROID / WEB',
+    `first_login_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次登录时间',
+    `last_login_at`  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最近登录时间',
+    `updated_at`     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_device` (`user_id`, `device_name`),
+    KEY `idx_ud_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户登录设备表（按 user+device_name 登记，在线状态由活跃会话判定）';

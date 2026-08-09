@@ -25,7 +25,7 @@ import java.util.List;
  * <p>
  * 支持 Bearer 头与 {@code ?token=} 查询参数（后者供 {@code <img>/<video>}/SSE 等
  * 浏览器直接请求，沿旧 JWT 过滤器的双通道）。
- * 校验：记录存在 && 未过期；ANDROID 会话做滑动续期（节流 1h 写库）；role 取用户表当前值。
+ * 校验：记录存在 && 未过期；ANDROID/WEB 会话滑动续期（节流 1h 写库）；role 取用户表当前值。
  */
 @Component
 public class SessionAuthenticationFilter extends OncePerRequestFilter {
@@ -46,11 +46,10 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
                     && session.getExpiresAt() != null && session.getExpiresAt().isAfter(now)) {
                 User user = userMapper.selectById(session.getUserId());
                 if (user != null) {
-                    // ANDROID 滑动续期：距上次使用超过 1 小时则写库顺延
-                    if ("ANDROID".equals(session.getDeviceType())
-                            && session.getLastUsedAt() != null
+                    // 滑动续期：距上次续期超过 1 小时则写库顺延（ANDROID / WEB 通用）
+                    if (session.getLastUsedAt() != null
                             && Duration.between(session.getLastUsedAt(), now)
-                                    .compareTo(sessionTokenService.androidTouchInterval()) > 0) {
+                                    .compareTo(sessionTokenService.touchInterval()) > 0) {
                         sessionTokenService.touch(session);
                     }
                     List<SimpleGrantedAuthority> authorities =

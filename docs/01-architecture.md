@@ -40,12 +40,12 @@ Vue 3 Web 管理台          Android Java App
 ### SSE 事件（`com.baiflow.event`）
 - `GET /api/events`（text/event-stream）长连接推送，需登录（EventSource 用 `?token=` 查询参数鉴权）
 - `SseService` 维护"用户 → 连接"注册表，定时心跳保活并清理失效连接
-- 已实现事件：`NOTE_UPDATED`；`TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 为已定义待接入
+- SSE 事件：`NOTE_UPDATED`（笔记跨端同步刷新；曾规划的传输/下载/通知事件已移除）
 
 ## MVP 功能
 
 ### 认证与权限
-- 用户名密码登录 + **登录会话 token**（长会话，吊销驱动 + ANDROID 180 天不活跃兜底 / WEB 固定 2h，见 `docs/09-auth-sessions.md`）
+- 用户名密码登录 + **登录会话 token**（长会话，吊销驱动 + 滑动续期：ANDROID 180 天 / WEB 约 2h 不活跃兜底，见 `docs/09-auth-sessions.md`）
 - 三种角色：ADMIN、USER、GUEST
 - 访客通过分享 URL 访问，不登录管理台
 
@@ -116,7 +116,7 @@ Vue 3 Web 管理台          Android Java App
 
 ### 认证与鉴权
 - 受保护 API 必须携带会话 token：`Authorization: Bearer <token>` 或 `?token=`（后者供 `<img>/<video>`、SSE 等浏览器直接请求）
-- 服务端逐请求校验 `bf_auth_session`（记录存在/未过期），吊销即删除记录；ANDROID 会话滑动续期
+- 服务端逐请求校验 `bf_auth_session`（记录存在/未过期），吊销即删除记录；ANDROID / WEB 会话均滑动续期
 - **未认证/会话过期返回 401**（客户端清会话回登录）；已登录但无权限返回 403（保留登录态，仅提示）
 - 强制 ADMIN/USER/GUEST 角色行为（role 取用户表当前值）
 - 密码、分享 token、提取码、隐私密码、会话 token 只存 hash

@@ -87,7 +87,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 - **SCROLL_PERCENT**
   进度类型：滚动百分比（0.0~1.0）。用于文本、Markdown、笔记等长内容，跨设备续读。
 - **SSE（Server-Sent Events）**
-  服务端单向实时推送（`text/event-stream`）。`GET /api/events` 已实现（`com.baiflow.event`：`SseService` 用户连接注册表 + `EventController` + 定时心跳清理），已推送 `NOTE_UPDATED` 事件；`TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 为已定义待接入。
+  服务端单向实时推送（`text/event-stream`）。`GET /api/events` 已实现（`com.baiflow.event`：`SseService` 用户连接注册表 + `EventController` + 定时心跳清理），当前仅推送 `NOTE_UPDATED`（笔记跨端同步刷新；曾规划的传输/下载/通知事件已移除）。
 - **Server Connection Timeout（服务器连接超时）**
   Web 管理台对**网络级失败**（连不上/连接超时/断网）的处理：距上次成功联系 ≥30s 且发生一次失败即判定超时，提示后返回登录页，**保留会话 token**，登录页提供「重新连接」一键恢复。见 `docs/10-web-connection-timeout.md`。
 

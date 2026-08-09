@@ -20,8 +20,7 @@ import java.util.Base64;
  * <p>
  * 认证模型 2：登录建一条会话，每次请求按 token 哈希查会话校验；吊销即硬删会话记录（即时生效），
  * 历史由审计日志留痕（见 {@code AuthServiceImpl} 的 LOGOUT / FORCE_LOGOUT / PASSWORD_CHANGED）。
- * ANDROID 会话滑动续期（每次使用顺延到 now + androidDays，180 天不活跃自动失效）；
- * WEB 会话固定短时（webHours，不滑动）。
+ * ANDROID / WEB 会话均**滑动续期**（活跃请求顺延到 now + 对应时长，不活跃自动失效：ANDROID 180 天 / WEB webHours）。
  */
 @Service
 public class SessionTokenService {
@@ -29,8 +28,8 @@ public class SessionTokenService {
     /** 会话 token 随机长度：32 字节（256-bit） */
     private static final int TOKEN_BYTES = 32;
     private static final SecureRandom RANDOM = new SecureRandom();
-    /** ANDROID 滑动续期节流：距上次使用超过 1 小时才写库更新 */
-    private static final Duration ANDROID_TOUCH_INTERVAL = Duration.ofHours(1);
+    /** 滑动续期写库节流：距上次续期超过 1 小时才更新（ANDROID / WEB 通用） */
+    private static final Duration TOUCH_INTERVAL = Duration.ofHours(1);
 
     @Autowired
     private AuthSessionService authSessionService;
@@ -94,17 +93,17 @@ public class SessionTokenService {
         authSessionService.remove(wrapper);
     }
 
-    /** ANDROID 滑动续期：更新 last_used_at 并把 expires_at 顺延到 now + androidDays */
+    /** 滑动续期：更新 last_used_at 并把 expires_at 顺延到 now + 对应设备类型时长（ANDROID 180 天 / WEB webHours） */
     public void touch(AuthSession session) {
         LocalDateTime now = LocalDateTime.now();
         session.setLastUsedAt(now);
-        session.setExpiresAt(now.plus(Duration.ofDays(properties.getAuthSession().getAndroidDays())));
+        session.setExpiresAt(now.plus(expiryFor(session.getDeviceType())));
         authSessionService.updateById(session);
     }
 
-    /** ANDROID 滑动续期写库节流间隔 */
-    public Duration androidTouchInterval() {
-        return ANDROID_TOUCH_INTERVAL;
+    /** 滑动续期写库节流间隔 */
+    public Duration touchInterval() {
+        return TOUCH_INTERVAL;
     }
 
     private Duration expiryFor(String deviceType) {

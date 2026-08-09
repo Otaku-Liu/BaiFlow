@@ -58,8 +58,9 @@
 - `PATCH /api/auth/profile`
 - `POST /api/auth/avatar`（multipart, ≤1MB, jpg/png/gif/webp）
 - `POST /api/auth/change-password` — 改密后吊销该用户全部会话（所有设备下线）
-- `GET /api/auth/sessions` — 当前用户的登录设备列表 `{ id, deviceName, deviceType, ip, lastUsedAt, createdAt, current }`
-- `DELETE /api/auth/sessions/{id}` — 强制下线某登录设备（本人任意会话；管理员可任意用户）
+- `GET /api/auth/sessions` — 当前用户的登录会话列表 `{ id, deviceName, deviceType, ip, lastUsedAt, createdAt, current }`
+- `GET /api/auth/devices` — 当前用户的登录设备列表（**含历史与在线状态**）`{ deviceName, deviceType, firstLoginAt, lastLoginAt, lastActiveAt, online, current, activeSessionId }`
+- `DELETE /api/auth/sessions/{id}` — 强制下线某登录会话（本人任意会话；管理员可任意用户）
 
 ### 用户（管理员）
 - `GET/POST /api/users` · `PATCH /api/users/{id}` · `POST /api/users/{id}/reset-password`
@@ -132,8 +133,7 @@
 ### 传输 · 通知 · 设备 · 事件
 - `GET /api/transfers` · `GET /api/transfers/{id}`
 - `GET /api/notifications` · `PATCH /api/notifications/{id}/read`
-- `POST /api/devices/register` · `GET /api/devices` · `PATCH /api/devices/{id}`（**待实现**：推送设备注册，与登录会话表正交）
-- `GET /api/events`（SSE，需登录）：事件类型 `NOTE_UPDATED`（已实现）/ `TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED`（后四者待各模块接入）
+- `GET /api/events`（SSE，需登录）：事件类型 `NOTE_UPDATED`（笔记跨端同步刷新；曾规划的传输/下载/通知事件已移除）
 
 SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GET /api/events?token=<会话token>` 查询参数（后端 `SessionAuthenticationFilter` 支持 `?token=` fallback）。`NOTE_UPDATED` 只推送给笔记所有者。
 

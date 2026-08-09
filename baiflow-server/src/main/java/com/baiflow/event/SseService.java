@@ -1,7 +1,6 @@
 package com.baiflow.event;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -77,8 +76,7 @@ public class SseService {
         }
     }
 
-    /** 心跳：每 30 秒向所有连接发送注释行保活，并清理已失效的连接 */
-    @Scheduled(fixedRate = 30_000)
+    /** 心跳：向所有连接发送注释行保活并清理失效连接。由 {@link SseHeartbeatScheduler} 定时调用。 */
     public void heartbeat() {
         registry.forEach((userId, emitters) -> emitters.forEach(emitter -> {
             try {

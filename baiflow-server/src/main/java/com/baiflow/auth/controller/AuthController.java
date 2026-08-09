@@ -3,6 +3,7 @@ package com.baiflow.auth.controller;
 import com.baiflow.auth.dto.request.LoginRequest;
 import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
+import com.baiflow.auth.dto.response.UserDeviceInfo;
 import com.baiflow.auth.security.AuthTokens;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.common.entity.ApiResponse;
@@ -52,6 +53,15 @@ public class AuthController {
     public ApiResponse<List<AuthSessionInfo>> sessions(Authentication auth, HttpServletRequest request) {
         return ApiResponse.success(
                 authService.listSessions(auth.getPrincipal().toString(), AuthTokens.extract(request)));
+    }
+
+    /**
+     * 当前用户的登录设备列表（含历史与在线状态），供 Web 端展示「登录过的设备 + 是否在线」。
+     */
+    @GetMapping("/devices")
+    public ApiResponse<List<UserDeviceInfo>> devices(Authentication auth, HttpServletRequest request) {
+        return ApiResponse.success(
+                authService.listDevices(auth.getPrincipal().toString(), AuthTokens.extract(request)));
     }
 
     /**

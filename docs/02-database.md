@@ -51,9 +51,6 @@
 ### transfer_task — 传输任务
 `id, created_by, task_type(UPLOAD/DOWNLOAD/DEVICE_SEND), status(WAITING/RUNNING/PAUSED/FAILED/COMPLETED), progress, error_message, created_at, updated_at`
 
-### device — 客户端设备
-`id, user_id, name, device_type(ANDROID/WEB/SERVER/NAS), token_hash, last_seen_at, status, created_at, updated_at`
-
 ### notification — 通知
 `id, user_id, level(INFO/WARN/ERROR), title, content, read_status, created_at, read_at`
 
@@ -85,7 +82,12 @@ Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体�
 ### auth_session — 登录会话
 `id, user_id, device_name, device_type(ANDROID/WEB), ip, user_agent, token_hash(SHA-256), expires_at, last_used_at, created_at`
 
-登录会话（模型 2）：每次请求按 `token_hash` 精确查询校验（记录存在 && 未过期），吊销即**删除记录**（即时生效），历史由审计日志留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`）。ANDROID 会话滑动续期（180 天不活跃兜底），WEB 会话固定短时。`token_hash` 只存哈希，数据库泄露不暴露可用 token。详见 `docs/09-auth-sessions.md`。
+登录会话（模型 2）：每次请求按 `token_hash` 精确查询校验（记录存在 && 未过期），吊销即**删除记录**（即时生效），历史由审计日志留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`）。ANDROID / WEB 会话均**滑动续期**（活跃请求顺延 `expires_at`，不活跃兜底：ANDROID 180 天 / WEB 约 2h）。`token_hash` 只存哈希，数据库泄露不暴露可用 token。详见 `docs/09-auth-sessions.md`。
+
+### user_device — 用户登录设备
+`id, user_id, device_name, device_type(ANDROID/WEB), first_login_at, last_login_at, updated_at`
+
+登录设备登记（按 `user_id + device_name` 唯一）：每次登录 upsert，**登出不删，保留登录历史**。在线状态由「是否存在未过期会话（bf_auth_session）」判定，本表只存历史。
 
 > 以上 5 张表统一由可重复迁移 `db/R__V1_init.sql` 创建（**项目约定：新表一律追加进 `R__V1_init.sql`，不单独建迁移脚本**；可重复迁移文件有改动即自动重新执行，全表 `IF NOT EXISTS` 幂等），**所有表与字段均带 COMMENT 注释**，便于管理与理解。
 

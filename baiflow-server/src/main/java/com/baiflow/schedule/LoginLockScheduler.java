@@ -1,4 +1,4 @@
-package com.baiflow.auth.service;
+package com.baiflow.schedule;
 
 import com.baiflow.audit.service.AuditService;
 import com.baiflow.auth.constant.LoginLockRedisKeys;

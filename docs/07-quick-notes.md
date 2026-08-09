@@ -27,7 +27,7 @@
 
 ## 3. 关键事实与前置缺口
 
-- **SSE `/api/events`**：原为缺口（`docs/03-api.md` 规划了 `GET /api/events`，但服务端无 SseEmitter / 事件通道），**Phase 1 已补齐**（`com.baiflow.event`：`SseService` 用户连接注册表 + `EventController` + 30s 心跳清理）。`NOTE_UPDATED` 已接入；`TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 为已定义、待各模块接入。
+- **SSE `/api/events`**：原为缺口（`docs/03-api.md` 规划了 `GET /api/events`，但服务端无 SseEmitter / 事件通道），**Phase 1 已补齐**（`com.baiflow.event`：`SseService` 用户连接注册表 + `EventController` + 30s 心跳清理）。`NOTE_UPDATED` 已接入；曾规划的 `TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 从未接入，且 aria2 下载模块已移除，2026-08-09 已从 `SseEventType` 移除。
 - 数据库迁移：统一 schema 可重复迁移 `R__V1_init.sql`（项目约定新表一律追加此文件；含 `bf_playback_progress` / `bf_note` / `bf_note_progress` / `bf_note_media` / `bf_auth_session` 五张表，全部表与字段均带注释）。
 
 ## 4. 数据库

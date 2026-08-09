@@ -1,4 +1,4 @@
-package com.baiflow.share.service;
+package com.baiflow.schedule;
 
 import com.baiflow.share.entity.ShareLink;
 import com.baiflow.share.mapper.ShareLinkMapper;

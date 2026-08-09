@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 登录会话实体 — 长会话 token（只存 SHA-256 哈希）+ 设备信息。
  * <p>
  * 认证模型 2：每次请求校验本表（记录存在 && 未过期），吊销即删除记录；
- * ANDROID 会话滑动续期（180 天不活跃兜底），WEB 会话固定短时（约 2h）。
+ * ANDROID / WEB 会话均滑动续期（活跃请求顺延，不活跃兜底：ANDROID 180 天 / WEB 约 2h）。
  */
 @Data
 @TableName("bf_auth_session")

@@ -3,6 +3,7 @@ package com.baiflow.auth.service;
 import com.baiflow.auth.dto.request.LoginRequest;
 import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
+import com.baiflow.auth.dto.response.UserDeviceInfo;
 import com.baiflow.user.dto.response.UserInfo;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -79,6 +80,16 @@ public interface AuthService {
      * @return 会话列表（按最近使用倒序）
      */
     List<AuthSessionInfo> listSessions(String userId, String currentToken);
+
+    /**
+     * 当前用户的登录设备列表（含历史与在线状态）。
+     * <p>「在线」= 当前存在未过期会话（登出/被踢即删会话 → 离线）；历史设备登出不删（bf_user_device）。
+     *
+     * @param userId       当前用户 ID
+     * @param currentToken 当前请求的会话 token（用于标记 current）
+     * @return 设备列表（按最近登录倒序）
+     */
+    List<UserDeviceInfo> listDevices(String userId, String currentToken);
 
     /**
      * 强制下线某会话：本人任意会话或管理员任意用户会话。

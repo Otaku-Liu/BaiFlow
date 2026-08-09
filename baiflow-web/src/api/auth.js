@@ -35,6 +35,11 @@ export function listSessions() {
   return http.get('/auth/sessions')
 }
 
+/** 当前用户的登录设备列表（含历史 + 在线状态） */
+export function listDevices() {
+  return http.get('/auth/devices')
+}
+
 /** 强制下线指定登录设备（会话） */
 export function revokeSession(id) {
   return http.delete(`/auth/sessions/${id}`)

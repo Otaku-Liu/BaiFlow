@@ -115,19 +115,22 @@
       <!-- 登录设备管理 -->
       <div class="session-section">
         <div class="session-title">登录设备</div>
-        <div v-if="sessions.length === 0" class="session-empty">暂无登录设备</div>
-        <div v-for="s in sessions" :key="s.id" class="session-row">
+        <div v-if="devices.length === 0" class="session-empty">暂无登录设备</div>
+        <div v-for="d in devices" :key="d.deviceName" class="session-row">
           <div class="session-info">
             <div class="session-name">
-              {{ s.deviceName || (s.deviceType === 'ANDROID' ? 'Android 设备' : 'Web 浏览器') }}
-              <el-tag v-if="s.current" size="small" type="success" style="margin-left:6px">当前</el-tag>
+              {{ d.deviceName }}
+              <el-tag v-if="d.current" size="small" type="success" style="margin-left:6px">当前</el-tag>
             </div>
             <div class="session-meta">
-              {{ s.deviceType === 'ANDROID' ? 'App' : 'Web' }} · {{ s.ip || '—' }} ·
-              {{ formatDateTime(s.lastUsedAt) }}
+              {{ d.deviceType === 'ANDROID' ? 'App' : 'Web' }} · 首次登录 {{ formatDateTime(d.firstLoginAt) }} ·
+              最近活跃 {{ formatDateTime(d.lastActiveAt) }}
             </div>
           </div>
-          <el-button v-if="!s.current" link type="danger" size="small" @click="handleRevokeSession(s)">强制下线</el-button>
+          <el-tag :type="d.online ? 'success' : 'info'" size="small" style="margin-right:8px">
+            {{ d.online ? '在线' : '离线' }}
+          </el-tag>
+          <el-button v-if="d.online && !d.current" link type="danger" size="small" @click="handleRevokeDevice(d)">强制下线</el-button>
         </div>
       </div>
 
@@ -164,7 +167,7 @@ import { ElMessage } from 'element-plus'
 import { FolderOpened, Share, User, Fold, Expand, Document, ArrowDown, Memo } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
-import { updateProfile, uploadAvatar, changePassword, listSessions, revokeSession } from '../api/auth'
+import { updateProfile, uploadAvatar, changePassword, listDevices, revokeSession } from '../api/auth'
 import { formatDateTime } from '../utils/format'
 import FilesView from './FilesView.vue'
 import NotesView from './NotesView.vue'
@@ -208,7 +211,7 @@ onUnmounted(() => {
 // 个人资料弹窗
 const profileDialogVisible = ref(false)
 const profileDisplayName = ref('')
-const sessions = ref([])
+const devices = ref([])
 
 // 修改密码弹窗
 const passwordDialogVisible = ref(false)
@@ -219,7 +222,7 @@ const confirmPassword = ref('')
 watch(profileDialogVisible, (v) => {
   if (v) {
     profileDisplayName.value = authStore.user?.displayName || ''
-    loadSessions()
+    loadDevices()
   }
 })
 
@@ -236,22 +239,22 @@ function openPasswordDialog() {
   passwordDialogVisible.value = true
 }
 
-/** 加载当前用户的登录设备列表（res.data 是 ApiResponse 包装，真正列表在 res.data.data） */
-async function loadSessions() {
+/** 加载当前用户的登录设备列表（含历史 + 在线状态） */
+async function loadDevices() {
   try {
-    const res = await listSessions()
-    sessions.value = res.data?.data || []
+    const res = await listDevices()
+    devices.value = res.data?.data || []
   } catch (e) {
-    sessions.value = []
+    devices.value = []
   }
 }
 
-/** 强制下线某设备（会话） */
-async function handleRevokeSession(s) {
+/** 强制下线某在线设备 */
+async function handleRevokeDevice(d) {
   try {
-    await revokeSession(s.id)
+    await revokeSession(d.activeSessionId)
     ElMessage.success('已强制下线')
-    loadSessions()
+    loadDevices()
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '操作失败')
   }
