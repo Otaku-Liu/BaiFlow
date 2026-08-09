@@ -7,7 +7,7 @@
 | 后端 | JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8, Redis 7 |
 | Web | Vue 3, Vite, Vue Router, Pinia, Axios, Element Plus |
 | Android | Java, Retrofit, OkHttp, WorkManager, Foreground Service |
-| 部署 | Ubuntu 24, Docker Compose, Nginx, aria2 RPC |
+| 部署 | Ubuntu 24, Docker Compose, Nginx |
 
 ## 总体架构
 
@@ -19,10 +19,10 @@ Vue 3 Web 管理台          Android Java App
                   |
                   v
      Spring Boot 3 API Server
-     (认证/文件/下载/传输/通知/设备)
+     (认证/文件/传输/通知/设备)
          |          |            |
          v          v            v
-      MySQL 8    Redis 7      后台任务 (aria2 RPC)
+      MySQL 8    Redis 7      后台任务
       (元数据)  (计数/登录锁)  (扫描/同步/通知)
          |
          v
@@ -60,11 +60,13 @@ Vue 3 Web 管理台          Android Java App
 ### 分享
 - 文件/文件夹分享链接，支持过期时间、访问次数、下载次数、提取码
 - 不暴露服务器真实路径
-- 管理员或创建者可撤销
+- 管理员或创建者可撤销；创建者可「停用 / 启用」链接（DISABLED 状态，可恢复）
+- 分享提取码连续错误 5 次锁定 15 分钟（Redis，多实例共享）
 
-### 下载中心
-- 通过 aria2 RPC 创建 URL/磁力/BT 下载
-- 暂停、恢复、删除、状态和进度展示
+### 文件下载记录
+- 每次下载（文件中心直接下载 / 分享下载）写入 `bf_download_record`
+- 文件中心列表显示每文件下载次数（CLIENT + SHARE 均计入），点击查看详情（来源 / 下载人 / IP / 时间）
+- 下载通道仅两条：登录用户（owner/admin）或有效分享链接，无匿名直下端点
 
 ### 传输与通知
 - 统一上传/下载任务展示
@@ -108,7 +110,7 @@ Vue 3 Web 管理台          Android Java App
 ## 安全基线
 
 ### 网络隔离
-- MySQL、aria2 RPC 不暴露公网
+- MySQL 不暴露公网
 - Spring Boot 管理端点不暴露公网
 - 防火墙只开放必要端口
 

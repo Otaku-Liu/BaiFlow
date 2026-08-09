@@ -69,8 +69,6 @@ public class MineFragment extends Fragment {
         view.findViewById(R.id.rowProfile).setOnClickListener(v -> showProfileDialog());
         view.findViewById(R.id.rowPassword).setOnClickListener(v -> showPasswordDialog());
         view.findViewById(R.id.rowLanguage).setOnClickListener(v -> showLanguageDialog());
-        view.findViewById(R.id.rowTransfers).setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), TransferListActivity.class)));
         view.findViewById(R.id.rowServer).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), ServerConfigActivity.class)));
         view.findViewById(R.id.rowOffline).setOnClickListener(v -> handleOfflineToggle());

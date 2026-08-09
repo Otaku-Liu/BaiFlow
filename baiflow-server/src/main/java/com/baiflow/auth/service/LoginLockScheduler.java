@@ -47,7 +47,7 @@ public class LoginLockScheduler {
         for (User user : lockedUsers) {
             try {
                 // 锁键不存在即代表锁定已到期；条件更新（WHERE status=LOCKED）保证多实例并发扫描时仅首个生效
-                if (!Boolean.TRUE.equals(redisTemplate.hasKey(LoginLockRedisKeys.LOCK + user.getUsername()))) {
+                if (!redisTemplate.hasKey(LoginLockRedisKeys.LOCK + user.getUsername())) {
                     int updated = userMapper.update(null, new LambdaUpdateWrapper<User>()
                             .eq(User::getId, user.getId())
                             .eq(User::getStatus, UserStatus.LOCKED)

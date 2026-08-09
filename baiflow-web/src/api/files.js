@@ -40,6 +40,11 @@ export function downloadFile(fileId, privacyToken) {
   })
 }
 
+/** 分页查询文件的下载记录（本人文件；管理员可查任意） */
+export function getFileDownloads(fileId, page = 1, size = 20) {
+  return http.get(`/files/${fileId}/downloads`, { params: { page, size } })
+}
+
 /** 创建文件夹 */
 export function createFolder({ storageRootId, parentId, name, viewUserId }, privacyToken) {
   const headers = {}

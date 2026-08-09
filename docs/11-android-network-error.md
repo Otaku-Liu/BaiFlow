@@ -72,7 +72,7 @@ Android 端网络错误处理现状：
 
 ### 4.3 各页面改造（行为对齐）
 
-- 交互调用点（FilesFragment / NotesFragment / MineFragment / TransferListActivity / NoteEditActivity 笔记编辑器）`new Callback<X>(){}` → `new UiCallback<X>(ctx){}`，删除 onFailure 里的网络错误 Toast；onResponse 里对 `code >= 500` 的分支不再弹 server message（全局已兜底）。
+- 交互调用点（FilesFragment / NotesFragment / MineFragment / NoteEditActivity 笔记编辑器）`new Callback<X>(){}` → `new UiCallback<X>(ctx){}`，删除 onFailure 里的网络错误 Toast；onResponse 里对 `code >= 500` 的分支不再弹 server message（全局已兜底）。
 - LoginActivity / ServerConfigActivity：onFailure 改用 `NetworkFeedback.classify(t)` 的友好文案做内联提示（**不触发全局 Toast**，避免双弹）。
 - 后台 UploadService / DownloadService：不改（保持现有失败处理，不弹 UI）。
 
@@ -90,7 +90,7 @@ Android 端网络错误处理现状：
 - 新增 `network/NetworkFeedback.java`、`network/UiCallback.java`
 - `network/ApiClient.java`：OkHttp `connectTimeout` 30s → 10s
 - `ui/MainActivity.java`：ConnectivityManager 监听注册/注销
-- `ui/FilesFragment.java`、`ui/NotesFragment.java`、`ui/MineFragment.java`、`ui/TransferListActivity.java`、`ui/NoteEditActivity.java`：调用点换 `UiCallback`，删网络错误 Toast，5xx 分支去重
+- `ui/FilesFragment.java`、`ui/NotesFragment.java`、`ui/MineFragment.java`、`ui/NoteEditActivity.java`：调用点换 `UiCallback`，删网络错误 Toast，5xx 分支去重
 - `ui/LoginActivity.java`、`ui/ServerConfigActivity.java`：失败文案改 `classify()` 友好文案
 - `res/values/strings.xml` + `res/values-en/strings.xml`：新增 4 个 key
 

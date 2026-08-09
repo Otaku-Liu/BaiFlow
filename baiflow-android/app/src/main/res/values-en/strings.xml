@@ -159,7 +159,6 @@
     <string name="mine_profile">Edit Profile</string>
     <string name="mine_password">Change Password</string>
     <string name="mine_language">Language</string>
-    <string name="mine_transfers">Transfers</string>
     <string name="mine_logout">Log Out</string>
     <string name="mine_not_logged_in">Not logged in</string>
     <string name="mine_display_name_hint">Display name</string>
@@ -176,14 +175,6 @@
     <string name="mine_language_english">English</string>
 
     <!-- ==================== Transfer ==================== -->
-    <string name="transfer_title">Download Tasks</string>
-    <string name="transfer_empty">No download tasks</string>
-    <string name="transfer_error">Error: %1$s</string>
-    <string name="transfer_status_waiting">Waiting</string>
-    <string name="transfer_status_running">Downloading</string>
-    <string name="transfer_status_paused">Paused</string>
-    <string name="transfer_status_completed">Completed</string>
-    <string name="transfer_status_failed">Failed</string>
     <string name="transfer_upload_preparing">Preparing upload...</string>
     <string name="transfer_upload_uploading">Uploading...</string>
     <string name="transfer_upload_completed">Upload complete</string>

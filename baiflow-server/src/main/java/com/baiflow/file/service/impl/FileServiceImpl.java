@@ -3,6 +3,8 @@ package com.baiflow.file.service.impl;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.common.util.I18nUtil;
+import com.baiflow.downloadrecord.dto.response.DownloadRecordInfo;
+import com.baiflow.downloadrecord.service.DownloadRecordService;
 import com.baiflow.file.dto.request.CreateFolderRequest;
 import com.baiflow.file.dto.request.MoveRequest;
 import com.baiflow.file.dto.request.RenameRequest;
@@ -83,6 +85,8 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
     @Autowired
     private PlaybackProgressService playbackProgressService;
     @Autowired
+    private DownloadRecordService downloadRecordService;
+    @Autowired
     private FileConvertService convertService;
 
     @Override
@@ -121,8 +125,13 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         int total = items.size();
         int from = Math.min((page - 1) * size, total);
         int to = Math.min(from + size, total);
-        List<FileItemInfo> recs = (from < total ? items.subList(from, to) : List.<FileItem>of())
-                .stream().map(FileItemInfo::from).toList();
+        List<FileItem> subList = from < total ? items.subList(from, to) : List.of();
+        // 批量统计本页文件的下载次数（CLIENT + SHARE 均计入）
+        Map<String, Long> counts = downloadRecordService.countByFileIds(
+                subList.stream().map(FileItem::getId).toList());
+        List<FileItemInfo> recs = subList.stream()
+                .map(f -> FileItemInfo.from(f, counts.getOrDefault(f.getId(), 0L).intValue()))
+                .toList();
         IPage<FileItemInfo> r = new Page<>(page, size, total);
         r.setRecords(recs);
         return r;
@@ -215,6 +224,15 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
             throw new BusinessException(ErrorCode.NOT_FOUND, "磁盘文件不存在");
         }
         return new FileSystemResource(fp);
+    }
+
+    @Override
+    public IPage<DownloadRecordInfo> listFileDownloads(String fileId, String userId, boolean isAdmin,
+                                                       int page, int size) {
+        FileItem f = getById(fileId);
+        if (f == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "文件不存在"); }
+        checkOwnership(f, userId, isAdmin);
+        return downloadRecordService.pageByFileId(fileId, page, size);
     }
 
     @Override

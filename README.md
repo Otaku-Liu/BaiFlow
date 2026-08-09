@@ -74,7 +74,7 @@ docker compose up -d
 | Phase 2: 认证、用户与权限 | ✅ | 会话 token 登录（吊销驱动）、ADMIN/USER/GUEST 角色模型、接口鉴权、登录设备管理 |
 | Phase 3: 文件根据地 MVP | ✅ | Storage Root、文件浏览/上传/下载/移动/删除 |
 | Phase 3.5: 隐私文件夹 | ✅ | 文件夹隐私密码、访问验证、短期会话 |
-| Phase 4: 下载中心 MVP | ✅ | aria2 RPC 接入、下载任务 CRUD、状态同步 |
+| Phase 4: 下载中心 MVP | ~~已移除~~ | aria2 URL 下载功能已按需求下线（2026-08-09），改为文件下载记录 + 次数统计 |
 | Phase 5: 传输中心与通知 | ✅ | 统一任务中心、进度展示、通知中心 |
 | Phase 6: Android Java MVP | ✅ | 登录、文件列表、上传/下载、任务状态、前台通知 |
 | Phase 7: NAS 接入 | ✅ | NAS 挂载目录作为 Storage Root |

@@ -1,6 +1,9 @@
 package com.baiflow.file.controller;
 
 import com.baiflow.common.entity.ApiResponse;
+import com.baiflow.downloadrecord.dto.response.DownloadRecordInfo;
+import com.baiflow.downloadrecord.enums.DownloadSource;
+import com.baiflow.downloadrecord.service.DownloadRecordService;
 import com.baiflow.file.dto.request.CreateFolderRequest;
 import com.baiflow.file.dto.request.MoveRequest;
 import com.baiflow.file.dto.request.RenameRequest;
@@ -9,6 +12,7 @@ import com.baiflow.file.dto.request.VerifyPrivacyRequest;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.file.service.FileService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -36,6 +40,8 @@ public class FileController {
 
     @Autowired
     private FileService fileService;
+    @Autowired
+    private DownloadRecordService downloadRecordService;
 
     /**
      * 列出指定存储根目录或文件夹下的子文件/子目录（目录优先排序）。
@@ -82,15 +88,31 @@ public class FileController {
     public ResponseEntity<Resource> download(@PathVariable String fileId,
                                               @RequestHeader(value = "X-Privacy-Access-Token",
                                                       required = false) String privacyAccessToken,
-                                              Authentication auth) {
+                                              Authentication auth, HttpServletRequest request) {
         Resource r = fileService.downloadFile(fileId, auth.getPrincipal().toString(),
                 isAdmin(auth), privacyAccessToken);
         String fn = r.getFilename() != null ? r.getFilename() : "download";
+        // 记录一次登录用户直接下载（异步写入），供文件中心下载次数统计与审计
+        downloadRecordService.recordDownload(fileId, fn, auth.getPrincipal().toString(),
+                DownloadSource.CLIENT, null,
+                request.getRemoteAddr(), request.getHeader("User-Agent"));
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.attachment().filename(fn, StandardCharsets.UTF_8).build().toString())
                 .body(r);
+    }
+
+    /**
+     * 分页查询某文件的下载记录（本人文件；管理员可查任意）— 供文件中心「下载详情」。
+     */
+    @GetMapping("/{id}/downloads")
+    public ApiResponse<IPage<DownloadRecordInfo>> listDownloads(@PathVariable String id,
+                                                                 @RequestParam(defaultValue = "1") int page,
+                                                                 @RequestParam(defaultValue = "20") int size,
+                                                                 Authentication auth) {
+        return ApiResponse.success(fileService.listFileDownloads(id, auth.getPrincipal().toString(),
+                isAdmin(auth), page, size));
     }
 
     /**

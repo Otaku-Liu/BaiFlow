@@ -108,7 +108,7 @@
   - **离线优先（实现偏差，简化 ADR §7 的 Provider 抽象）**：Room 作为笔记唯一数据源（分区 = 服务器地址 或 LOCAL），NotesFragment / NoteEditActivity 直接读写 Room；`SyncService`（`data/`）负责 outbox 推 + 增量拉 + 冲突标记 + 媒体上传/缓存。媒体离线新建用 `local://` 引用（`data/MediaFiles`），同步时上传并改写为服务端 URL。
   - 入口流改造：新增 `GuideActivity` 引导页；`MainActivity` 按三态分发（本地/在线/离线 → 主界面；服务器已设未登录未离线 → 登录页）。
   - `ServerConfigActivity`（换服务器清旧分区）/ `LoginActivity`（「使用离线模式」入口 + 本地笔记上传询问 + 同步调度）/ `MineFragment`（模式指示、离线开关、立即同步、重连、两级登出）。
-  - `FilesFragment` / `TransferListActivity`：本地/离线模式显示禁用占位。
+  - `FilesFragment`：本地/离线模式显示禁用占位。
   - WorkManager `SyncWorker`（`sync/`）：在线模式周期 + 网络约束；离线/登出取消。
 - **后端**（增量拉取所需）：
   - `GET /api/notes` 增 `updatedAfter` 参数（配合 `updatedAt` 索引），并返回删除标记（或新增独立 sync 端点）。

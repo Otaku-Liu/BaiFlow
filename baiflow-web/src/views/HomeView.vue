@@ -47,10 +47,6 @@
               <el-icon><Memo /></el-icon>
               <span>{{ t('menu.notes') }}</span>
             </el-menu-item>
-            <el-menu-item index="downloads">
-              <el-icon><Download /></el-icon>
-              <span>{{ t('menu.downloads') }}</span>
-            </el-menu-item>
             <el-menu-item index="shares">
               <el-icon><Share /></el-icon>
               <span>{{ t('menu.shares') }}</span>
@@ -75,7 +71,6 @@
         <el-main class="app-main">
           <transition name="view-fade" mode="out-in">
             <FilesView v-if="activeMenu === 'files'" key="files" />
-            <DownloadsView v-else-if="activeMenu === 'downloads'" key="downloads" />
             <NotesView v-else-if="activeMenu === 'notes'" key="notes" />
             <SharesView v-else-if="activeMenu === 'shares'" key="shares" />
             <UsersView v-else-if="activeMenu === 'users'" key="users" />
@@ -166,13 +161,12 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { FolderOpened, Download, Share, User, Fold, Expand, Document, ArrowDown, Memo } from '@element-plus/icons-vue'
+import { FolderOpened, Share, User, Fold, Expand, Document, ArrowDown, Memo } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { updateProfile, uploadAvatar, changePassword, listSessions, revokeSession } from '../api/auth'
 import { formatDateTime } from '../utils/format'
 import FilesView from './FilesView.vue'
-import DownloadsView from './DownloadsView.vue'
 import NotesView from './NotesView.vue'
 import SharesView from './SharesView.vue'
 import UsersView from './UsersView.vue'

@@ -240,17 +240,6 @@ public class ApiClient {
         @GET("storage-roots/active")
         Call<ApiResponse<List<StorageRoot>>> listStorageRoots();
 
-        // --- 下载任务 ---
-        @POST("downloads")
-        Call<ApiResponse<DownloadTask>> createDownload(@Body Map<String, String> body);
-
-        @GET("downloads")
-        Call<ApiResponse<PagedResult<DownloadTask>>> listDownloads(
-                @Query("status") String status,
-                @Query("page") int page,
-                @Query("size") int size
-        );
-
         // --- 随手记笔记 ---
         @GET("notes")
         Call<ApiResponse<PagedResult<NoteSummary>>> listNotes(
@@ -391,18 +380,6 @@ public class ApiClient {
         return getService().listStorageRoots();
     }
 
-    public Call<ApiResponse<DownloadTask>> createDownload(String sourceUrl, String targetStorageRootId,
-                                                            String targetRelativePath) {
-        Map<String, String> body = new java.util.HashMap<>();
-        body.put("sourceUrl", sourceUrl);
-        body.put("targetStorageRootId", targetStorageRootId);
-        if (targetRelativePath != null) { body.put("targetRelativePath", targetRelativePath); }
-        return getService().createDownload(body);
-    }
-
-    public Call<ApiResponse<PagedResult<DownloadTask>>> listDownloads(String status, int page, int size) {
-        return getService().listDownloads(status, page, size);
-    }
 
     // ==================== 随手记笔记 ====================
 

@@ -107,6 +107,9 @@ BaiFlow 涉及的关键术语速查。按字母序。
 - **WorkManager**
   Android 后台任务调度（本项目传输功能已用）。随手记离线同步用它实现"恢复联网 / 周期"触发同步。
 
+- **文件下载记录（Download Record）**
+  每次下载（文件中心直接下载 / 分享下载）写入 `bf_download_record`，供文件中心下载次数统计与 ADMIN 审计。直接下载记录下载人（CLIENT）；分享下载下载人为空、关联分享 ID（SHARE）。下载通道仅两条：登录用户（owner/admin）或有效分享链接，无匿名直下。见 `docs/13-download-records.md`。
+
 ## 随手记相关流程速览
 
 - **内容同步**：编辑保存 → 服务端 `updated_at=now` → SSE 推 `NOTE_UPDATED` → 其他端刷新

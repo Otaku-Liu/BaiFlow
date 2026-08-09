@@ -83,7 +83,4 @@ public final class ErrorCode {
 
     /** 存储根目录不可用 */
     public static final int STORAGE_ROOT_OFFLINE = 50002;
-
-    /** aria2 或下载引擎错误 */
-    public static final int DOWNLOAD_ENGINE_ERROR = 50003;
 }

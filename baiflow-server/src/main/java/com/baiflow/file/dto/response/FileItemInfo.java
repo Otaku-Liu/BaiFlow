@@ -10,11 +10,17 @@ import java.time.LocalDateTime;
 public record FileItemInfo(String id, String storageRootId, String parentId, String ownerUserId,
                            String name, String relativePath, ItemType itemType, Long sizeBytes,
                            String mimeType, String hashSha256, PrivacyMode privacyMode,
-                           FileItemStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
+                           FileItemStatus status, LocalDateTime createdAt, LocalDateTime updatedAt,
+                           int downloadCount) {
     public static FileItemInfo from(FileItem f) {
+        return from(f, 0);
+    }
+
+    /** 附下载次数构建（文件列表批量统计时使用） */
+    public static FileItemInfo from(FileItem f, int downloadCount) {
         return new FileItemInfo(f.getId(), f.getStorageRootId(), f.getParentId(), f.getOwnerUserId(),
                 f.getName(), f.getRelativePath(), f.getItemType(), f.getSizeBytes(),
                 f.getMimeType(), f.getHashSha256(), f.getPrivacyMode(), f.getStatus(),
-                f.getCreatedAt(), f.getUpdatedAt());
+                f.getCreatedAt(), f.getUpdatedAt(), downloadCount);
     }
 }

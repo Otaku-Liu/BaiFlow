@@ -12,7 +12,7 @@ BaiFlow is a personal server based download and file collaboration center. It pr
 - Backend: JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8, Redis 7.
 - Web: Vue 3, Vite, Vue Router, Pinia, Axios.
 - Android: Java, Retrofit, OkHttp, WorkManager, Foreground Service.
-- Deployment: Ubuntu 24, Docker Compose, Nginx, aria2 RPC.
+- Deployment: Ubuntu 24, Docker Compose, Nginx.
 
 ## Development Rules
 - Keep every phase small, runnable, and reversible.

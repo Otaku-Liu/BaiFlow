@@ -13,7 +13,7 @@ BaiFlow 运行在个人服务器上，以本地磁盘为文件根据地，围绕
 | `baiflow-server` | JDK 17, Spring Boot 3.x, MyBatis Plus, MySQL 8 | REST API 服务端 |
 | `baiflow-web` | Vue 3, Vite, Element Plus, Pinia, Axios | Web 管理台 |
 | `baiflow-android` | Java, Retrofit, OkHttp, WorkManager | Android 客户端 |
-| `deploy` | Docker Compose, Nginx, aria2 | 部署配置 |
+| `deploy` | Docker Compose, Nginx | 部署配置 |
 
 ## 快速开始
 

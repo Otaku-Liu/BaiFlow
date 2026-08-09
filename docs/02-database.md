@@ -36,13 +36,17 @@
 `id, user_id, file_item_id, access_token_hash, expires_at, created_at`
 
 ### share_link — 分享链接
-`id, target_file_item_id, created_by, token_hash, extraction_code_hash, share_type(FILE/FOLDER), access_mode(VIEW/DOWNLOAD), expires_at, max_views, view_count, max_downloads, download_count, status(ACTIVE/EXPIRED/REVOKED), created_at, updated_at`
+`id, target_file_item_id, created_by, token_hash, extraction_code_hash, share_type(FILE/FOLDER), access_mode(VIEW/DOWNLOAD), expires_at, max_views, view_count, max_downloads, download_count, status(ACTIVE/DISABLED/EXPIRED/REVOKED), created_at, updated_at`
+
+> `DISABLED`（创建者停用，可恢复）也拒绝访问；提取码连续错误 5 次锁定 15 分钟（Redis）。
 
 ### share_access_log — 分享访问日志
 `id, share_link_id, action(VIEW/DOWNLOAD/VERIFY_CODE/FAILED), ip_address, user_agent, success, failure_reason, created_at`
 
-### download_task — 下载任务
-`id, created_by, source_url, aria2_gid, target_storage_root_id, target_relative_path, status(WAITING/RUNNING/PAUSED/FAILED/COMPLETED/DELETED), progress, speed_bytes_per_second, error_message, created_at, updated_at, completed_at`
+### download_record — 文件下载记录
+`id, file_id, file_name, downloader_user_id, source(CLIENT/SHARE), share_id, ip_address, user_agent, created_at`
+
+> 每次下载一条（登录直接下载 CLIENT 记录下载人；分享下载 SHARE 下载人为空关联分享 ID），文件下载次数 = 按 `file_id` 聚合。
 
 ### transfer_task — 传输任务
 `id, created_by, task_type(UPLOAD/DOWNLOAD/DEVICE_SEND), status(WAITING/RUNNING/PAUSED/FAILED/COMPLETED), progress, error_message, created_at, updated_at`
@@ -92,7 +96,6 @@ Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体�
 - `file_item(storage_root_id, relative_path)` UNIQUE
 - `share_link(token_hash)` UNIQUE
 - `share_link(created_by, status, created_at)`
-- `download_task(created_by, status, created_at)`
 - `notification(user_id, read_status, created_at)`
 
 ## 一致性原则

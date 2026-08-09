@@ -79,18 +79,9 @@ public class SessionTokenService {
                 .last("LIMIT 1"));
     }
 
-    /** 吊销指定会话（登出 / 强制下线）— 硬删会话记录；审计留痕见 {@code AuthServiceImpl} */
-    public void revoke(String sessionId) {
-        authSessionService.removeById(sessionId);
-    }
-
-    /** 吊销某用户全部会话（重置密码时调用，所有设备强制下线重新登录）— 硬删 */
-    public void revokeAll(String userId) {
-        revokeAllExcept(userId, null);
-    }
-
     /**
      * 吊销某用户全部会话，保留指定会话 — 硬删记录。
+     * <p>单个会话的吊销（登出/强制下线）由调用方直接删除记录，审计留痕见 {@code AuthServiceImpl}。
      *
      * @param keepSessionId 保留的会话 ID（可空 = 全部吊销）
      */

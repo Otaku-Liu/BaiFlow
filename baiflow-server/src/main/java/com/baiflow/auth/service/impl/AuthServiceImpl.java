@@ -146,7 +146,7 @@ public class AuthServiceImpl implements AuthService {
     public void logout(String token) {
         AuthSession session = sessionTokenService.findByToken(token);
         if (session != null) {
-            sessionTokenService.revoke(session.getId());
+            sessionMapper.deleteById(session.getId());
             auditService.log(session.getUserId(), "LOGOUT", "SESSION", session.getId(),
                     RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(), "登出");
             log.info("会话已登出: userId={}, sessionId={}", session.getUserId(), session.getId());
@@ -176,7 +176,7 @@ public class AuthServiceImpl implements AuthService {
         if (!isAdmin && !userId.equals(target.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权下线此设备");
         }
-        sessionTokenService.revoke(sessionId);
+        sessionMapper.deleteById(sessionId);
         auditService.log(userId, "FORCE_LOGOUT", "SESSION", sessionId,
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "强制下线设备：" + target.getDeviceName() + "（目标用户 " + target.getUserId() + "）");
@@ -290,7 +290,7 @@ public class AuthServiceImpl implements AuthService {
         userMapper.updateById(user);
 
         // 重置密码后吊销该用户全部登录会话（所有设备强制下线重新登录，含当前设备）
-        sessionTokenService.revokeAll(userId);
+        sessionTokenService.revokeAllExcept(userId, null);
         auditService.log(userId, "PASSWORD_CHANGED", "USER", userId,
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "修改密码，吊销全部登录会话");
@@ -303,7 +303,7 @@ public class AuthServiceImpl implements AuthService {
      */
     private boolean isLocked(String username) {
         try {
-            return Boolean.TRUE.equals(redisTemplate.hasKey(LoginLockRedisKeys.LOCK + username));
+            return redisTemplate.hasKey(LoginLockRedisKeys.LOCK + username);
         } catch (DataAccessException e) {
             log.warn("Redis 不可用，跳过登录锁定检查: {}", e.getMessage());
             return false;

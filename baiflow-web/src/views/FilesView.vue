@@ -71,6 +71,14 @@
 <el-table-column :label="t('files.uploadTime')">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
+      <el-table-column :label="t('files.downloadCount')" width="90" align="right">
+        <template #default="{ row }">
+          <el-button v-if="row.itemType === 'FILE'" link type="primary" size="small" @click="showDownloadDetails(row)">
+            {{ row.downloadCount ?? 0 }}
+          </el-button>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column :label="t('common.actions')" width="300" fixed="right">
         <template #default="{ row }">
           <div class="action-btns">
@@ -101,6 +109,35 @@
 
     <!-- 空状态 -->
     <el-empty v-if="!loading && rootId && fileStore.items.length === 0" :description="t('files.emptyDirectory')" />
+
+    <!-- 下载详情弹窗 -->
+    <el-dialog v-model="downloadDetailsVisible" :title="t('files.downloadDetails')" width="640px">
+      <div class="download-detail-header">
+        <span class="download-detail-name">{{ downloadDetailsFileName }}</span>
+        <span class="download-detail-count">{{ t('files.downloadCount') }}：{{ downloadDetailsTotal }}</span>
+      </div>
+      <el-table :data="downloadRecords" v-loading="downloadDetailsLoading" size="small" max-height="360">
+        <el-table-column :label="t('files.downloadTime')" min-width="150">
+          <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('files.downloadSource')" width="110">
+          <template #default="{ row }">
+            <el-tag :type="row.source === 'CLIENT' ? 'primary' : 'warning'" size="small">
+              {{ row.source === 'CLIENT' ? t('files.sourceClient') : t('files.sourceShare') }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('files.downloader')" min-width="130">
+          <template #default="{ row }">
+            {{ row.source === 'CLIENT' ? (row.downloaderUsername || '-') : (t('files.sourceShare') + (row.shareId ? ' · ' + row.shareId : '')) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="ipAddress" :label="t('common.ipAddress')" min-width="120" />
+      </el-table>
+      <template #footer>
+        <el-button @click="downloadDetailsVisible = false">{{ t('common.close') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 上传对话框 -->
     <el-dialog v-model="showUploadDialog" :title="t('files.uploadTitle')" width="450px">
@@ -167,7 +204,7 @@ import { useAuthStore } from '../stores/auth'
 import { useFileStore } from '../stores/file'
 import {
   listFiles, uploadFile, downloadFile, createFolder, renameFile, deleteFile,
-  setPrivacy, removePrivacy, verifyPrivacy, listStorageRoots
+  setPrivacy, removePrivacy, verifyPrivacy, listStorageRoots, getFileDownloads
 } from '../api/files'
 import { listUsers } from '../api/users'
 import { formatDateTime, formatSize } from '../utils/format'
@@ -395,6 +432,30 @@ async function doDownload(row) {
     })
   } catch (e) {
     ElMessage.error(e.response?.data?.message || e.message || t('files.operationFailed'))
+  }
+}
+
+// 下载详情弹窗
+const downloadDetailsVisible = ref(false)
+const downloadDetailsLoading = ref(false)
+const downloadDetailsFileName = ref('')
+const downloadDetailsTotal = ref(0)
+const downloadRecords = ref([])
+
+/** 查看文件的下载记录（CLIENT + SHARE 来源、下载人、时间） */
+async function showDownloadDetails(row) {
+  downloadDetailsFileName.value = row.name
+  downloadDetailsTotal.value = row.downloadCount ?? 0
+  downloadDetailsVisible.value = true
+  downloadDetailsLoading.value = true
+  try {
+    const res = await getFileDownloads(row.id, 1, 20)
+    downloadRecords.value = res.data.data?.records || []
+    downloadDetailsTotal.value = res.data.data?.total ?? downloadDetailsTotal.value
+  } catch (e) {
+    ElMessage.error(t('files.downloadDetailsLoadFailed'))
+  } finally {
+    downloadDetailsLoading.value = false
   }
 }
 

@@ -7,6 +7,7 @@
       <el-select v-model="filterStatus" clearable @change="loadShares" :placeholder="t('shares.statusFilter')" style="width:140px">
         <el-option :label="t('shares.status.all')" value="" />
         <el-option :label="t('shares.status.active')" value="ACTIVE" />
+        <el-option :label="t('shares.status.disabled')" value="DISABLED" />
         <el-option :label="t('shares.status.expired')" value="EXPIRED" />
         <el-option :label="t('shares.status.revoked')" value="REVOKED" />
       </el-select>
@@ -38,8 +39,10 @@
       <el-table-column :label="t('common.createdAt')" width="160">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column :label="t('common.actions')" width="180" fixed="right">
+      <el-table-column :label="t('common.actions')" width="200" fixed="right">
         <template #default="{ row }">
+          <el-button v-if="row.status === 'ACTIVE'" link size="small" @click="doToggleStatus(row, 'DISABLED')">{{ t('shares.disable') }}</el-button>
+          <el-button v-if="row.status === 'DISABLED'" type="success" link size="small" @click="doToggleStatus(row, 'ACTIVE')">{{ t('shares.enable') }}</el-button>
           <el-button v-if="row.status === 'ACTIVE'" type="danger" link size="small" @click="doRevoke(row)">{{ t('common.revoke') }}</el-button>
           <el-button v-if="authStore.isAdmin" link size="small" @click="showAnalytics(row)">{{ t('common.analyze') }}</el-button>
         </template>
@@ -122,7 +125,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Share } from '@element-plus/icons-vue'
-import { createShare, listShares, revokeShare, buildShareUrl, getShareAnalytics } from '../api/shares'
+import { createShare, listShares, updateShare, revokeShare, buildShareUrl, getShareAnalytics } from '../api/shares'
 import { useAuthStore } from '../stores/auth'
 import { formatDateTime } from '../utils/format'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
@@ -205,8 +208,26 @@ async function showAnalytics(row) {
   }
 }
 
-function statusType(s) { return {ACTIVE:'success',EXPIRED:'info',REVOKED:'danger'}[s]||'info' }
-function statusLabel(s) { return {ACTIVE:t('shares.status.active'),EXPIRED:t('shares.status.expired'),REVOKED:t('shares.status.revoked')}[s]||s }
+function statusType(s) { return {ACTIVE:'success',DISABLED:'info',EXPIRED:'info',REVOKED:'danger'}[s]||'info' }
+function statusLabel(s) { return {ACTIVE:t('shares.status.active'),DISABLED:t('shares.status.disabled'),EXPIRED:t('shares.status.expired'),REVOKED:t('shares.status.revoked')}[s]||s }
+
+/** 停用 / 启用分享链接（仅 ACTIVE ↔ DISABLED；REVOKED 不可恢复） */
+async function doToggleStatus(row, status) {
+  const disabling = status === 'DISABLED'
+  try {
+    await confirm({
+      title: t(disabling ? 'shares.disableConfirmTitle' : 'shares.enableConfirmTitle'),
+      message: t(disabling ? 'shares.disableConfirmMsg' : 'shares.enableConfirmMsg'),
+      confirmText: t(disabling ? 'shares.disable' : 'shares.enable'),
+      type: disabling ? 'warning' : 'success'
+    })
+    await updateShare(row.id, { status })
+    ElMessage.success(t(disabling ? 'shares.disabled' : 'shares.enabled'))
+    loadShares()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('shares.toggleFailed'))
+  }
+}
 </script>
 
 <style scoped>

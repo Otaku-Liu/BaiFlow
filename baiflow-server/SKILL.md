@@ -1,6 +1,6 @@
 ---
 name: baiflow-server
-description: BaiFlow Spring Boot 后端：API、认证、MyBatis Plus、MySQL、文件操作、下载任务、传输、通知、aria2
+description: BaiFlow Spring Boot 后端：API、认证、MyBatis Plus、MySQL、文件操作、传输、通知
 ---
 
 # BaiFlow Server

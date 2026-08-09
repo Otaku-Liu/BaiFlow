@@ -2,6 +2,8 @@ package com.baiflow.share.service.impl;
 
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
+import com.baiflow.downloadrecord.enums.DownloadSource;
+import com.baiflow.downloadrecord.service.DownloadRecordService;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.file.entity.FileItem;
 import com.baiflow.file.service.FileService;
@@ -30,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -40,14 +43,26 @@ import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> implements ShareService {
     private static final String REDIS_SHARE_VIEW_KEY = "share:view:";
 
+    /** 提取码最大错误次数 */
+    private static final int MAX_CODE_FAILURES = 5;
+    /** 提取码锁定时长（分钟），同时作为失败计数滑动窗口 */
+    private static final int CODE_LOCK_MINUTES = 15;
+    /** Redis 键前缀：提取码失败次数 */
+    private static final String REDIS_CODE_FAIL_KEY = "share:code:fail:";
+    /** Redis 键前缀：提取码锁定标记 */
+    private static final String REDIS_CODE_LOCK_KEY = "share:code:lock:";
+
     @Autowired
     private ShareAccessLogMapper logMapper;
+    @Autowired
+    private DownloadRecordService downloadRecordService;
     @Autowired
     private FileService fileService;
     @Autowired
@@ -182,10 +197,18 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         if (sl.getExtractionCodeHash() == null || sl.getExtractionCodeHash().isEmpty()) {
             return Map.of("valid", true, "message", "无需提取码");
         }
+        // 提取码错误次数过多锁定检查（Redis 计数，多实例共享）
+        if (isCodeLocked(sl.getId())) {
+            recordLog(sl, "VERIFY_CODE", request, false, "提取码锁定");
+            throw new BusinessException(ErrorCode.EXTRACTION_CODE_INVALID,
+                    "提取码错误次数过多，请" + CODE_LOCK_MINUTES + "分钟后再试");
+        }
         if (!passwordEncoder.matches(code, sl.getExtractionCodeHash())) {
+            recordCodeFailure(sl.getId());
             recordLog(sl, "VERIFY_CODE", request, false, "提取码错误");
             throw new BusinessException(ErrorCode.EXTRACTION_CODE_INVALID, "提取码错误");
         }
+        clearCodeFailures(sl.getId());
         recordLog(sl, "VERIFY_CODE", request, true, "");
         incrementView(sl);
         return Map.of("valid", true, "message", "提取码验证成功");
@@ -272,6 +295,10 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         sl.setDownloadCount(sl.getDownloadCount() + 1);
         updateById(sl);
         recordLog(sl, "DOWNLOAD", request, true, "");
+        // 记录一次分享下载（匿名，关联分享 ID），供文件中心下载次数统计与审计
+        downloadRecordService.recordDownload(file.getId(), file.getName(), null,
+                DownloadSource.SHARE, sl.getId(),
+                request.getRemoteAddr(), request.getHeader("User-Agent"));
         return new FileSystemResource(fp);
     }
 
@@ -326,5 +353,40 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         logEntry.setSuccess(success);
         logEntry.setFailureReason(reason);
         logMapper.insert(logEntry);
+    }
+
+    /** 提取码是否已被锁定（Redis 不可用时 fail-open，不阻断验证） */
+    private boolean isCodeLocked(String shareId) {
+        try {
+            return redisTemplate.hasKey(REDIS_CODE_LOCK_KEY + shareId);
+        } catch (DataAccessException e) {
+            log.warn("Redis 不可用，跳过提取码锁定检查: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /** 记录提取码失败（滑动窗口，错误达阈值则锁定 CODE_LOCK_MINUTES，到期自动解锁） */
+    private void recordCodeFailure(String shareId) {
+        try {
+            String failKey = REDIS_CODE_FAIL_KEY + shareId;
+            Long count = redisTemplate.opsForValue().increment(failKey);
+            redisTemplate.expire(failKey, CODE_LOCK_MINUTES, TimeUnit.MINUTES);
+            if (count != null && count >= MAX_CODE_FAILURES) {
+                redisTemplate.opsForValue().set(
+                        REDIS_CODE_LOCK_KEY + shareId, "1", CODE_LOCK_MINUTES, TimeUnit.MINUTES);
+            }
+        } catch (DataAccessException e) {
+            log.warn("Redis 不可用，跳过提取码失败计数: {}", e.getMessage());
+        }
+    }
+
+    /** 提取码验证成功后清除失败记录 */
+    private void clearCodeFailures(String shareId) {
+        try {
+            redisTemplate.delete(REDIS_CODE_FAIL_KEY + shareId);
+            redisTemplate.delete(REDIS_CODE_LOCK_KEY + shareId);
+        } catch (DataAccessException e) {
+            log.warn("Redis 不可用，跳过清除提取码失败记录: {}", e.getMessage());
+        }
     }
 }

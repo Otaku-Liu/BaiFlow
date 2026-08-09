@@ -5,7 +5,7 @@
 -- ============================================================
 
 -- -----------------------------------------------------------
--- 1. 系统用户表
+-- 系统用户表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_user` (
     `id`            VARCHAR(32)  NOT NULL COMMENT '用户主键，UUID',
@@ -31,7 +31,7 @@ SELECT REPLACE(UUID(), '-', ''), 'admin',
 WHERE NOT EXISTS (SELECT 1 FROM `bf_user` WHERE `username` = 'admin');
 
 -- -----------------------------------------------------------
--- 2. 存储根目录表
+-- 存储根目录表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_storage_root` (
     `id`         VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS `bf_storage_root` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='存储根目录表（定义文件操作的安全边界）';
 
 -- -----------------------------------------------------------
--- 3. 文件项表（文件和目录元数据）
+-- 文件项表（文件和目录元数据）
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_file_item` (
     `id`                    VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `bf_file_item` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件项表（存储文件和目录的元数据，文件本体落磁盘）';
 
 -- -----------------------------------------------------------
--- 4. 用户存储权限表
+-- 用户存储权限表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_user_storage_permission` (
     `id`              VARCHAR(32) NOT NULL COMMENT '主键，UUID',
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS `bf_user_storage_permission` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户存储权限表（定义用户对存储根目录或文件/文件夹的访问级别）';
 
 -- -----------------------------------------------------------
--- 5. 隐私文件夹访问会话表
+-- 隐私文件夹访问会话表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_private_folder_access` (
     `id`                VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS `bf_private_folder_access` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='隐私文件夹访问会话表（密码验证通过后的短期会话）';
 
 -- -----------------------------------------------------------
--- 6. 传输任务表
+-- 传输任务表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_transfer_task` (
     `id`            VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `bf_transfer_task` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='传输任务表（上传、下载、设备流转）';
 
 -- -----------------------------------------------------------
--- 7. 用户通知表
+-- 用户通知表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_notification` (
     `id`          VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
@@ -139,35 +139,7 @@ CREATE TABLE IF NOT EXISTS `bf_notification` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户通知表';
 
 -- -----------------------------------------------------------
--- 8. 下载任务表（aria2 下载管理）
--- -----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `bf_download_task` (
-    `id`                     VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
-    `created_by`             VARCHAR(32)   NOT NULL COMMENT '创建者用户 ID',
-    `owner_username`         VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '创建者用户名快照（用户删除后保留）',
-    `owner_display_name`     VARCHAR(128)  NOT NULL DEFAULT '' COMMENT '创建者展示名快照（用户删除后保留）',
-    `source_url`             VARCHAR(2048) NOT NULL COMMENT '下载源 URL',
-    `aria2_gid`              VARCHAR(64)   NOT NULL DEFAULT '' COMMENT 'aria2 返回的任务 GID，用于状态查询和操作',
-    `target_storage_root_id` VARCHAR(32)   NOT NULL COMMENT '目标存储根目录 ID',
-    `target_relative_path`   VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '下载完成后文件所在相对路径（相对于存储根目录）',
-    `file_name`              VARCHAR(512)  NOT NULL DEFAULT '' COMMENT '下载文件名（由 aria2 返回或从 URL 推断）',
-    `status`                 VARCHAR(16)   NOT NULL DEFAULT 'WAITING' COMMENT '状态：WAITING / RUNNING / PAUSED / FAILED / COMPLETED / DELETED',
-    `progress`               INT           NOT NULL DEFAULT 0 COMMENT '下载进度（0-100）',
-    `total_bytes`            BIGINT        NOT NULL DEFAULT 0 COMMENT '文件总大小（字节）',
-    `completed_bytes`        BIGINT        NOT NULL DEFAULT 0 COMMENT '已下载字节数',
-    `speed_bytes_per_second` BIGINT        NOT NULL DEFAULT 0 COMMENT '下载速度（字节/秒）',
-    `error_message`          VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '失败时的错误描述',
-    `created_at`             TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`             TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `completed_at`           TIMESTAMP     NULL COMMENT '下载完成时间',
-    PRIMARY KEY (`id`),
-    KEY `idx_dt_user_status` (`created_by`, `status`, `created_at`),
-    KEY `idx_dt_aria2_gid` (`aria2_gid`),
-    KEY `idx_dt_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='下载任务表（aria2 下载管理）';
-
--- -----------------------------------------------------------
--- 9. 分享链接表
+-- 分享链接表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_share_link` (
     `id`                       VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
@@ -194,7 +166,7 @@ CREATE TABLE IF NOT EXISTS `bf_share_link` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分享链接表';
 
 -- -----------------------------------------------------------
--- 10. 分享访问日志表
+-- 分享访问日志表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_share_access_log` (
     `id`             VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
@@ -210,7 +182,7 @@ CREATE TABLE IF NOT EXISTS `bf_share_access_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分享访问日志表';
 
 -- -----------------------------------------------------------
--- 11. 操作审计日志表
+-- 操作审计日志表
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_audit_log` (
     `id`            VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
@@ -229,7 +201,7 @@ CREATE TABLE IF NOT EXISTS `bf_audit_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作审计日志表';
 
 -- -----------------------------------------------------------
--- 12. 播放/阅读进度表（视频/音频/PDF/文本，跨设备断点续看）
+-- 播放/阅读进度表（视频/音频/PDF/文本，跨设备断点续看）
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_playback_progress` (
     `id`             VARCHAR(32) NOT NULL COMMENT '主键，UUID',
@@ -245,7 +217,7 @@ CREATE TABLE IF NOT EXISTS `bf_playback_progress` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='播放/阅读进度表（每个用户对每个文件一条记录，支持跨设备断点续看）';
 
 -- -----------------------------------------------------------
--- 13. 随手记笔记表（便签/笔记，正文存 Markdown）
+-- 随手记笔记表（便签/笔记，正文存 Markdown）
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_note` (
     `id`         VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
@@ -261,7 +233,7 @@ CREATE TABLE IF NOT EXISTS `bf_note` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='随手记笔记表（标题 + Markdown 正文，独立于文件系统存储）';
 
 -- -----------------------------------------------------------
--- 14. 笔记阅读进度表（跨设备续读长笔记）
+-- 笔记阅读进度表（跨设备续读长笔记）
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_note_progress` (
     `id`             VARCHAR(32) NOT NULL COMMENT '主键，UUID',
@@ -276,7 +248,7 @@ CREATE TABLE IF NOT EXISTS `bf_note_progress` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='笔记阅读进度表（每个用户对每篇笔记一条记录，支持跨设备续读）';
 
 -- -----------------------------------------------------------
--- 15. 随手记笔记媒体表（图片/录音/画画，独立于文件中心存储）
+-- 随手记笔记媒体表（图片/录音/画画，独立于文件中心存储）
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_note_media` (
     `id`         VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
@@ -291,7 +263,7 @@ CREATE TABLE IF NOT EXISTS `bf_note_media` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='随手记笔记媒体表（图片/录音/画画，独立于文件中心存储）';
 
 -- -----------------------------------------------------------
--- 16. 登录会话表（长会话 token + 设备信息，吊销驱动 + 不活跃兜底）
+-- 登录会话表（长会话 token + 设备信息，吊销驱动 + 不活跃兜底）
 -- -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `bf_auth_session` (
     `id`            VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
@@ -308,3 +280,22 @@ CREATE TABLE IF NOT EXISTS `bf_auth_session` (
     UNIQUE KEY `uk_token_hash` (`token_hash`),
     KEY `idx_user` (`user_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录会话表（长会话 token + 设备信息，吊销驱动 + 不活跃兜底）';
+
+-- -----------------------------------------------------------
+-- 文件下载记录表（文件中心直接下载 + 分享下载，供下载次数统计与 ADMIN 审计）
+-- -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_download_record` (
+    `id`                 VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
+    `file_id`            VARCHAR(32)  NOT NULL COMMENT '被下载的文件 ID',
+    `file_name`          VARCHAR(512) NOT NULL DEFAULT '' COMMENT '文件名快照（文件删除后保留）',
+    `downloader_user_id` VARCHAR(32)  NULL COMMENT '下载人用户 ID（分享匿名下载为 NULL）',
+    `source`             VARCHAR(16)  NOT NULL DEFAULT 'CLIENT' COMMENT '来源：CLIENT（登录直接下载）/ SHARE（分享链接下载）',
+    `share_id`           VARCHAR(32)  NULL COMMENT '来源分享链接 ID（非分享下载为 NULL）',
+    `ip_address`         VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '下载 IP',
+    `user_agent`         VARCHAR(255) NOT NULL DEFAULT '' COMMENT '下载 UA',
+    `created_at`         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '下载时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_dr_file` (`file_id`, `created_at`),
+    KEY `idx_dr_user` (`downloader_user_id`, `created_at`),
+    KEY `idx_dr_share` (`share_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件下载记录表';

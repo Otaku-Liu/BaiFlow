@@ -14,7 +14,7 @@ Before planning or coding, read:
 - Backend: JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8, Redis 7.
 - Web: Vue 3, Vite, Vue Router, Pinia, Axios.
 - Android: Java, Retrofit, OkHttp, WorkManager, Foreground Service.
-- Deployment: Ubuntu 24, Docker Compose, Nginx, aria2 RPC.
+- Deployment: Ubuntu 24, Docker Compose, Nginx.
 
 ## Current Feature Decisions
 - Support users and roles: `ADMIN`, `USER`, `GUEST`.

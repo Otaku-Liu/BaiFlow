@@ -5,6 +5,7 @@ import com.baiflow.file.dto.request.MoveRequest;
 import com.baiflow.file.dto.request.RenameRequest;
 import com.baiflow.file.dto.request.SetPrivacyRequest;
 import com.baiflow.file.dto.request.VerifyPrivacyRequest;
+import com.baiflow.downloadrecord.dto.response.DownloadRecordInfo;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.file.entity.FileItem;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -80,6 +81,20 @@ public interface FileService extends IService<FileItem> {
      * @throws com.baiflow.common.exception.BusinessException FILE_OPERATION_FAILED 目标项是目录而非文件
      */
     Resource downloadFile(String fileId, String userId, boolean isAdmin, String privacyAccessToken);
+
+    /**
+     * 分页查询某文件的下载记录（本人文件；管理员可查任意）。校验与 {@link #downloadFile} 相同的所有权。
+     *
+     * @param fileId  目标文件 ID
+     * @param userId  当前用户 ID
+     * @param isAdmin 是否管理员
+     * @param page    页码（从 1 开始）
+     * @param size    每页数量
+     * @return 下载记录分页（按时间倒序）
+     * @throws com.baiflow.common.exception.BusinessException NOT_FOUND 文件不存在
+     * @throws com.baiflow.common.exception.BusinessException FORBIDDEN 无权查看
+     */
+    IPage<DownloadRecordInfo> listFileDownloads(String fileId, String userId, boolean isAdmin, int page, int size);
 
     /**
      * 在存储根目录中创建文件夹（同时在磁盘和元数据中创建）。

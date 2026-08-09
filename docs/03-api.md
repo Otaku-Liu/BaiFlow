@@ -44,7 +44,6 @@
 | 50000 | 服务端内部错误 |
 | 50001 | 文件操作失败 |
 | 50002 | 存储根目录不可用 |
-| 50003 | 下载引擎错误 |
 
 ## 接口清单
 
@@ -76,9 +75,10 @@
 - `POST /api/storage-roots/{id}/check`（管理员检测 NAS 连通性）
 
 ### 文件
-- `GET /api/files?storageRootId=&parentId=&page=&size=&viewUserId=`
+- `GET /api/files?storageRootId=&parentId=&page=&size=&viewUserId=`（文件列表每项含 `downloadCount`）
 - `POST /api/files/upload`（支持 `viewUserId` 参数）
-- `GET /api/files/download/{fileId}`
+- `GET /api/files/download/{fileId}`（登录用户直接下载，写入下载记录）
+- `GET /api/files/{id}/downloads` — 文件的下载记录分页（时间/来源/下载人/IP；本人文件，管理员可查任意）
 - `POST /api/files/folders`（支持 `viewUserId` 参数）
 - `PATCH /api/files/{id}/rename` · `PATCH /api/files/{id}/move`
 - `DELETE /api/files/{id}`
@@ -90,8 +90,9 @@
 隐私文件夹访问需传 `X-Privacy-Access-Token` 头，令牌有效期 30 分钟。
 
 ### 分享
-- `POST/GET /api/shares` · `GET/PATCH/DELETE /api/shares/{id}`
+- `POST/GET /api/shares` · `GET/PATCH/DELETE /api/shares/{id}`（PATCH 的 `status` 支持 `ACTIVE` / `DISABLED`，创建者可停用/启用）
 - `GET /api/shares/{id}/analytics`（管理员）
+- 分享提取码连续错误 5 次锁定 15 分钟（Redis）
 
 ### 公开分享
 - `GET /api/public/shares/{token}`
@@ -127,13 +128,6 @@
 
 ### 审计日志（管理员）
 - `GET /api/admin/audit-logs/login` — 分页查询登录与会话操作日志（`LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED` / `ACCOUNT_LOCKED` / `ACCOUNT_UNLOCKED`），支持用户名模糊搜索、操作类型和日期范围筛选
-
-### 下载
-- `POST/GET /api/downloads` · `GET /api/downloads/{id}`
-- `POST /api/downloads/{id}/pause` · `POST /api/downloads/{id}/resume`
-- `DELETE /api/downloads/{id}`
-
-后端通过 aria2 JSON-RPC 管理下载，定时同步状态。
 
 ### 传输 · 通知 · 设备 · 事件
 - `GET /api/transfers` · `GET /api/transfers/{id}`

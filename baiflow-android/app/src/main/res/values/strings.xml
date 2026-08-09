@@ -159,7 +159,6 @@
     <string name="mine_profile">修改资料</string>
     <string name="mine_password">修改密码</string>
     <string name="mine_language">语言</string>
-    <string name="mine_transfers">传输任务</string>
     <string name="mine_logout">退出登录</string>
     <string name="mine_not_logged_in">未登录</string>
     <string name="mine_display_name_hint">展示名称</string>
@@ -176,14 +175,6 @@
     <string name="mine_language_english">English</string>
 
     <!-- ==================== 传输 ==================== -->
-    <string name="transfer_title">下载任务</string>
-    <string name="transfer_empty">没有下载任务</string>
-    <string name="transfer_error">错误：%1$s</string>
-    <string name="transfer_status_waiting">等待中</string>
-    <string name="transfer_status_running">下载中</string>
-    <string name="transfer_status_paused">已暂停</string>
-    <string name="transfer_status_completed">已完成</string>
-    <string name="transfer_status_failed">失败</string>
     <string name="transfer_upload_preparing">准备上传...</string>
     <string name="transfer_upload_uploading">上传中...</string>
     <string name="transfer_upload_completed">上传完成</string>

@@ -9,7 +9,7 @@ BaiFlow（小白流转）是一个个人服务器上的下载与文件协同中�
 | 后端 | JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8 |
 | Web | Vue 3, Vite, Vue Router, Pinia, Axios |
 | Android | Java, Retrofit, OkHttp, WorkManager, Foreground Service |
-| 部署 | Ubuntu 24, Docker Compose, Nginx, aria2 RPC |
+| 部署 | Ubuntu 24, Docker Compose, Nginx |
 
 ## 项目结构
 
@@ -36,7 +36,7 @@ docs/               项目文档（需求、架构、API、数据库等）
 - 强制 ADMIN、USER、GUEST 角色行为
 - 用户密码、分享 token、提取码、隐私文件夹密码只存储 hash
 - 文件操作必须限制在配置的 Storage Root 内，路径需归一化校验
-- MySQL 和 aria2 RPC 不暴露在公网路由上
+- MySQL 不暴露在公网路由上
 - **每次代码调整**（尤其涉及配置/路径/凭据）做一次**隐私与机密核查**：真实路径（`/home/lxb/...`）、真实域名、硬编码密码/secret/token/API Key
 - 若改动涉及隐私（真实用户名路径/域名/凭据），**先向用户确认「保留还是屏蔽 git」**，不擅自提交
 - 已知待办：`/home/lxb/...` 真实路径散落在 `application.yml` / `application-dev.example.yml` / `deploy/nginx.conf`，后续**部署脚本化时统一改为占位符 + 环境变量注入**
@@ -78,6 +78,7 @@ docs/               项目文档（需求、架构、API、数据库等）
 - `docs/06-coding-standards.md` — 编码规范（后端/前端/Android）
 - `docs/07-quick-notes.md` — ADR：随手记（便签/笔记）方案与三阶段实施计划
 - `docs/08-ios-design-system.md` — ADR：Android iOS 风格设计系统（集中式 styles）
+- `docs/13-download-records.md` — ADR：文件下载记录、下载次数统计与下载安全管理（移除 aria2 下载中心）
 - `docs/glossary.md` — 术语表
 
 ## 测试与验收
