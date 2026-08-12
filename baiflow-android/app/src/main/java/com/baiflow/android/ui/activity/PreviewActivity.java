@@ -1,4 +1,4 @@
-package com.baiflow.android.ui;
+package com.baiflow.android.ui.activity;
 
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -106,7 +106,7 @@ public class PreviewActivity extends AppCompatActivity {
     }
 
     /** 判断预览类型，与 Web 的 mimeCategory 对齐 */
-    static String previewCategory(String mime) {
+    public static String previewCategory(String mime) {
         if (mime == null || mime.isEmpty()) { return "unsupported"; }
         if (mime.startsWith("image/")) return "image";
         if (mime.startsWith("video/")) return "video";
@@ -117,7 +117,7 @@ public class PreviewActivity extends AppCompatActivity {
         return "unsupported";
     }
 
-    static boolean canPreview(String mime) {
+    public static boolean canPreview(String mime) {
         return !"unsupported".equals(previewCategory(mime));
     }
 

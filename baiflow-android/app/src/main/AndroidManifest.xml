@@ -20,7 +20,7 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".ui.activity.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -28,19 +28,25 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".ui.LoginActivity"
+        <activity android:name=".ui.activity.LoginActivity"
             android:exported="false" />
-        <activity android:name=".ui.ServerConfigActivity"
+        <activity android:name=".ui.activity.ServerConfigActivity"
             android:exported="false" />
-        <activity android:name=".ui.GuideActivity"
+        <activity android:name=".ui.activity.ProfileActivity"
             android:exported="false" />
-        <activity android:name=".ui.PreviewActivity"
+        <activity android:name=".ui.activity.PasswordActivity"
+            android:exported="false" />
+        <activity android:name=".ui.activity.LanguageActivity"
+            android:exported="false" />
+        <activity android:name=".ui.activity.GuideActivity"
+            android:exported="false" />
+        <activity android:name=".ui.activity.PreviewActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize" />
-        <activity android:name=".ui.NoteEditActivity"
+        <activity android:name=".ui.activity.NoteEditActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ui.NoteDrawActivity"
+        <activity android:name=".ui.activity.NoteDrawActivity"
             android:exported="false" />
 
         <service

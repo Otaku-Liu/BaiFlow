@@ -5,30 +5,28 @@
     android:layout_height="match_parent"
     android:background="@color/background">
 
-    <!-- 顶部工具栏：标题 + 新建 -->
-    <LinearLayout
+    <!-- 顶部工具栏：居中标题 + 右侧新建 -->
+    <FrameLayout
         style="@style/Ios.Header"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        android:layout_height="56dp">
 
         <TextView
             style="@style/Ios.Header.Title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
             android:text="@string/notes_title" />
 
-        <com.google.android.material.button.MaterialButton
+        <com.baiflow.android.widget.AnimatedTextButton
             android:id="@+id/btnNew"
             style="@style/Ios.Button.Text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="16dp"
             android:text="@string/notes_new" />
-    </LinearLayout>
+    </FrameLayout>
 
     <!-- 搜索框 -->
     <EditText

@@ -6,12 +6,28 @@
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorSecondary">@color/accent</item>
         <item name="android:statusBarColor">@color/primary</item>
+        <!-- 窗口背景设为应用底色，避免语言切换等 Activity 重建时黑/白闪烁 -->
+        <item name="android:windowBackground">@color/background</item>
+        <!-- 统一弹窗圆角（Material / appcompat AlertDialog） -->
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.BaiFlow.Dialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.BaiFlow.Dialog</item>
+    </style>
+
+    <!-- 圆角弹窗：16dp 圆角，所有 AlertDialog 共用 -->
+    <style name="ShapeAppearance.BaiFlow.Dialog" parent="ShapeAppearance.MaterialComponents.LargeComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="ThemeOverlay.BaiFlow.Dialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearance.BaiFlow.Dialog</item>
     </style>
 
     <!-- Apple 风格 Design Token，与 Web 端统一 -->
     <color name="primary">#007AFF</color>
     <color name="primary_dark">#0066D6</color>
     <color name="accent">#007AFF</color>
+    <color name="accent_light">#5AC8FA</color>
     <color name="white">#FFFFFF</color>
     <color name="text_primary">#1D1D1F</color>
     <color name="text_secondary">#86868B</color>

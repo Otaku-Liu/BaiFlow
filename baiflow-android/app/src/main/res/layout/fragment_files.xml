@@ -5,38 +5,57 @@
     android:layout_height="match_parent"
     android:background="@color/background">
 
-    <!-- 顶部工具栏 -->
-    <LinearLayout
+    <!-- 顶部工具栏：居中标题 + 左侧上一级图标 + 右侧新建 -->
+    <FrameLayout
         style="@style/Ios.Header"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        android:layout_height="56dp">
 
         <TextView
             style="@style/Ios.Header.Title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
             android:text="@string/files_title" />
 
-        <com.google.android.material.button.MaterialButton
+        <com.baiflow.android.widget.AnimatedTintImageView
             android:id="@+id/btnUp"
-            style="@style/Ios.Button.Text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/files_up_level"
+            android:layout_width="44dp"
+            android:layout_height="match_parent"
+            android:padding="12dp"
+            android:src="@drawable/ic_undo"
+            android:tint="@color/up_tint_selector"
+            android:scaleType="fitCenter"
+            android:layout_gravity="start|center_vertical"
+            android:contentDescription="@string/files_up_level"
             android:enabled="false" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnUpload"
-            style="@style/Ios.Button.Text"
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/files_upload" />
-    </LinearLayout>
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_gravity="end"
+            android:paddingEnd="16dp">
+
+            <com.baiflow.android.widget.AnimatedTintImageView
+                android:id="@+id/btnRefresh"
+                android:layout_width="40dp"
+                android:layout_height="match_parent"
+                android:padding="10dp"
+                android:src="@drawable/ic_refresh"
+                android:tint="@color/text_accent_selector"
+                android:scaleType="fitCenter"
+                android:contentDescription="@string/files_refresh" />
+
+            <com.baiflow.android.widget.AnimatedTextButton
+                android:id="@+id/btnNew"
+                style="@style/Ios.Button.Text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/files_new" />
+        </LinearLayout>
+    </FrameLayout>
 
     <!-- 管理员用户切换（仅管理员可见） -->
     <LinearLayout
@@ -65,7 +84,7 @@
             android:layout_marginStart="12dp" />
     </LinearLayout>
 
-    <!-- 面包屑 / 当前路径 -->
+    <!-- 面包屑 / 当前路径（始终显示，含根目录，避免进入子文件夹时列表下移） -->
     <TextView
         android:id="@+id/tvPath"
         android:layout_width="match_parent"
@@ -74,7 +93,7 @@
         android:textSize="13sp"
         android:textColor="@color/text_secondary"
         android:background="@color/white"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
     <!-- 进度条 -->
     <ProgressBar

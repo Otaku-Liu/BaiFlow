@@ -1,4 +1,4 @@
-package com.baiflow.android.ui;
+package com.baiflow.android.ui.fragment;
 
 import android.content.Intent;
 import android.net.Uri;
@@ -14,6 +14,7 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.PopupMenu;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -39,6 +40,7 @@ import com.baiflow.android.network.UiCallback;
 import com.baiflow.android.transfer.DownloadService;
 import com.baiflow.android.transfer.UploadService;
 import com.baiflow.android.util.FormatUtil;
+import com.baiflow.android.ui.activity.PreviewActivity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,13 +67,14 @@ public class FilesFragment extends Fragment {
     private FileAdapter adapter;
     private SessionManager session;
     private ApiClient client;
-    private com.google.android.material.button.MaterialButton btnUp;
+    private android.widget.ImageView btnUp;
     /** 文件夹导航栈（栈顶=当前目录；空=根目录），支持逐级返回上一级 */
     private final java.util.ArrayDeque<FileItem> folderStack = new java.util.ArrayDeque<>();
 
     private List<StorageRoot> roots = new ArrayList<>();
     private List<UserInfo> users = new ArrayList<>();
     private String currentRootId;
+    private String currentRootName;
     private String currentParentId;
     private String currentPath = "";
     private String currentViewUserId;   // 管理员切换的目标用户 ID（null = 全部）
@@ -116,7 +119,7 @@ public class FilesFragment extends Fragment {
         progressBar = view.findViewById(R.id.progressBar);
         adminRow = view.findViewById(R.id.adminRow);
         spinnerUser = view.findViewById(R.id.spinnerUser);
-        View btnUpload = view.findViewById(R.id.btnUpload);
+        View btnNew = view.findViewById(R.id.btnNew);
         btnUp = view.findViewById(R.id.btnUp);
 
         adapter = new FileAdapter();
@@ -124,7 +127,10 @@ public class FilesFragment extends Fragment {
         recyclerView.setAdapter(adapter);
 
         swipeRefresh.setOnRefreshListener(this::loadFiles);
-        btnUpload.setOnClickListener(v -> filePicker.launch("*/*"));
+        // 「新建」按钮：在按钮下方弹出 新建文件夹 / 上传文件 下拉
+        btnNew.setOnClickListener(this::showNewMenu);
+        // 「刷新」按钮：重新加载当前目录
+        view.findViewById(R.id.btnRefresh).setOnClickListener(v -> loadFiles());
         // 「上一级」按钮：逐级返回，根目录时置灰
         btnUp.setOnClickListener(v -> navigateUp());
         updateUpButton();
@@ -150,7 +156,8 @@ public class FilesFragment extends Fragment {
             recyclerView.setVisibility(View.GONE);
             swipeRefresh.setEnabled(false);
             adminRow.setVisibility(View.GONE);
-            btnUpload.setEnabled(false);
+            btnNew.setEnabled(false);
+            view.findViewById(R.id.btnRefresh).setEnabled(false);
             return;
         }
 
@@ -178,11 +185,11 @@ public class FilesFragment extends Fragment {
                     StorageRoot first = roots.get(0);
                     if (!first.getId().equals(currentRootId)) {
                         currentRootId = first.getId();
+                        currentRootName = first.getName();
                         folderStack.clear();
                         currentParentId = null;
-                        currentPath = "";
-                        tvPath.setVisibility(View.GONE);
                         updateUpButton();
+                        rebuildPath();
                         loadFiles();
                     }
                 } else if (response.code() < 500) {
@@ -264,9 +271,8 @@ public class FilesFragment extends Fragment {
                 // 切换用户后回到根目录重新加载
                 folderStack.clear();
                 currentParentId = null;
-                currentPath = "";
-                tvPath.setVisibility(View.GONE);
                 updateUpButton();
+                rebuildPath();
                 loadFiles();
             }
 
@@ -276,12 +282,77 @@ public class FilesFragment extends Fragment {
         });
     }
 
+    // ---- 新建（新建文件夹 / 上传文件） ----
+
+    /** 「新建」按钮：在按钮下方弹出 新建文件夹 / 上传文件 下拉（圆角） */
+    private void showNewMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(requireContext(), anchor,
+                android.view.Gravity.NO_GRAVITY, 0, R.style.Ios_PopupMenu);
+        menu.getMenu().add(0, 1, 0, getString(R.string.files_new_folder));
+        menu.getMenu().add(0, 2, 0, getString(R.string.files_upload));
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) {
+                showNewFolderDialog();
+            } else {
+                filePicker.launch("*/*");
+            }
+            return true;
+        });
+        // 菜单关闭后强制恢复「新建」按钮的蓝色（anchor 即该按钮，按压态可能未清除）
+        menu.setOnDismissListener(m ->
+                ((com.baiflow.android.widget.AnimatedTextButton) anchor).resetColor());
+        menu.show();
+    }
+
+    /** 新建文件夹：输入名称 → 调后端创建 → 刷新列表 */
+    private void showNewFolderDialog() {
+        final EditText input = new EditText(requireContext());
+        input.setHint(getString(R.string.files_new_folder_hint));
+        new AlertDialog.Builder(requireContext())
+                .setTitle(getString(R.string.files_new_folder))
+                .setView(input)
+                .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        Toast.makeText(requireContext(), getString(R.string.files_name_required), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    createFolder(name);
+                })
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .show();
+    }
+
+    private void createFolder(String name) {
+        client.createFolder(currentRootId, currentParentId, name, null)
+                .enqueue(new UiCallback<ApiResponse<FileItem>>(requireContext()) {
+                    @Override
+                    protected void onUiResponse(Call<ApiResponse<FileItem>> call,
+                                                Response<ApiResponse<FileItem>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
+                            Toast.makeText(requireContext(), getString(R.string.files_folder_created), Toast.LENGTH_SHORT).show();
+                            loadFiles();
+                        } else if (response.code() < 500) {
+                            String msg = response.body() != null ? response.body().getMessage()
+                                    : getString(R.string.files_folder_create_failed);
+                            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    protected void onUiFailure(Call<ApiResponse<FileItem>> call, Throwable t) {
+                        // 网络失败已由 UiCallback 统一提示
+                    }
+                });
+    }
+
     // ---- 文件列表加载 ----
     private void loadFiles() {
         if (currentRootId == null) { return; }
 
         showLoading(true);
-        swipeRefresh.setRefreshing(true);
+        // 程序化加载只显示顶部进度条；SwipeRefresh 转圈仅由用户下拉触发，避免加载时出现遮罩
+        // （下拉刷新时 SwipeRefreshLayout 已自行置 refreshing，响应回调里 setRefreshing(false) 会停掉）
 
         String token = privacyTokens.get(currentParentId);
 
@@ -411,22 +482,28 @@ public class FilesFragment extends Fragment {
         loadFiles();
     }
 
-    /** 从导航栈重建路径文案，并维护「上一级」按钮可用态 */
+    /** 重建路径文案（始终显示，含根目录显示根名），并维护「上一级」按钮可用态 */
     private void rebuildPath() {
-        StringBuilder sb = new StringBuilder();
-        java.util.Iterator<FileItem> it = folderStack.descendingIterator();
-        while (it.hasNext()) {
-            if (sb.length() > 0) { sb.append(" / "); }
-            sb.append(it.next().getName());
+        if (folderStack.isEmpty()) {
+            currentPath = (currentRootName != null && !currentRootName.isBlank())
+                    ? currentRootName : getString(R.string.files_root);
+        } else {
+            StringBuilder sb = new StringBuilder();
+            java.util.Iterator<FileItem> it = folderStack.descendingIterator();
+            while (it.hasNext()) {
+                if (sb.length() > 0) { sb.append(" / "); }
+                sb.append(it.next().getName());
+            }
+            currentPath = sb.toString();
         }
-        currentPath = sb.toString();
         tvPath.setText(currentPath);
-        tvPath.setVisibility(folderStack.isEmpty() ? View.GONE : View.VISIBLE);
+        tvPath.setVisibility(View.VISIBLE);
         updateUpButton();
     }
 
     private void updateUpButton() {
         if (btnUp != null) {
+            // 根目录禁用：up_tint_selector 的禁用态会置灰，无需手动 alpha
             btnUp.setEnabled(!folderStack.isEmpty());
         }
     }
@@ -458,7 +535,6 @@ public class FilesFragment extends Fragment {
             holder.tvMeta.setText(meta);
 
             holder.ivIcon.setImageResource(iconFor(item));
-            holder.ivIcon.setColorFilter(colorFor(item), android.graphics.PorterDuff.Mode.SRC_IN);
 
             holder.tvPrivacyTag.setVisibility(item.isPrivate() ? View.VISIBLE : View.GONE);
 
@@ -484,7 +560,7 @@ public class FilesFragment extends Fragment {
         @Override
         public int getItemCount() { return items.size(); }
 
-        /** 按文件类型返回图标 */
+        /** 按文件类型返回图标（彩色 PNG；json/xml 独立，其它 text 共用文件图标） */
         private int iconFor(FileItem item) {
             if (item.isDirectory()) return R.drawable.ic_folder;
             String mime = item.getMimeType();
@@ -493,31 +569,15 @@ public class FilesFragment extends Fragment {
             if (mime.startsWith("video/")) return R.drawable.ic_type_video;
             if (mime.startsWith("audio/")) return R.drawable.ic_type_audio;
             if ("application/pdf".equals(mime)) return R.drawable.ic_type_pdf;
-            if (mime.startsWith("text/") || "application/json".equals(mime)
-                    || "application/xml".equals(mime)) return R.drawable.ic_type_text;
-            if (mime.contains("msword") || mime.contains("wordprocessingml")
-                    || mime.contains("ms-excel") || mime.contains("spreadsheetml")
-                    || mime.contains("ms-powerpoint") || mime.contains("presentationml")) return R.drawable.ic_type_office;
+            if (mime.endsWith("json")) return R.drawable.ic_type_json;
+            if (mime.endsWith("xml")) return R.drawable.ic_type_xml;
+            if (mime.startsWith("text/")) return R.drawable.ic_type_file;
+            if (mime.contains("msword") || mime.contains("wordprocessingml")) return R.drawable.ic_type_word;
+            if (mime.contains("ms-excel") || mime.contains("spreadsheetml")) return R.drawable.ic_type_excel;
+            if (mime.contains("ms-powerpoint") || mime.contains("presentationml")) return R.drawable.ic_type_ppt;
             if (mime.contains("zip") || mime.contains("compressed") || mime.contains("x-tar")
                     || mime.contains("gzip")) return R.drawable.ic_type_archive;
             return R.drawable.ic_type_file;
-        }
-
-        /** 文件类型图标颜色（iOS 语义色） */
-        private int colorFor(FileItem item) {
-            if (item.isDirectory()) return 0xFF007AFF;
-            String mime = item.getMimeType();
-            if (mime == null) return 0xFF8E8E93;
-            if (mime.startsWith("image/")) return 0xFF34C759;
-            if (mime.startsWith("video/")) return 0xFFFF9500;
-            if (mime.startsWith("audio/")) return 0xFFFF3B30;
-            if ("application/pdf".equals(mime)) return 0xFFFF3B30;
-            if (mime.startsWith("text/") || "application/json".equals(mime)
-                    || "application/xml".equals(mime)) return 0xFFAF52DE;
-            if (mime.contains("msword") || mime.contains("wordprocessingml")
-                    || mime.contains("ms-excel") || mime.contains("spreadsheetml")
-                    || mime.contains("ms-powerpoint") || mime.contains("presentationml")) return 0xFF5856D6;
-            return 0xFF8E8E93;
         }
 
         class ViewHolder extends RecyclerView.ViewHolder {

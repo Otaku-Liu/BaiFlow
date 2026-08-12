@@ -77,7 +77,11 @@
             android:layout_marginStart="4dp"
             android:layout_marginBottom="8dp" />
 
-        <!-- 菜单卡片 -->
+        <!-- ==================== 账号 ==================== -->
+        <TextView
+            style="@style/Ios.SectionTitle"
+            android:text="@string/mine_section_account" />
+
         <LinearLayout
             android:orientation="vertical"
             android:layout_width="match_parent"
@@ -88,7 +92,7 @@
                 android:id="@+id/rowProfile"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
@@ -106,24 +110,25 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="›"
-                    android:textSize="20sp"
+                    android:textSize="25sp"
                     android:textColor="@color/text_secondary" />
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
+                android:layout_marginStart="20dp"
                 android:background="@color/divider" />
 
             <LinearLayout
                 android:id="@+id/rowPassword"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
-                android:foreground="@drawable/bg_ripple_middle">
+                android:foreground="@drawable/bg_ripple_bottom">
 
                 <TextView
                     android:layout_width="0dp"
@@ -137,24 +142,31 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="›"
-                    android:textSize="20sp"
+                    android:textSize="25sp"
                     android:textColor="@color/text_secondary" />
             </LinearLayout>
+        </LinearLayout>
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/divider" />
+        <!-- ==================== 通用 ==================== -->
+        <TextView
+            style="@style/Ios.SectionTitle"
+            android:text="@string/mine_section_general" />
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card">
 
             <LinearLayout
                 android:id="@+id/rowLanguage"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
-                android:foreground="@drawable/bg_ripple_middle">
+                android:foreground="@drawable/bg_ripple_top">
 
                 <TextView
                     android:layout_width="0dp"
@@ -168,20 +180,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="›"
-                    android:textSize="20sp"
+                    android:textSize="25sp"
                     android:textColor="@color/text_secondary" />
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
+                android:layout_marginStart="20dp"
                 android:background="@color/divider" />
 
             <LinearLayout
                 android:id="@+id/rowServer"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
@@ -199,24 +212,27 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="›"
-                    android:textSize="20sp"
+                    android:textSize="25sp"
                     android:textColor="@color/text_secondary" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- 离线 / 同步 / 重连 -->
+        <!-- ==================== 同步 ==================== -->
+        <TextView
+            style="@style/Ios.SectionTitle"
+            android:text="@string/mine_section_sync" />
+
         <LinearLayout
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
             android:background="@drawable/bg_card">
 
             <LinearLayout
                 android:id="@+id/rowOffline"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
@@ -235,20 +251,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="›"
-                    android:textSize="20sp"
+                    android:textSize="25sp"
                     android:textColor="@color/text_secondary" />
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
+                android:layout_marginStart="20dp"
                 android:background="@color/divider" />
 
             <LinearLayout
                 android:id="@+id/rowSync"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
@@ -263,16 +280,11 @@
                     android:textColor="@color/text_primary" />
             </LinearLayout>
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/divider" />
-
             <LinearLayout
                 android:id="@+id/rowReconnect"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
@@ -291,9 +303,9 @@
         <!-- 退出 -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnLogout"
-            style="@style/Ios.Button.Danger"
+            style="@style/Ios.Button.DangerOutline"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="44dp"
             android:layout_marginTop="24dp"
             android:text="@string/mine_logout" />
 

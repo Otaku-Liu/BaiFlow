@@ -67,7 +67,7 @@
         android:layout_marginTop="16dp"
         android:visibility="gone" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.baiflow.android.widget.AnimatedTextButton
         android:id="@+id/btnChangeServer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -75,7 +75,7 @@
         style="@style/Ios.Button.Text"
         android:layout_marginTop="8dp" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.baiflow.android.widget.AnimatedTextButton
         android:id="@+id/btnOfflineMode"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

@@ -11,15 +11,13 @@
         android:layout_width="match_parent"
         android:layout_height="56dp">
 
-        <!-- 居中标题 -->
         <TextView
             style="@style/Ios.Header.Title"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
-            android:text="@string/server_config_title" />
+            android:text="@string/mine_profile" />
 
-        <!-- 左侧返回：chevron + 上一级名称 -->
         <LinearLayout
             android:id="@+id/btnBack"
             android:layout_width="wrap_content"
@@ -46,46 +44,34 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- 内容区（居中） -->
+    <!-- 内容区 -->
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:padding="24dp"
-        android:gravity="center">
+        android:gravity="top">
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/server_url_hint"
+            android:hint="@string/mine_display_name_hint"
             style="@style/Ios.TextInput">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etServerUrl"
+                android:id="@+id/etDisplayName"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textUri"
-                android:text="http://10.0.2.2:8080" />
+                android:layout_height="wrap_content" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnConnect"
-            style="@style/Ios.Button.Primary"
+        <com.baiflow.android.widget.AnimatedTextButton
+            android:id="@+id/btnSave"
+            style="@style/Ios.Button.Text"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginTop="20dp"
-            android:text="@string/server_connect" />
-
-        <TextView
-            android:id="@+id/tvError"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#EF4444"
-            android:textSize="14sp"
-            android:gravity="center"
             android:layout_marginTop="16dp"
-            android:visibility="gone" />
+            android:text="@string/common_save" />
 
     </LinearLayout>
 

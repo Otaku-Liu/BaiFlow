@@ -16,7 +16,7 @@ import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.FileItem;
-import com.baiflow.android.ui.MainActivity;
+import com.baiflow.android.ui.activity.MainActivity;
 import java.io.File;
 import java.io.FileInputStream;
 import okhttp3.MediaType;

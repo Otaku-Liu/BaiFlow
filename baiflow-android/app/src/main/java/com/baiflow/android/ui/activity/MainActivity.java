@@ -1,4 +1,4 @@
-package com.baiflow.android.ui;
+package com.baiflow.android.ui.activity;
 
 import android.content.Context;
 import android.content.Intent;
@@ -15,6 +15,9 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.network.NetworkFeedback;
+import com.baiflow.android.ui.fragment.FilesFragment;
+import com.baiflow.android.ui.fragment.MineFragment;
+import com.baiflow.android.ui.fragment.NotesFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**

@@ -1,4 +1,4 @@
-package com.baiflow.android.ui;
+package com.baiflow.android.ui.activity;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -7,6 +7,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.baiflow.android.R;
+import com.baiflow.android.ui.NoteDrawView;
 
 import java.io.ByteArrayOutputStream;
 

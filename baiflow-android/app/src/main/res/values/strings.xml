@@ -69,6 +69,14 @@
     <!-- ==================== 文件 ==================== -->
     <string name="files_title">文件中心</string>
     <string name="files_up_level">上一级</string>
+    <string name="files_refresh">刷新</string>
+    <string name="files_root">根目录</string>
+    <string name="files_new">新建</string>
+    <string name="files_new_folder">新建文件夹</string>
+    <string name="files_new_folder_hint">文件夹名称</string>
+    <string name="files_folder_created">文件夹已创建</string>
+    <string name="files_folder_create_failed">创建失败</string>
+    <string name="files_name_required">请输入名称</string>
     <string name="files_upload">上传</string>
     <string name="files_view_user">查看用户</string>
     <string name="files_empty">此目录为空</string>
@@ -160,6 +168,13 @@
     <string name="mine_password">修改密码</string>
     <string name="mine_language">语言</string>
     <string name="mine_logout">退出登录</string>
+    <string name="mine_logout_confirm_title">退出登录</string>
+    <string name="mine_logout_confirm_msg">确定要退出当前账号吗？本地笔记将保留。</string>
+    <string name="mine_section_account">账号</string>
+    <string name="mine_section_general">通用</string>
+    <string name="mine_section_sync">同步</string>
+    <string name="mine_offline_confirm_title">进入离线模式</string>
+    <string name="mine_offline_confirm_msg">离线模式保留本地笔记、清除当前登录态，恢复在线需重新登录。确定进入离线模式吗？</string>
     <string name="mine_not_logged_in">未登录</string>
     <string name="mine_display_name_hint">展示名称</string>
     <string name="mine_profile_updated">资料已更新</string>

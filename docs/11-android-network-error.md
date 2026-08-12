@@ -89,9 +89,9 @@ Android 端网络错误处理现状：
 
 - 新增 `network/NetworkFeedback.java`、`network/UiCallback.java`
 - `network/ApiClient.java`：OkHttp `connectTimeout` 30s → 10s
-- `ui/MainActivity.java`：ConnectivityManager 监听注册/注销
-- `ui/FilesFragment.java`、`ui/NotesFragment.java`、`ui/MineFragment.java`、`ui/NoteEditActivity.java`：调用点换 `UiCallback`，删网络错误 Toast，5xx 分支去重
-- `ui/LoginActivity.java`、`ui/ServerConfigActivity.java`：失败文案改 `classify()` 友好文案
+- `ui/activity/MainActivity.java`：ConnectivityManager 监听注册/注销
+- `ui/fragment/FilesFragment.java`、`ui/fragment/NotesFragment.java`、`ui/fragment/MineFragment.java`、`ui/activity/NoteEditActivity.java`：调用点换 `UiCallback`，删网络错误 Toast，5xx 分支去重
+- `ui/activity/LoginActivity.java`、`ui/activity/ServerConfigActivity.java`：失败文案改 `classify()` 友好文案
 - `res/values/strings.xml` + `res/values-en/strings.xml`：新增 4 个 key
 
 ## 6. 安全

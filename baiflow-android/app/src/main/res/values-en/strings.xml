@@ -69,6 +69,14 @@
     <!-- ==================== Files ==================== -->
     <string name="files_title">File Center</string>
     <string name="files_up_level">Up</string>
+    <string name="files_refresh">Refresh</string>
+    <string name="files_root">Home</string>
+    <string name="files_new">New</string>
+    <string name="files_new_folder">New Folder</string>
+    <string name="files_new_folder_hint">Folder name</string>
+    <string name="files_folder_created">Folder created</string>
+    <string name="files_folder_create_failed">Create failed</string>
+    <string name="files_name_required">Please enter a name</string>
     <string name="files_upload">Upload</string>
     <string name="files_view_user">View User</string>
     <string name="files_empty">This folder is empty</string>
@@ -160,6 +168,13 @@
     <string name="mine_password">Change Password</string>
     <string name="mine_language">Language</string>
     <string name="mine_logout">Log Out</string>
+    <string name="mine_logout_confirm_title">Log Out</string>
+    <string name="mine_logout_confirm_msg">Log out of the current account? Local notes will be kept.</string>
+    <string name="mine_section_account">Account</string>
+    <string name="mine_section_general">General</string>
+    <string name="mine_section_sync">Sync</string>
+    <string name="mine_offline_confirm_title">Enter Offline Mode</string>
+    <string name="mine_offline_confirm_msg">Offline mode keeps local notes but clears the current login; going back online requires logging in again. Enter offline mode?</string>
     <string name="mine_not_logged_in">Not logged in</string>
     <string name="mine_display_name_hint">Display name</string>
     <string name="mine_profile_updated">Profile updated</string>
@@ -171,7 +186,8 @@
     <string name="mine_password_mismatch">The two new passwords do not match</string>
     <string name="mine_password_changed">Password changed, please log in again</string>
     <string name="mine_password_change_failed">Change failed</string>
-    <string name="mine_language_chinese">Chinese</string>
+    <!-- 语言选择项显示各语言本名，不随界面语言翻译 -->
+    <string name="mine_language_chinese">中文</string>
     <string name="mine_language_english">English</string>
 
     <!-- ==================== Transfer ==================== -->

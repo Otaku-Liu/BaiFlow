@@ -1,4 +1,4 @@
-package com.baiflow.android.ui;
+package com.baiflow.android.ui.activity;
 
 import android.content.Intent;
 import android.os.Bundle;

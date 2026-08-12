@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 返回按钮按压态：按下/长按时字体与 chevron 变浅蓝，背景不变 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true" android:color="@color/accent_light" />
+    <item android:color="@color/accent" />
+</selector>

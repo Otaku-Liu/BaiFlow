@@ -1,4 +1,4 @@
-package com.baiflow.android.ui;
+package com.baiflow.android.ui.fragment;
 
 import android.os.Bundle;
 import android.text.Editable;
@@ -26,6 +26,7 @@ import com.baiflow.android.data.LocalNote;
 import com.baiflow.android.data.LocalNoteDao;
 import com.baiflow.android.data.SyncService;
 import com.baiflow.android.sync.SyncWorker;
+import com.baiflow.android.ui.activity.NoteEditActivity;
 
 import java.util.ArrayList;
 import java.util.List;
