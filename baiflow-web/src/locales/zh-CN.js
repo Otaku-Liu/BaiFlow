@@ -42,7 +42,8 @@ export default {
     unlimited: '不限',
     pleaseInput: '请输入',
     pleaseSelect: '请选择',
-    logout: '退出'
+    logout: '退出',
+    resumed: '已恢复到上次观看位置'
   },
   loginLog: {
     title: '登录与会话日志',

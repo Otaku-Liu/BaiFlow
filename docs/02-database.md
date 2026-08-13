@@ -62,7 +62,7 @@
 ### playback_progress — 播放/阅读进度
 `id, user_id, file_item_id, position_type(SECONDS/PAGE/SCROLL_PERCENT), position_value, created_at, updated_at`
 
-每个用户对每个文件只存一条记录。`position_type` 区分视频秒数、PDF 页码、文本滚动百分比，支持跨设备断点续看。
+每个用户对每个文件只存一条记录。`position_type` 区分视频秒数、PDF 页码、文本滚动百分比，支持跨设备断点续看。**删除文件时级联删除该文件的全部进度行**。
 
 ### note — 随手记笔记
 `id, user_id, title, content(LONGTEXT, Markdown), status(ACTIVE/DELETED 软删除), created_at, updated_at, deleted_at`
@@ -72,7 +72,7 @@
 ### note_progress — 笔记阅读进度
 `id, user_id, note_id, position_type(SCROLL_PERCENT), position_value, created_at, updated_at`
 
-每个用户对每篇笔记只存一条记录，`(user_id, note_id)` 唯一。复用 playback 的 SCROLL_PERCENT 思路，支持跨设备续读长笔记。
+每个用户对每篇笔记只存一条记录，`(user_id, note_id)` 唯一。复用 playback 的 SCROLL_PERCENT 思路，支持跨设备续读长笔记。**删除笔记时级联删除该笔记的进度行**。
 
 ### note_media — 笔记媒体
 `id, user_id, media_type(IMAGE/AUDIO/DRAWING), file_name, mime_type, size_bytes, created_at`

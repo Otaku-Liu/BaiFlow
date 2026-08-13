@@ -130,6 +130,9 @@ public class NoteServiceImpl implements NoteService {
         note.setDeletedAt(LocalDateTime.now());
         note.setUpdatedAt(LocalDateTime.now());
         noteMapper.updateById(note);
+        // 级联删除该笔记的阅读进度，避免残留孤儿进度
+        noteProgressService.remove(new LambdaQueryWrapper<NoteProgress>()
+                .eq(NoteProgress::getNoteId, id));
         publishUpdated(note.getUserId(), note);
     }
 

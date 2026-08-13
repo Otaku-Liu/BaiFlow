@@ -20,12 +20,14 @@ import android.widget.MediaController;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.VideoView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
+import com.baiflow.android.data.ProgressReporter;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.transfer.DownloadService;
 
@@ -59,6 +61,16 @@ public class PreviewActivity extends AppCompatActivity {
     private FrameLayout previewContainer;
     private LinearLayout loadingContainer, errorContainer, unsupportedContainer;
     private MediaPlayer audioPlayer;
+
+    // 进度相关：视频/音频续播 + 文本/Markdown 续读，与 Web 共用同一份数据
+    private VideoView videoView;
+    private ScrollView textScrollView;
+    private Runnable videoTimerTask;   // 视频 10s 定时上报
+    private Runnable audioTimerTask;   // 音频 10s 定时上报
+    private Runnable scrollTimer;      // 文本/Markdown 滚动防抖上报
+    private final int[] pendingSeekMs = {0};  // 音频续播目标（ms），prepared 后消费
+    private boolean videoPlayed;       // 视频已开始播放（允许存 0 清除历史）
+    private boolean audioPlayed;       // 音频已开始播放（允许存 0 清除历史）
 
     public static Intent newIntent(android.content.Context ctx, String fileId, String fileName,
                                    String mime, String privacyToken, long sizeBytes) {
@@ -182,9 +194,21 @@ public class PreviewActivity extends AppCompatActivity {
         tv.setLineSpacing(4f, 1f);
         tv.setPadding(24, 24, 24, 24);
         ScrollView sv = new ScrollView(this);
+        textScrollView = sv;
         sv.addView(tv);
         previewContainer.addView(sv, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        // 续读：拉到 SCROLL_PERCENT 后自动滚动到记录位置
+        new Thread(() -> {
+            double pct = ProgressReporter.fetchFileProgress(client, fileId);
+            mainHandler.post(() -> applyTextProgress(sv, pct));
+        }).start();
+        // 上报：滚动防抖 2s（与 Web 预览一致）
+        sv.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+            if (scrollTimer != null) mainHandler.removeCallbacks(scrollTimer);
+            scrollTimer = () -> saveTextProgress(sv);
+            mainHandler.postDelayed(scrollTimer, 2000);
+        });
     }
 
     private void renderAudio(byte[] bytes) {
@@ -192,8 +216,37 @@ public class PreviewActivity extends AppCompatActivity {
             File f = writeTemp(bytes, fileName);
             audioPlayer = new MediaPlayer();
             audioPlayer.setDataSource(f.getAbsolutePath());
-            audioPlayer.setOnPreparedListener(mp -> mp.start());
+            // 续播：prepared 后先 seek 到记录位置再播放（seek 在 prepared 后才能调用）
+            audioPlayer.setOnPreparedListener(mp -> {
+                audioPlayed = true;
+                if (pendingSeekMs[0] > 0) {
+                    try {
+                        mp.seekTo(pendingSeekMs[0]);
+                        Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
+                    } catch (Exception ignored) {
+                    }
+                    pendingSeekMs[0] = 0;
+                }
+                mp.start();
+                startAudioTimer();
+            });
             audioPlayer.prepareAsync();
+            // 拉取进度（可能晚于 prepared：已播放则直接 seek，未播放则由 prepared 监听消费）
+            new Thread(() -> {
+                double s = ProgressReporter.fetchFileProgress(client, fileId);
+                mainHandler.post(() -> {
+                    if (s <= 0) return;
+                    pendingSeekMs[0] = (int) (s * 1000);
+                    if (audioPlayer != null && audioPlayer.isPlaying()) {
+                        try {
+                            audioPlayer.seekTo(pendingSeekMs[0]);
+                            pendingSeekMs[0] = 0;
+                            Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
+                        } catch (Exception ignored) {
+                        }
+                    }
+                });
+            }).start();
 
             TextView tv = new TextView(this);
             tv.setText(getString(R.string.preview_playing,
@@ -216,12 +269,29 @@ public class PreviewActivity extends AppCompatActivity {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             }
             VideoView vv = new VideoView(this);
+            videoView = vv;
             MediaController mc = new MediaController(this);
             vv.setMediaController(mc);
+            // 续播：prepared 后 start，随后拉进度 seek（VideoView 在 prepare 前后都接受 seekTo）
+            vv.setOnPreparedListener(mp -> {
+                if (videoView == vv) {
+                    videoPlayed = true;
+                    vv.start();
+                    startVideoTimer(vv);
+                }
+            });
             vv.setVideoURI(Uri.fromFile(f));
-            vv.start();
             previewContainer.addView(vv, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+            new Thread(() -> {
+                double s = ProgressReporter.fetchFileProgress(client, fileId);
+                mainHandler.post(() -> {
+                    if (videoView == vv && s > 0) {
+                        vv.seekTo((int) (s * 1000));
+                        Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }).start();
         } catch (Exception e) {
             showError();
         }
@@ -314,12 +384,103 @@ public class PreviewActivity extends AppCompatActivity {
         errorContainer.setVisibility(View.VISIBLE);
     }
 
+    // ==================== 进度上报辅助 ====================
+
+    /** 视频每 10s 上报当前秒数（与 Web 预览节奏一致） */
+    private void startVideoTimer(VideoView vv) {
+        if (videoTimerTask != null) mainHandler.removeCallbacks(videoTimerTask);
+        videoTimerTask = new Runnable() {
+            @Override
+            public void run() {
+                if (videoView == vv) {
+                    saveVideoProgress(vv);
+                    mainHandler.postDelayed(this, 10000);
+                }
+            }
+        };
+        mainHandler.postDelayed(videoTimerTask, 10000);
+    }
+
+    /** 音频每 10s 上报当前秒数 */
+    private void startAudioTimer() {
+        if (audioTimerTask != null) mainHandler.removeCallbacks(audioTimerTask);
+        audioTimerTask = new Runnable() {
+            @Override
+            public void run() {
+                if (audioPlayer != null) {
+                    saveAudioProgress();
+                    mainHandler.postDelayed(this, 10000);
+                }
+            }
+        };
+        mainHandler.postDelayed(audioTimerTask, 10000);
+    }
+
+    /** 音频上报：已播放过才允许存 0（seek 回开头时清除历史），未播放则避免误存 0 覆盖历史 */
+    private void saveAudioProgress() {
+        if (audioPlayer == null) return;
+        try {
+            int pos = audioPlayer.getCurrentPosition();
+            if (pos > 0 || audioPlayed) {
+                ProgressReporter.saveFileProgress(client, fileId,
+                        ProgressReporter.TYPE_SECONDS, pos / 1000.0);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** 视频上报：已播放过才允许存 0（seek 回开头时清除历史），未播放则避免误存 0 覆盖历史 */
+    private void saveVideoProgress(VideoView vv) {
+        int pos = vv.getCurrentPosition();
+        if (pos > 0 || videoPlayed) {
+            ProgressReporter.saveFileProgress(client, fileId, ProgressReporter.TYPE_SECONDS, pos / 1000.0);
+        }
+    }
+
+    /** 文本/Markdown 续读：自动滚动到记录百分比（布局完成后计算最大滚动距离） */
+    private void applyTextProgress(ScrollView sv, double pct) {
+        if (pct <= 0.01) return;
+        sv.post(() -> {
+            View child = sv.getChildAt(0);
+            if (child == null) return;
+            int max = child.getHeight() - sv.getHeight();
+            if (max > 0) {
+                sv.scrollTo(0, (int) (pct * max));
+                Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    /** 文本/Markdown 上报滚动百分比（0~1；回顶 pct=0 也保存，用于清除历史进度） */
+    private void saveTextProgress(ScrollView sv) {
+        View child = sv.getChildAt(0);
+        if (child == null) return;
+        int max = child.getHeight() - sv.getHeight();
+        if (max <= 0) return;
+        double pct = Math.min(1, Math.max(0, (double) sv.getScrollY() / max));
+        ProgressReporter.saveFileProgress(client, fileId, ProgressReporter.TYPE_SCROLL_PERCENT, pct);
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (videoTimerTask != null) mainHandler.removeCallbacks(videoTimerTask);
+        if (audioTimerTask != null) mainHandler.removeCallbacks(audioTimerTask);
+        if (scrollTimer != null) mainHandler.removeCallbacks(scrollTimer);
+        // 退出前保存最终进度
+        if (videoView != null) {
+            saveVideoProgress(videoView);
+        }
         if (audioPlayer != null) {
-            try { audioPlayer.release(); } catch (Exception ignored) { }
+            saveAudioProgress();
+            try {
+                audioPlayer.release();
+            } catch (Exception ignored) {
+            }
             audioPlayer = null;
+        }
+        if (textScrollView != null) {
+            saveTextProgress(textScrollView);
         }
     }
 }

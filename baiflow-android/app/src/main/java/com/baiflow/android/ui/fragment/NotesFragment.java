@@ -127,14 +127,21 @@ public class NotesFragment extends Fragment {
         recyclerView.setVisibility(items == null || items.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
-    /** 在线模式：后台同步一次，完成后刷新列表 */
+    /** 在线模式：后台同步一次，完成后刷新列表；非在线模式直接停止刷新动画 */
     private void syncAndReload() {
-        if (!session.isOnlineMode()) return;
+        if (!session.isOnlineMode()) {
+            swipeRefresh.setRefreshing(false);
+            return;
+        }
         android.content.Context ctx = requireContext();
         new Thread(() -> {
             SyncService.syncOnce(ctx);
             if (getActivity() != null) {
-                getActivity().runOnUiThread(this::reload);
+                getActivity().runOnUiThread(() -> {
+                    reload();
+                    // 下拉刷新转圈由 SwipeRefreshLayout 触发，完成后必须复位，否则一直转（对齐 FilesFragment）
+                    swipeRefresh.setRefreshing(false);
+                });
             }
         }).start();
     }

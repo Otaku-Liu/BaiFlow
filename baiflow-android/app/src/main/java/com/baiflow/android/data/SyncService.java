@@ -143,6 +143,11 @@ public final class SyncService {
                              LocalNoteDao dao, String partition) throws IOException {
         String since = session.getLastSyncAt();
         boolean hasSince = since != null && !since.isEmpty();
+        // 本地镜像为空时增量游标无意义（登出清缓存等场景会留旧 lastSyncAt），强制全量重拉，
+        // 否则增量 updatedAfter=旧时间 会漏掉更早的笔记，Room 永远为空
+        if (hasSince && dao.countSynced(partition) == 0) {
+            hasSince = false;
+        }
         String sinceIso = hasSince ? since : "1970-01-01T00:00:00";
         LocalDateTime latest = parse(sinceIso, LocalDateTime.of(1970, 1, 1, 0, 0));
 

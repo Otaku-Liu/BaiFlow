@@ -42,7 +42,8 @@ export default {
     unlimited: 'Unlimited',
     pleaseInput: 'Please enter',
     pleaseSelect: 'Please select',
-    logout: 'Logout'
+    logout: 'Logout',
+    resumed: 'Restored to last position'
   },
   loginLog: {
     title: 'Login & Session Logs',

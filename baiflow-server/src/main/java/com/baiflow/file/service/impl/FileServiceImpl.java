@@ -366,6 +366,10 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         f.setDeletedAt(LocalDateTime.now());
         updateById(f);
 
+        // 级联删除该文件的播放/阅读进度，避免残留孤儿进度
+        playbackProgressService.remove(new LambdaQueryWrapper<PlaybackProgress>()
+                .eq(PlaybackProgress::getFileItemId, id));
+
         StorageRoot root = storageService.getByIdOrThrow(f.getStorageRootId());
         Path p = storageService.resolveRootPath(root).resolve(f.getRelativePath()).normalize();
         storageService.verifyPathInRoot(root, p);

@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.os.Bundle;
+import android.view.MotionEvent;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -18,6 +19,7 @@ import com.baiflow.android.network.NetworkFeedback;
 import com.baiflow.android.ui.fragment.FilesFragment;
 import com.baiflow.android.ui.fragment.MineFragment;
 import com.baiflow.android.ui.fragment.NotesFragment;
+import com.baiflow.android.util.KeyboardUtil;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
@@ -105,6 +107,13 @@ public class MainActivity extends AppCompatActivity {
             }
             return true;
         });
+    }
+
+    /** 点击空白区域（非输入框）收起键盘并让搜索框失焦 */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        KeyboardUtil.hideOnTouchOutside(this, ev);
+        return super.dispatchTouchEvent(ev);
     }
 
     /** 注册设备网络监听：断网即时提示，恢复时提示「网络已恢复」 */

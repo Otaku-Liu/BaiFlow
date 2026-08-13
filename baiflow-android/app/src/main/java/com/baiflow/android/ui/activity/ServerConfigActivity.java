@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.MotionEvent;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -16,6 +17,7 @@ import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.data.AppDatabase;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.network.NetworkFeedback;
+import com.baiflow.android.util.KeyboardUtil;
 
 /**
  * 服务器配置页 — 输入 BaiFlow 服务器地址，并检测连通性（经 ApiClient 请求 /api/health）。
@@ -32,6 +34,13 @@ public class ServerConfigActivity extends AppCompatActivity {
     private SessionManager session;
     private ApiClient client;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    /** 点击空白区域（非输入框）收起键盘并让当前输入框失焦 */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        KeyboardUtil.hideOnTouchOutside(this, ev);
+        return super.dispatchTouchEvent(ev);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

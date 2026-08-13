@@ -118,10 +118,12 @@ const category = computed(() => mimeCategory(mime.value))
 const progressType = computed(() => progressTypeForCategory(category.value))
 
 // ---- 进度管理 ----
-let progress = null
-if (props.fileItem) {
-  progress = usePlaybackProgress(props.fileItem.id, progressType.value || 'SECONDS')
-}
+// 抽屉常驻挂载、fileItem 初始为 null：composable 在 setup 顶层创建一次，
+// fileId/类型用 computed 响应文件切换，不在 watcher 里重建（useI18n 等须在 setup 顶层调用）
+const progress = usePlaybackProgress(
+  computed(() => props.fileItem?.id),
+  computed(() => progressType.value || 'SECONDS')
+)
 
 async function onMediaReady() {
   if (!progress || !mediaRef.value) return
@@ -155,7 +157,8 @@ async function loadTextContent() {
     if (progress && scrollRef.value) {
       await progress.promptResume((pos) => {
         if (scrollRef.value) {
-          scrollRef.value.scrollTop = pos * scrollRef.value.scrollHeight
+          const max = scrollRef.value.scrollHeight - scrollRef.value.clientHeight
+          if (max > 0) scrollRef.value.scrollTop = pos * max
         }
       })
       // 滚动进度：防抖 2 秒保存
@@ -164,8 +167,12 @@ async function loadTextContent() {
         if (scrollTimer) clearTimeout(scrollTimer)
         scrollTimer = setTimeout(() => {
           if (scrollRef.value) {
-            const pct = scrollRef.value.scrollTop / scrollRef.value.scrollHeight
-            if (pct > 0) progress.saveNow(pct)
+            const max = scrollRef.value.scrollHeight - scrollRef.value.clientHeight
+            if (max > 0) {
+              const pct = Math.min(1, Math.max(0, scrollRef.value.scrollTop / max))
+              // 回顶时 pct=0 也保存，用于清除历史进度
+              progress.saveNow(pct)
+            }
           }
         }, 2000)
       })
@@ -187,7 +194,8 @@ async function loadMarkdown() {
     if (progress && scrollRef.value) {
       await progress.promptResume((pos) => {
         if (scrollRef.value) {
-          scrollRef.value.scrollTop = pos * scrollRef.value.scrollHeight
+          const max = scrollRef.value.scrollHeight - scrollRef.value.clientHeight
+          if (max > 0) scrollRef.value.scrollTop = pos * max
         }
       })
       let scrollTimer = null
@@ -195,8 +203,12 @@ async function loadMarkdown() {
         if (scrollTimer) clearTimeout(scrollTimer)
         scrollTimer = setTimeout(() => {
           if (scrollRef.value) {
-            const pct = scrollRef.value.scrollTop / scrollRef.value.scrollHeight
-            if (pct > 0) progress.saveNow(pct)
+            const max = scrollRef.value.scrollHeight - scrollRef.value.clientHeight
+            if (max > 0) {
+              const pct = Math.min(1, Math.max(0, scrollRef.value.scrollTop / max))
+              // 回顶时 pct=0 也保存，用于清除历史进度
+              progress.saveNow(pct)
+            }
           }
         }, 2000)
       })

@@ -3,8 +3,7 @@ package com.baiflow.android.model;
 import com.google.gson.annotations.SerializedName;
 
 /**
- * 笔记阅读进度 — Android 编辑器非阅读器，本模型仅用于定义接口契约，
- * 客户端不主动上报（进度由 Web 阅读时维护）。
+ * 笔记阅读进度（SCROLL_PERCENT，0~1）— Android 编辑器续读时上报，与 Web 共用同一份数据。
  */
 public class NoteProgress {
     @SerializedName("noteId")

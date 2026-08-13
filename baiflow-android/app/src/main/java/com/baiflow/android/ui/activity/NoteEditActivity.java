@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.MotionEvent;
 import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -52,6 +53,7 @@ import com.baiflow.android.data.AppDatabase;
 import com.baiflow.android.data.LocalNote;
 import com.baiflow.android.data.LocalNoteDao;
 import com.baiflow.android.data.MediaFiles;
+import com.baiflow.android.data.ProgressReporter;
 import com.baiflow.android.data.SyncService;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.NoteDetail;
@@ -59,6 +61,7 @@ import com.baiflow.android.model.NoteMedia;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.network.UiCallback;
 import com.baiflow.android.sync.SyncWorker;
+import com.baiflow.android.util.KeyboardUtil;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -102,6 +105,7 @@ public class NoteEditActivity extends AppCompatActivity {
     private LocalNote currentNote;           // 当前编辑的本地笔记（null = 新建）
     private boolean dirty = false;
     private boolean saving = false;
+    private Runnable progressScrollTimer;    // 笔记滚动进度防抖上报（与 Web 笔记 800ms 一致）
 
     // 工具栏
     private com.google.android.material.button.MaterialButton
@@ -180,6 +184,12 @@ public class NoteEditActivity extends AppCompatActivity {
             @Override public void onImageTapped(NoteImageSpan span) { showImageMenu(span); }
             @Override public void onAudioTapped(NoteAudioSpan span) { playAudio(span); }
         });
+        // 阅读进度：滚动防抖上报（保存与正文 dirty 完全独立）
+        etContent.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+            if (progressScrollTimer != null) mainHandler.removeCallbacks(progressScrollTimer);
+            progressScrollTimer = this::saveNoteProgress;
+            mainHandler.postDelayed(progressScrollTimer, 800);
+        });
 
         // 返回：有改动自动保存
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -188,6 +198,7 @@ public class NoteEditActivity extends AppCompatActivity {
                 if (dirty && !saving) {
                     save(true);
                 } else {
+                    saveNoteProgress();
                     finish();
                 }
             }
@@ -218,8 +229,18 @@ public class NoteEditActivity extends AppCompatActivity {
 
         findViewById(R.id.btnSave).setOnClickListener(v -> save(false));
         findViewById(R.id.btnBack).setOnClickListener(v -> {
-            if (dirty && !saving) save(true); else finish();
+            if (dirty && !saving) save(true); else {
+                saveNoteProgress();
+                finish();
+            }
         });
+    }
+
+    /** 点击空白区域（非输入框）收起键盘并让当前输入框失焦；点标题↔正文之间切换不收起 */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        KeyboardUtil.hideOnTouchOutside(this, ev);
+        return super.dispatchTouchEvent(ev);
     }
 
     // ==================== 工具栏 ====================
@@ -456,10 +477,53 @@ public class NoteEditActivity extends AppCompatActivity {
         dirty = false;
         loadMediaImages();
         refreshToolbarState();
+        resumeNoteProgress();
         // 同步冲突标记 → 打开时提示「覆盖/重载」
         if (n.conflict) {
             showConflictDialog(false);
         }
+    }
+
+    // ==================== 阅读进度（续读 + 上报，与 Web 共用 SCROLL_PERCENT）====================
+
+    /** 续读：拉取服务端笔记进度后自动滚动到记录位置（仅已同步的笔记） */
+    private void resumeNoteProgress() {
+        if (currentNote == null || currentNote.serverId == null) return;
+        String noteId = currentNote.serverId;
+        new Thread(() -> {
+            double pct = ProgressReporter.fetchNoteProgress(client, noteId);
+            mainHandler.post(() -> applyNoteProgress(pct));
+        }).start();
+    }
+
+    /** 应用滚动位置：布局完成后计算最大滚动距离，短笔记（不足一屏）不滚动 */
+    private void applyNoteProgress(double pct) {
+        if (pct <= 0.01) return;
+        etContent.post(() -> {
+            int max = noteScrollRange();
+            if (max > 0) {
+                etContent.scrollTo(0, (int) (pct * max));
+                Toast.makeText(this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    /** 上报笔记滚动进度（0~1；回顶 pct=0 也保存以清除历史；短笔记不存；新建/未同步笔记不上报） */
+    private void saveNoteProgress() {
+        if (currentNote == null || currentNote.serverId == null) return;
+        int max = noteScrollRange();
+        if (max <= 0) return;
+        double pct = Math.min(1, Math.max(0, (double) etContent.getScrollY() / max));
+        ProgressReporter.saveNoteProgress(client, currentNote.serverId, pct);
+    }
+
+    /** 正文最大滚动距离：文本总高 - 可视高（含上下 padding），不足一屏为 0 */
+    private int noteScrollRange() {
+        android.text.Layout layout = etContent.getLayout();
+        if (layout == null) return 0;
+        int visible = etContent.getHeight()
+                - etContent.getCompoundPaddingTop() - etContent.getCompoundPaddingBottom();
+        return Math.max(0, layout.getHeight() - visible);
     }
 
     private void save(final boolean finishAfter) {
@@ -490,7 +554,10 @@ public class NoteEditActivity extends AppCompatActivity {
         if (session.isOnlineMode()) {
             SyncWorker.requestNow(this);
         }
-        if (finishAfter) finish();
+        if (finishAfter) {
+            saveNoteProgress();
+            finish();
+        }
     }
 
     /** 乐观并发冲突弹窗：覆盖（丢对方改动）/ 重新加载（丢本地改动） */
@@ -536,6 +603,7 @@ public class NoteEditActivity extends AppCompatActivity {
                     dirty = false;
                     loadMediaImages();
                     refreshToolbarState();
+                    resumeNoteProgress();
                     Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_reloaded), Toast.LENGTH_SHORT).show();
                     if (finishAfter) finish();
                 } else if (response.code() < 500) {

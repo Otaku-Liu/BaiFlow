@@ -139,7 +139,11 @@ public class SessionManager {
 
     // ---- Clear ----
 
-    /** 登出/401：清 token + 用户，保留服务器地址并复位离线标记（停在登录页） */
+    /**
+     * 登出/401：清 token + 用户，保留服务器地址并复位离线标记（停在登录页）。
+     * 同时清增量同步游标 lastSyncAt —— 登出等流程会清 Room 分区缓存，若保留旧游标，
+     * 重登后增量拉取 updatedAfter=旧时间 会漏掉所有更早的笔记（Room 永远为空）。
+     */
     public void clearSession() {
         prefs.edit()
                 .remove(KEY_TOKEN)
@@ -147,6 +151,7 @@ public class SessionManager {
                 .remove(KEY_USERNAME)
                 .remove(KEY_DISPLAY_NAME)
                 .remove(KEY_ROLE)
+                .remove(KEY_LAST_SYNC_AT)
                 .putBoolean(KEY_OFFLINE, false)
                 .apply();
     }

@@ -5,10 +5,14 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.os.IBinder;
+import android.provider.MediaStore;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import com.baiflow.android.R;
@@ -21,6 +25,7 @@ import com.baiflow.android.util.FormatUtil;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Response;
@@ -68,6 +73,7 @@ public class DownloadService extends Service {
     }
 
     private void performDownload(String fileId, String fileName, long totalBytes) {
+        Uri mediaUri = null;   // API 29+ 的 MediaStore 条目（失败时清理）
         try {
             ApiClient client = ApiClient.getInstance(session);
             Call<ResponseBody> call = client.downloadFile(fileId, null);
@@ -79,13 +85,30 @@ public class DownloadService extends Service {
                 return;
             }
 
-            // 保存到 app 私有下载目录
-            File downloadDir = new File(getFilesDir(), "downloads");
-            if (!downloadDir.exists()) { downloadDir.mkdirs(); }
-            File outputFile = new File(downloadDir, fileName);
-
+            String safeName = sanitizeFileName(fileName);
             InputStream in = response.body().byteStream();
-            FileOutputStream out = new FileOutputStream(outputFile);
+            OutputStream out;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // API 29+：写入公共 Download（MediaStore，作用域存储，无需权限）
+                String mime = java.net.URLConnection.guessContentTypeFromName(safeName);
+                if (mime == null) { mime = "application/octet-stream"; }
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Downloads.DISPLAY_NAME, safeName);
+                values.put(MediaStore.Downloads.MIME_TYPE, mime);
+                values.put(MediaStore.Downloads.IS_PENDING, 1);
+                mediaUri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                if (mediaUri == null) {
+                    updateNotification(fileName, getString(R.string.transfer_download_failed_detail, "无法创建下载文件"), 0);
+                    stopSelf();
+                    return;
+                }
+                out = getContentResolver().openOutputStream(mediaUri);
+            } else {
+                // API 26-28：写入公共 Download 目录（需 WRITE_EXTERNAL_STORAGE，由调用方申请）
+                File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                if (!dir.exists()) { dir.mkdirs(); }
+                out = new FileOutputStream(new File(dir, safeName));
+            }
 
             byte[] buffer = new byte[8192];
             long downloaded = 0;
@@ -107,17 +130,38 @@ public class DownloadService extends Service {
                 }
             }
 
+            out.flush();
             out.close();
             in.close();
 
+            // MediaStore 收尾：标记可见（文件管理器/下载应用即可看到）
+            if (mediaUri != null) {
+                ContentValues done = new ContentValues();
+                done.put(MediaStore.Downloads.IS_PENDING, 0);
+                getContentResolver().update(mediaUri, done, null, null);
+            }
+
             updateNotification(fileName, getString(R.string.transfer_download_completed), 100);
-            Log.i(TAG, "下载完成: " + outputFile.getAbsolutePath());
+            Log.i(TAG, "下载完成: " + safeName);
 
         } catch (Exception e) {
             Log.e(TAG, "下载失败", e);
+            // MediaStore 半成品清理，避免残留 IS_PENDING=1 的隐藏条目
+            if (mediaUri != null) {
+                try {
+                    getContentResolver().delete(mediaUri, null, null);
+                } catch (Exception ignored) {
+                }
+            }
             updateNotification(fileName, getString(R.string.transfer_download_failed_detail, e.getMessage()), 0);
         }
         stopSelf();
+    }
+
+    /** 文件名消毒：去除路径分隔符与非法字符（含控制字符），保留中文与空格 */
+    private String sanitizeFileName(String name) {
+        if (name == null) { return "file"; }
+        return name.replaceAll("[/\\\\:*?\"<>|\\p{Cntrl}]", "_");
     }
 
     private Notification buildNotification(String fileName, String status, int progress) {

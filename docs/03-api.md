@@ -82,7 +82,7 @@
 - `GET /api/files/{id}/downloads` — 文件的下载记录分页（时间/来源/下载人/IP；本人文件，管理员可查任意）
 - `POST /api/files/folders`（支持 `viewUserId` 参数）
 - `PATCH /api/files/{id}/rename` · `PATCH /api/files/{id}/move`
-- `DELETE /api/files/{id}`
+- `DELETE /api/files/{id}`（软删除；**级联删除该文件的播放/阅读进度行**）
 - `POST /api/files/{id}/privacy` · `DELETE /api/files/{id}/privacy`
 - `POST /api/files/{id}/privacy/verify`
 
@@ -116,7 +116,7 @@
 - `POST /api/notes` — 新建 `{ title, content }`（content 为 Markdown）
 - `GET /api/notes/{id}` — 详情（含 Markdown 正文）
 - `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt? }`，服务端刷新 `updated_at`；`baseUpdatedAt` 为乐观并发依据，早于服务端当前 `updated_at` 时返回业务码 `40901`（NOTE_CONFLICT，客户端可选覆盖/重新加载）
-- `DELETE /api/notes/{id}` — 软删除（status=DELETED）
+- `DELETE /api/notes/{id}` — 软删除（status=DELETED；**级联删除该笔记的阅读进度行**）
 - `GET /api/notes/{id}/progress` — 查询当前用户对笔记的阅读进度 `{ positionType, positionValue, updatedAt }`
 - `PUT /api/notes/{id}/progress` — 保存阅读进度 `{ positionValue }`（滚动百分比 0~1）
 

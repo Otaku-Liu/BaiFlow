@@ -34,11 +34,19 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 
 - 小文件 Retrofit multipart 上传；长任务前台服务（UploadService / DownloadService）带通知
 - 下载计次由后端记录（见 `docs/13-download-records.md`）
+- **下载落公共 Download 文件夹**：API 29+ 走 `MediaStore.Downloads`（作用域存储，无需权限，系统「下载」/文件管理器可见）；API 26-28 写 `Environment.DIRECTORY_DOWNLOADS`，下载前申请 `WRITE_EXTERNAL_STORAGE`
+- **不支持预览的文件**：点按弹「暂不支持在线预览」对话框（含「下载」按钮），**不自动下载**，手动点「下载」才下载
+
+## 浏览进度（跨端同步）
+
+- 文件预览：视频/音频存 **SECONDS**（10s 定时 + 退出时保存）；文本/Markdown 存 **SCROLL_PERCENT**（滚动防抖 2s，回顶保存 0 清除历史）；打开时自动 seek/滚动到记录位置并 Toast「已恢复到上次观看位置」
+- 随手记：编辑器滚动防抖 800ms 上报 SCROLL_PERCENT，打开时自动滚动到记录位置
+- 与 Web 共用服务端 `bf_playback_progress` / `bf_note_progress`，按用户存、不记设备；视频/音频仅在播放过（played）后才允许存 0，避免未播放关闭时误清历史
 
 ## 页面
 
 - 登录 / 服务器配置（连通性检测）→ **MainActivity**（底部三栏，`ViewPager2` 滑动 + 底部导航双向同步）
-  - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「新建」（下拉：新建文件夹 / 上传文件）；文件列表按类型用彩色 PNG 图标（pdf/json/xml/word/excel/ppt 等）
+  - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「新建」（下拉：新建文件夹 / 上传文件）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等）；不支持预览的文件点按弹下载确认框
   - **随手记** `NotesFragment`：列表/搜索/删除 → `NoteEditActivity`（富文本）→ `NoteDrawActivity`（画画）
   - **我的** `MineFragment`：分组（账号/通用/同步）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认
 
@@ -58,7 +66,7 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 
 - 组件：按钮（Primary / Text / **DangerOutline** 白底红字）、输入框、标题栏（居中标题 + 返回图标）、卡片、圆角弹窗（16dp）/ 下拉（12dp）
 - **按压渐变**：`widget/` 的 `AnimatedTextButton` / `AnimatedTextLabel` / `AnimatedTintImageView`，文字/图标按压「蓝→浅蓝」平滑过渡（`text_accent_selector`）；返回/刷新/上一级用单色 PNG + tint 参与渐变
-- 文件类型图标：彩色 PNG（`res/drawable/ic_type_*`）
+- 文件类型图标：彩色 PNG（`res/drawable/ic_type_*`，含 md；Web 端复用同一批 PNG 展示）
 
 ## 随手记（Phase 2 在线已实现；Phase 3 离线模式已实现）
 

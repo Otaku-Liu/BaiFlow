@@ -236,6 +236,14 @@ public class ApiClient {
                 @Body Map<String, String> body
         );
 
+        // --- 文件预览进度 ---
+        @GET("files/{id}/progress")
+        Call<ApiResponse<Map<String, Object>>> getFileProgress(@Path("id") String id);
+
+        @PUT("files/{id}/progress")
+        Call<ApiResponse<Map<String, Object>>> saveFileProgress(@Path("id") String id,
+                @Body Map<String, Object> body);
+
         // --- 存储根目录 ---
         @GET("storage-roots/active")
         Call<ApiResponse<List<StorageRoot>>> listStorageRoots();
@@ -273,7 +281,7 @@ public class ApiClient {
         @GET("notes/media/{id}")
         Call<ResponseBody> getNoteMedia(@Path("id") String id);
 
-        // --- 笔记阅读进度（契约定义；Android 不主动上报）---
+        // --- 笔记阅读进度（SCROLL_PERCENT，0~1）---
         @GET("notes/{id}/progress")
         Call<ApiResponse<NoteProgress>> getNoteProgress(@Path("id") String id);
 
@@ -438,5 +446,29 @@ public class ApiClient {
     /** 获取笔记媒体字节流（带鉴权，供编辑器回读图片/录音） */
     public Call<ResponseBody> getNoteMedia(String mediaId) {
         return getService().getNoteMedia(mediaId);
+    }
+
+    // ==================== 浏览进度 ====================
+
+    public Call<ApiResponse<Map<String, Object>>> getProgress(String fileId) {
+        return getService().getFileProgress(fileId);
+    }
+
+    public Call<ApiResponse<Map<String, Object>>> saveProgress(String fileId, String positionType,
+                                                               double positionValue) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("positionType", positionType != null ? positionType : "SECONDS");
+        body.put("positionValue", positionValue);
+        return getService().saveFileProgress(fileId, body);
+    }
+
+    public Call<ApiResponse<NoteProgress>> getNoteProgress(String noteId) {
+        return getService().getNoteProgress(noteId);
+    }
+
+    public Call<ApiResponse<Map<String, Object>>> saveNoteProgress(String noteId, double positionValue) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("positionValue", positionValue);
+        return getService().saveNoteProgress(noteId, body);
     }
 }

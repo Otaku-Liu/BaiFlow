@@ -1,5 +1,6 @@
 package com.baiflow.android.ui.fragment;
 
+import android.Manifest;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -39,8 +40,9 @@ import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.network.UiCallback;
 import com.baiflow.android.transfer.DownloadService;
 import com.baiflow.android.transfer.UploadService;
-import com.baiflow.android.util.FormatUtil;
 import com.baiflow.android.ui.activity.PreviewActivity;
+import com.baiflow.android.util.DownloadUtil;
+import com.baiflow.android.util.FormatUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +72,17 @@ public class FilesFragment extends Fragment {
     private android.widget.ImageView btnUp;
     /** 文件夹导航栈（栈顶=当前目录；空=根目录），支持逐级返回上一级 */
     private final java.util.ArrayDeque<FileItem> folderStack = new java.util.ArrayDeque<>();
+    /** 待下载文件（API 26-28 权限回调后继续下载） */
+    private FileItem pendingDownload;
+    private final ActivityResultLauncher<String> downloadPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted && pendingDownload != null) {
+                    startDownload(pendingDownload);
+                } else {
+                    Toast.makeText(requireContext(), getString(R.string.files_download_permission_denied), Toast.LENGTH_SHORT).show();
+                }
+                pendingDownload = null;
+            });
 
     private List<StorageRoot> roots = new ArrayList<>();
     private List<UserInfo> users = new ArrayList<>();
@@ -547,7 +560,8 @@ public class FilesFragment extends Fragment {
                             item.getMimeType(), privacyTokens.get(currentParentId),
                             item.getSizeBytes() != null ? item.getSizeBytes() : 0L));
                 } else {
-                    downloadFile(item);
+                    // 不支持预览：提示 + 手动确认下载，不自动下载
+                    showUnsupportedDownloadDialog(item);
                 }
             });
 
@@ -560,9 +574,11 @@ public class FilesFragment extends Fragment {
         @Override
         public int getItemCount() { return items.size(); }
 
-        /** 按文件类型返回图标（彩色 PNG；json/xml 独立，其它 text 共用文件图标） */
+        /** 按文件类型返回图标（彩色 PNG；md/json/xml 独立，其它 text 共用文件图标） */
         private int iconFor(FileItem item) {
             if (item.isDirectory()) return R.drawable.ic_folder;
+            // md 优先按扩展名识别：服务端存的 mime 是上传方 Content-Type，.md 可能不是 text/markdown
+            if (isMarkdown(item)) return R.drawable.ic_type_md;
             String mime = item.getMimeType();
             if (mime == null) return R.drawable.ic_type_file;
             if (mime.startsWith("image/")) return R.drawable.ic_type_image;
@@ -580,6 +596,17 @@ public class FilesFragment extends Fragment {
             return R.drawable.ic_type_file;
         }
 
+        /** 是否 Markdown 文件：扩展名 .md/.markdown，或 MIME 含 markdown */
+        private boolean isMarkdown(FileItem item) {
+            String name = item.getName();
+            if (name != null) {
+                String lower = name.toLowerCase(java.util.Locale.ROOT);
+                if (lower.endsWith(".md") || lower.endsWith(".markdown")) return true;
+            }
+            String mime = item.getMimeType();
+            return mime != null && mime.contains("markdown");
+        }
+
         class ViewHolder extends RecyclerView.ViewHolder {
             ImageView ivIcon;
             TextView tvName, tvMeta, tvPrivacyTag;
@@ -594,13 +621,30 @@ public class FilesFragment extends Fragment {
     }
 
     private void downloadFile(FileItem item) {
-        Intent downloadIntent = new Intent(requireContext(), DownloadService.class);
-        downloadIntent.putExtra(DownloadService.EXTRA_FILE_ID, item.getId());
-        downloadIntent.putExtra(DownloadService.EXTRA_FILE_NAME, item.getName());
-        downloadIntent.putExtra(DownloadService.EXTRA_SIZE_BYTES,
+        // API 26-28 写公共 Download 目录需存储权限；未授权先请求，授权后继续下载
+        if (DownloadUtil.needsLegacyStoragePermission()
+                && !DownloadUtil.hasLegacyStoragePermission(requireContext())) {
+            pendingDownload = item;
+            downloadPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            return;
+        }
+        startDownload(item);
+    }
+
+    private void startDownload(FileItem item) {
+        DownloadUtil.startDownloadService(requireContext(), item.getId(), item.getName(),
                 item.getSizeBytes() != null ? item.getSizeBytes() : 0L);
-        requireContext().startForegroundService(downloadIntent);
         Toast.makeText(requireContext(), getString(R.string.files_download_started, item.getName()), Toast.LENGTH_SHORT).show();
+    }
+
+    /** 不支持预览的文件：提示 + 手动确认下载（不自动下载） */
+    private void showUnsupportedDownloadDialog(FileItem item) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(getString(R.string.preview_unsupported))
+                .setMessage(getString(R.string.files_unsupported_download_prompt, item.getName()))
+                .setPositiveButton(getString(R.string.files_download), (d, w) -> downloadFile(item))
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .show();
     }
 
     private void showFileContextMenu(FileItem item) {

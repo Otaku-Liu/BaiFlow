@@ -83,7 +83,7 @@ let noteUpdatedAt = null // 当前打开笔记基于的 updatedAt（乐观并发
 let saveInterval = null
 let searchTimer = null
 
-const { maybeResume, saveFromScroll } = useNoteProgress(currentId, confirm)
+const { maybeResume, saveFromScroll } = useNoteProgress(currentId)
 
 /** Vditor 的滚动容器（阅读进度用，IR 模式在 .vditor-content / .vditor-ir） */
 function getScrollEl() {

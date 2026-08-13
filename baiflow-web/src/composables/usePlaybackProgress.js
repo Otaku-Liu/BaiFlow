@@ -1,22 +1,28 @@
 import { ref, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { getProgress, saveProgress } from '../api/files'
 
 /**
  * 播放/阅读进度管理 composable。
  *
- * @param {string} fileId     文件 ID
- * @param {string} positionType 进度类型：SECONDS | PAGE | SCROLL_PERCENT
- * @param {import('vue').Ref} targetRef  视频/音频的 template ref，或带 scrollTop 的容器 ref
+ * 参数为 ref/computed：抽屉常驻挂载时 fileItem 初始为 null，打开/切换文件时通过
+ * fileIdRef 响应变化，本函数只需在 setup 顶层调用一次（不重建），避免在 watcher 里
+ * 调用组合函数（useI18n/onUnmounted 必须在 setup 顶层）。
+ *
+ * @param {import('vue').Ref<string|undefined>} fileIdRef      文件 ID
+ * @param {import('vue').Ref<string>} positionTypeRef 进度类型：SECONDS | PAGE | SCROLL_PERCENT
  */
-export function usePlaybackProgress(fileId, positionType) {
+export function usePlaybackProgress(fileIdRef, positionTypeRef) {
+  const { t } = useI18n()
   const savedPosition = ref(null)
   let autoSaveTimer = null
 
   /** 从服务端查询进度，有则返回，无则 null */
   async function checkProgress() {
+    if (!fileIdRef.value) return null
     try {
-      const { data } = await getProgress(fileId)
+      const { data } = await getProgress(fileIdRef.value)
       if (data.code === 0 && data.data) {
         savedPosition.value = data.data.positionValue
         return {
@@ -29,30 +35,17 @@ export function usePlaybackProgress(fileId, positionType) {
   }
 
   /**
-   * 如果有历史进度，弹出 Toast 提示用户跳转。
-   * @param {function} onJump 用户点击「跳转」时的回调 (position) => void
+   * 有历史进度则自动恢复到记录位置，并提示「已恢复到上次观看位置」（不再弹跳转确认）。
+   * @param {function} onJump 恢复位置的回调 (position) => void
    */
   async function promptResume(onJump) {
     const progress = await checkProgress()
     if (!progress || progress.positionValue <= 0) return
-
-    let label = ''
-    if (progress.positionType === 'PAGE') {
-      label = `上次看到第 ${Math.round(progress.positionValue)} 页`
-    } else if (progress.positionType === 'SCROLL_PERCENT') {
-      label = `上次看到 ${Math.round(progress.positionValue * 100)}%`
-    } else {
-      const m = Math.floor(progress.positionValue / 60)
-      const s = Math.floor(progress.positionValue % 60)
-      label = `上次看到 ${m}:${String(s).padStart(2, '0')}`
-    }
-
+    onJump(progress.positionValue)
     ElMessage({
-      message: label,
-      type: 'info',
-      duration: 5000,
-      showClose: true,
-      onClick: () => onJump(progress.positionValue)
+      message: t('common.resumed'),
+      type: 'success',
+      duration: 2000
     })
   }
 
@@ -64,16 +57,16 @@ export function usePlaybackProgress(fileId, positionType) {
     stopAutoSave()
     autoSaveTimer = setInterval(() => {
       const val = getCurrentPosition()
-      if (val != null) {
-        saveProgress(fileId, positionType, val).catch(() => {})
+      if (val != null && fileIdRef.value) {
+        saveProgress(fileIdRef.value, positionTypeRef.value, val).catch(() => {})
       }
     }, 10000)
   }
 
   /** 立即保存当前进度 */
   function saveNow(positionValue) {
-    if (positionValue != null) {
-      saveProgress(fileId, positionType, positionValue).catch(() => {})
+    if (positionValue != null && fileIdRef.value) {
+      saveProgress(fileIdRef.value, positionTypeRef.value, positionValue).catch(() => {})
     }
   }
 

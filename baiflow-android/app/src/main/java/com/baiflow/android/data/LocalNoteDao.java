@@ -39,6 +39,10 @@ public interface LocalNoteDao {
     @Query("SELECT COUNT(*) FROM bf_local_note WHERE serverUrl = 'LOCAL' AND source = 'LOCAL_ONLY'")
     int countLocalOnly();
 
+    /** 某分区已同步的服务端镜像笔记数（镜像为空时增量游标无意义，需全量重拉） */
+    @Query("SELECT COUNT(*) FROM bf_local_note WHERE serverUrl = :serverUrl AND source = 'SYNCED'")
+    int countSynced(String serverUrl);
+
     /** 本地模式笔记（首次配服务器登录时「上传前询问」用） */
     @Query("SELECT * FROM bf_local_note WHERE serverUrl = 'LOCAL' AND source = 'LOCAL_ONLY'")
     List<LocalNote> listLocalOnly();

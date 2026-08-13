@@ -56,10 +56,8 @@
       <el-table-column :label="t('common.name')" min-width="280">
         <template #default="{ row }">
           <div class="name-cell">
-            <el-icon :size="18">
-              <Folder v-if="row.itemType === 'DIRECTORY'" color="#409EFF" />
-              <Document v-else />
-            </el-icon>
+            <img v-if="row.itemType === 'DIRECTORY'" :src="folderIconPath" class="file-type-icon" alt="" />
+            <img v-else :src="fileIconPath(row.name, row.mimeType)" class="file-type-icon" alt="" />
             <span style="margin-left:8px">{{ row.name }}</span>
             <el-tag v-if="row.privacyMode === 'PRIVATE'" size="small" type="warning" style="margin-left:6px">{{ t('files.privacy') }}</el-tag>
           </div>
@@ -199,7 +197,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { Folder, Document, Upload, FolderAdd, UploadFilled } from '@element-plus/icons-vue'
+import { Upload, FolderAdd, UploadFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { useFileStore } from '../stores/file'
 import {
@@ -211,7 +209,7 @@ import { formatDateTime, formatSize } from '../utils/format'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import PreviewDrawer from '../components/PreviewDrawer.vue'
-import { mimeCategory, canPreview } from '../utils/mime'
+import { mimeCategory, canPreview, fileIconPath, folderIconPath } from '../utils/mime'
 
 const authStore = useAuthStore()
 const fileStore = useFileStore()
@@ -718,6 +716,14 @@ function handleHttpError(e) {
   display: flex;
   align-items: center;
   font-weight: 500;
+}
+
+/* 文件类型图标（200x200 PNG，缩小展示） */
+.file-type-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .action-btns {

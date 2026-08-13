@@ -72,6 +72,45 @@ export function canPreview(mime) {
 export function progressTypeForCategory(category) {
   if (category === 'video' || category === 'audio') return 'SECONDS'
   if (category === 'pdf') return 'PAGE'
-  if (category === 'text') return 'SCROLL_PERCENT'
+  if (category === 'text' || category === 'markdown') return 'SCROLL_PERCENT'
   return null
+}
+
+// ---- 文件类型图标（与 Android 端 FilesFragment.iconFor 保持一致，图标复用 Android 资源） ----
+
+/** 图标基础路径（Vite public 目录，构建后复制到 dist 根） */
+const ICON_DIR = '/icons/'
+
+/** 文件夹图标 */
+export const folderIconPath = `${ICON_DIR}ic_folder.png`
+
+/**
+ * 根据文件名/MIME 返回文件类型图标路径。
+ * md 优先按扩展名识别：服务端存的 mime 是上传方 Content-Type，.md 可能不是 text/markdown。
+ */
+export function fileIconPath(name, mime) {
+  if (isMarkdown(name, mime)) return `${ICON_DIR}ic_type_md.png`
+  if (!mime) return `${ICON_DIR}ic_type_file.png`
+  if (mime.startsWith('image/')) return `${ICON_DIR}ic_type_image.png`
+  if (mime.startsWith('video/')) return `${ICON_DIR}ic_type_video.png`
+  if (mime.startsWith('audio/')) return `${ICON_DIR}ic_type_audio.png`
+  if (mime === 'application/pdf') return `${ICON_DIR}ic_type_pdf.png`
+  if (mime.endsWith('json')) return `${ICON_DIR}ic_type_json.png`
+  if (mime.endsWith('xml')) return `${ICON_DIR}ic_type_xml.png`
+  if (mime.startsWith('text/')) return `${ICON_DIR}ic_type_file.png`
+  if (mime.includes('msword') || mime.includes('wordprocessingml')) return `${ICON_DIR}ic_type_word.png`
+  if (mime.includes('ms-excel') || mime.includes('spreadsheetml')) return `${ICON_DIR}ic_type_excel.png`
+  if (mime.includes('ms-powerpoint') || mime.includes('presentationml')) return `${ICON_DIR}ic_type_ppt.png`
+  if (mime.includes('zip') || mime.includes('compressed') || mime.includes('x-tar')
+      || mime.includes('gzip')) return `${ICON_DIR}ic_type_archive.png`
+  return `${ICON_DIR}ic_type_file.png`
+}
+
+/** 是否 Markdown 文件：扩展名 .md/.markdown，或 MIME 含 markdown */
+function isMarkdown(name, mime) {
+  if (name) {
+    const lower = name.toLowerCase()
+    if (lower.endsWith('.md') || lower.endsWith('.markdown')) return true
+  }
+  return !!(mime && mime.includes('markdown'))
 }

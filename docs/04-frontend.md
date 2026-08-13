@@ -42,7 +42,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | `components/PreviewDrawer.vue` | 文件预览抽屉，按 MIME 类型路由到 5 种渲染器（img/video/audio/iframe/pre） |
 | `views/NotesView.vue` | 随手记页：左侧笔记列表 + 右侧 Vditor 编辑器（IR 即时渲染，输出 Markdown 源；工具栏含自定义代码块按钮）、10s 自动保存 + 手动保存、编辑区滚动保存 SCROLL_PERCENT、SSE 收 NOTE_UPDATED 刷新列表/别端保存时未在编辑则同步正文、乐观并发冲突（覆盖/重载）；`rewriteMediaAuth()` 把 `/api/notes/media/{id}` 的 `<img>`/`<audio>` 追加 `?token=<会话token>`（复用 SSE 的 token 鉴权）|
 | `composables/useConfirmDialog.js` | 提供 `confirm()` promise 式 API，搭配 `ConfirmDialog` 使用 |
-| `composables/usePlaybackProgress.js` | 播放/阅读进度管理：查询历史进度、Toast 续看提示、10s 自动保存、关闭时最终保存 |
+| `composables/usePlaybackProgress.js` | 播放/阅读进度管理：查询历史进度、打开时**自动恢复位置**并提示「已恢复到上次观看位置」（不再弹跳转确认）、10s 自动保存、关闭时最终保存；滚动百分比按「滚动范围（scrollHeight - clientHeight）」计算，与 Android 一致 |
 | `composables/useSse.js` | SSE 长连接封装：`EventSource` 连 `/api/events?token=<会话token>`，按事件名注册回调，组件卸载关闭 |
 | `api/notes.js` | 笔记 CRUD + 阅读进度 API 封装 |
 | `utils/mime.js` | 扩展名→MIME 映射表、MIME 主类型判定（image/video/audio/pdf/markdown/text/unknown）、预览支持判断、进度类型推断（SECONDS/PAGE/SCROLL_PERCENT） |

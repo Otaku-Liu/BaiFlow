@@ -2,6 +2,7 @@ package com.baiflow.android.ui.activity;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -20,6 +21,7 @@ import com.baiflow.android.model.UserInfo;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.network.NetworkFeedback;
 import com.baiflow.android.sync.SyncWorker;
+import com.baiflow.android.util.KeyboardUtil;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -62,6 +64,13 @@ public class LoginActivity extends AppCompatActivity {
             startActivity(new Intent(this, MainActivity.class));
             finish();
         });
+    }
+
+    /** 点击空白区域（非输入框）收起键盘并让当前输入框失焦 */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        KeyboardUtil.hideOnTouchOutside(this, ev);
+        return super.dispatchTouchEvent(ev);
     }
 
     private void doLogin() {
