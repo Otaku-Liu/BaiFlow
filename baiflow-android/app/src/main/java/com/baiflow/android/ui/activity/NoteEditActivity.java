@@ -2,28 +2,23 @@ package com.baiflow.android.ui.activity;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
-import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.MotionEvent;
 import android.text.Editable;
-import android.text.Spannable;
-import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
-import android.text.style.URLSpan;
+import android.text.style.UnderlineSpan;
 import android.view.View;
 import android.widget.EditText;
-import android.widget.ImageView;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,57 +28,38 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
-import com.baiflow.android.editor.EditorStyle;
-import com.baiflow.android.editor.MarkdownEmitter;
-import com.baiflow.android.editor.MarkdownParser;
-import com.baiflow.android.editor.ModelToSpanned;
-import com.baiflow.android.editor.NoteAudioSpan;
-import com.baiflow.android.editor.NoteBulletSpan;
-import com.baiflow.android.editor.NoteHeadingSpan;
-import com.baiflow.android.editor.NoteImageSpan;
-import com.baiflow.android.editor.NoteInlineCodeSpan;
-import com.baiflow.android.editor.NoteOrderedSpan;
-import com.baiflow.android.editor.ParagraphHelper;
-import com.baiflow.android.editor.RichEditText;
-import com.baiflow.android.editor.SpanExtractor;
 import com.baiflow.android.data.AppDatabase;
 import com.baiflow.android.data.LocalNote;
 import com.baiflow.android.data.LocalNoteDao;
 import com.baiflow.android.data.MediaFiles;
 import com.baiflow.android.data.ProgressReporter;
 import com.baiflow.android.data.SyncService;
-import com.baiflow.android.model.ApiResponse;
-import com.baiflow.android.model.NoteDetail;
-import com.baiflow.android.model.NoteMedia;
+import com.baiflow.android.editor.BlockRichText;
+import com.baiflow.android.editor.EditorStyle;
+import com.baiflow.android.editor.MarkdownEmitter;
+import com.baiflow.android.editor.MarkdownParser;
+import com.baiflow.android.editor.NoteBlocks;
 import com.baiflow.android.network.ApiClient;
-import com.baiflow.android.network.UiCallback;
 import com.baiflow.android.sync.SyncWorker;
+import com.baiflow.android.ui.adapter.NoteBlockAdapter;
 import com.baiflow.android.util.KeyboardUtil;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import okhttp3.ResponseBody;
-import retrofit2.Call;
-import retrofit2.Response;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * 随手记富文本编辑器页 — 所见即所得 Markdown 编辑。
- * <p>
- * 加载：Markdown → {@link MarkdownParser} → Doc → {@link ModelToSpanned} → Spannable。
- * 保存：Spannable → {@link SpanExtractor} → Doc → {@link MarkdownEmitter} → Markdown。
- * 支持工具栏格式化（加粗/斜体/删除线/H1-H3/列表/引用/代码块/链接）、图片插入、
- * 录音插入、画画插入；返回时自动保存。媒体经服务器笔记媒体接口上传，引用写进正文。
+ * 随手记块编辑器 — 每块一个真实 View（文本 EditText / 图片 / 音频播放组件）。
+ * 加载：Markdown → {@link MarkdownParser} → {@link NoteBlocks#fromDoc} → RecyclerView；
+ * 保存：块 → {@link NoteBlocks#toDoc} → {@link MarkdownEmitter} → Room（离线优先，同步不变）。
  */
 public class NoteEditActivity extends AppCompatActivity {
 
@@ -94,47 +70,49 @@ public class NoteEditActivity extends AppCompatActivity {
 
     private SessionManager session;
     private ApiClient client;
-    private EditorStyle editorStyle;
     private LocalNoteDao dao;
 
     private EditText etTitle;
-    private RichEditText etContent;
+    private RecyclerView recyclerBlocks;
+    private FrameLayout blockFrame;
+    private View floatBar;
+    private NoteBlockAdapter blockAdapter;
+    private EditorStyle editorStyle;
+    // 最近一次聚焦的文本块（浮动条 B/I/U/S 与顶部块类型栏的操作对象；失去焦点后仍保留，
+    // 便于点击工具栏按钮时继续对原块操作，下一次聚焦时更新）
+    private EditText activeTextBlock;
+    private int activeBlockPosition = -1;
+    private Integer pendingInsertIdx;   // 「在上方插入」媒体时的目标位置（null = 追加末尾）
 
-    private NoteImageSpan replaceTarget;     // 替换旧图的目标 span
-
-    private LocalNote currentNote;           // 当前编辑的本地笔记（null = 新建）
+    private final List<NoteBlocks.Block> blocks = new ArrayList<>();
+    private LocalNote currentNote;
     private boolean dirty = false;
     private boolean saving = false;
-    private Runnable progressScrollTimer;    // 笔记滚动进度防抖上报（与 Web 笔记 800ms 一致）
 
-    // 工具栏
-    private com.google.android.material.button.MaterialButton
-            btnBold, btnItalic, btnStrike, btnH1, btnH2, btnBullet, btnMore;
-    private com.google.android.material.button.MaterialButton
-            btnH3, btnOrdered, btnInlineCode, btnLink, btnImage, btnAudio, btnDraw;
-    private View moreRow;
-
-    // 媒体加载
-    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    // 图片位图 LRU 缓存（access-order，上限 64 张），避免重复拉取
-    private final Map<String, Bitmap> bitmapCache = java.util.Collections.synchronizedMap(
-            new LinkedHashMap<String, Bitmap>(32, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, Bitmap> eldest) {
-                    return size() > 64;
-                }
-            });
+    private final java.util.concurrent.ExecutorService ioExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+    private Runnable progressScrollTimer;   // 阅读进度滚动防抖上报
 
-    private MediaPlayer audioPlayer;
+    // 媒体
+    private final MediaRecorder[] activeRecorder = {null};
+    private final File[] recordingFile = {null};
+    private final boolean[] recording = {false};
+    private final long[] recordingStartMs = {0};   // 录音起始墙钟（算真实时长，避免 MediaPlayer 误读）
 
     // 图片选择（普通插入）
     private final ActivityResultLauncher<String> imagePicker = registerForActivityResult(
             new ActivityResultContracts.GetContent(), uri -> {
                 if (uri == null) return;
-                NoteImageSpan target = replaceTarget;
-                replaceTarget = null;   // 一次性消费替换目标，避免下次选择误替换
-                readImageAndInsert(uri, target);
+                ioExecutor.execute(() -> {
+                    try {
+                        byte[] bytes = readAll(uri);
+                        addImageBlock(bytes, "image.jpg", "image/jpeg");
+                    } catch (Exception e) {
+                        mainHandler.post(() -> Toast.makeText(this,
+                                getString(R.string.note_edit_image_decode_failed), Toast.LENGTH_SHORT).show());
+                    }
+                });
             });
 
     // 画画结果
@@ -143,7 +121,7 @@ public class NoteEditActivity extends AppCompatActivity {
                 if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                     byte[] png = result.getData().getByteArrayExtra(NoteDrawActivity.EXTRA_PNG);
                     if (png != null) {
-                        insertImageMedia(png, getString(R.string.note_edit_drawing_filename), "image/png", "DRAWING", getString(R.string.note_draw_title));
+                        addImageBlock(png, getString(R.string.note_edit_drawing_filename), "image/png");
                     }
                 }
             });
@@ -166,30 +144,26 @@ public class NoteEditActivity extends AppCompatActivity {
         session = SessionManager.getInstance(this);
         client = ApiClient.getInstance(session);
         dao = AppDatabase.get(this).noteDao();
-        editorStyle = new EditorStyle(this);
 
         long localId = getIntent().getLongExtra(EXTRA_LOCAL_ID, -1);
         String title = getIntent().getStringExtra(EXTRA_TITLE);
 
         etTitle = findViewById(R.id.etTitle);
-        etContent = findViewById(R.id.etContent);
-        moreRow = findViewById(R.id.moreRow);
+        recyclerBlocks = findViewById(R.id.recyclerBlocks);
+        editorStyle = new EditorStyle(this);
+        blockFrame = findViewById(R.id.blockFrame);
+        floatBar = findViewById(R.id.floatFormatBar);
         TextView headerTitle = findViewById(R.id.tvHeaderTitle);
         headerTitle.setText(localId < 0 ? getString(R.string.note_edit_new_title) : getString(R.string.note_edit_edit_title));
+        // 键盘开合/布局变化时浮动条跟随焦点块重新定位
+        blockFrame.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            if (floatBar.getVisibility() == View.VISIBLE) {
+                positionFloatingBar();
+            }
+        });
 
         wireToolbar();
-        wireEditor();
-
-        etContent.setMediaTapListener(new RichEditText.OnMediaTapListener() {
-            @Override public void onImageTapped(NoteImageSpan span) { showImageMenu(span); }
-            @Override public void onAudioTapped(NoteAudioSpan span) { playAudio(span); }
-        });
-        // 阅读进度：滚动防抖上报（保存与正文 dirty 完全独立）
-        etContent.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            if (progressScrollTimer != null) mainHandler.removeCallbacks(progressScrollTimer);
-            progressScrollTimer = this::saveNoteProgress;
-            mainHandler.postDelayed(progressScrollTimer, 800);
-        });
+        setupBlockList();
 
         // 返回：有改动自动保存
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -204,23 +178,14 @@ public class NoteEditActivity extends AppCompatActivity {
             }
         });
 
-        // 新建 / 编辑
         etTitle.setText(title != null ? title : "");
         if (localId >= 0) {
             loadNote(localId);
         } else {
             etTitle.requestFocus();
+            addBlock(NoteBlocks.TEXT);
         }
 
-        // 正文变更 → 标脏 + 刷新工具栏激活态
-        etContent.addTextChangedListener(new android.text.TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
-            @Override public void afterTextChanged(android.text.Editable s) {
-                dirty = true;
-                refreshToolbarState();
-            }
-        });
         etTitle.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
@@ -236,303 +201,552 @@ public class NoteEditActivity extends AppCompatActivity {
         });
     }
 
-    /** 点击空白区域（非输入框）收起键盘并让当前输入框失焦；点标题↔正文之间切换不收起 */
+    /** 点击空白收起键盘；工具栏/浮动条上的点击不触发（避免格式化时焦点被清、浮动条消失） */
     @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        KeyboardUtil.hideOnTouchOutside(this, ev);
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        if (!isToolbarTouch(ev)) {
+            KeyboardUtil.hideOnTouchOutside(this, ev);
+        }
         return super.dispatchTouchEvent(ev);
+    }
+
+    /** 按下点是否落在工具栏（媒体/块类型）或浮动格式条上 */
+    private boolean isToolbarTouch(android.view.MotionEvent ev) {
+        if (ev.getAction() != android.view.MotionEvent.ACTION_DOWN) {
+            return false;
+        }
+        return isPointInView(ev, floatBar)
+                || isPointInView(ev, findViewById(R.id.toolbarRow));
+    }
+
+    private boolean isPointInView(android.view.MotionEvent ev, View v) {
+        if (v == null || v.getVisibility() != View.VISIBLE) {
+            return false;
+        }
+        int[] loc = new int[2];
+        v.getLocationOnScreen(loc);
+        return ev.getRawX() >= loc[0] && ev.getRawX() <= loc[0] + v.getWidth()
+                && ev.getRawY() >= loc[1] && ev.getRawY() <= loc[1] + v.getHeight();
+    }
+
+    // ==================== 块列表 ====================
+
+    private void setupBlockList() {
+        recyclerBlocks.setLayoutManager(new LinearLayoutManager(this));
+        final ItemTouchHelper[] touchHelper = new ItemTouchHelper[1];
+        blockAdapter = new NoteBlockAdapter(blocks, new NoteBlockAdapter.Listener() {
+            @Override public void onChanged() { dirty = true; }
+            @Override public void onDelete(int position) {
+                blocks.remove(position);
+                blockAdapter.notifyItemRemoved(position);
+                // 删光后补一个空文本块，保证仍可输入
+                if (blocks.isEmpty()) {
+                    NoteBlocks.Block b = new NoteBlocks.Block();
+                    b.type = NoteBlocks.TEXT;
+                    blocks.add(b);
+                    blockAdapter.notifyItemInserted(0);
+                }
+                dirty = true;
+            }
+            @Override public void onSwitchType(int position, int type, int level) {
+                NoteBlocks.Block b = blocks.get(position);
+                NoteBlocks.Block nb = new NoteBlocks.Block();
+                nb.type = type;
+                nb.level = level;
+                nb.text = b.text;
+                blocks.set(position, nb);
+                blockAdapter.notifyItemChanged(position);
+                dirty = true;
+            }
+            @Override public void onStartDrag(RecyclerView.ViewHolder holder) {
+                touchHelper[0].startDrag(holder);
+            }
+            @Override public void onTextBlockFocused(int position, EditText et) {
+                activeTextBlock = et;
+                activeBlockPosition = position;
+                showFloatingBar();
+            }
+            @Override public void onTextBlockFocusLost() {
+                // 只隐藏浮动条，保留 activeTextBlock 供工具栏按钮对原块继续操作
+                floatBar.setVisibility(View.GONE);
+            }
+            @Override public void onInsertAbove(int position, View anchor) {
+                showInsertAboveMenu(position, anchor);
+            }
+            @Override public void onTextSelectionChanged(boolean selecting) {
+                // 文本选中菜单弹出时隐藏浮动格式条，收起后恢复
+                if (selecting) {
+                    floatBar.setVisibility(View.GONE);
+                } else if (activeTextBlock != null) {
+                    showFloatingBar();
+                }
+            }
+        }, client, editorStyle);
+        recyclerBlocks.setAdapter(blockAdapter);
+        // 块间间距（与 Web 的 margin-bottom 8px 一致；顶部「＋」插在间距处）
+        recyclerBlocks.addItemDecoration(new RecyclerView.ItemDecoration() {
+            @Override
+            public void getItemOffsets(android.graphics.Rect outRect, View view,
+                                       RecyclerView parent, RecyclerView.State state) {
+                outRect.bottom = Math.round(8 * getResources().getDisplayMetrics().density);
+            }
+        });
+        // 拖动排序：长按块左侧「⋮⋮⋮」触发
+        ItemTouchHelper it = new ItemTouchHelper(new ItemTouchHelper.Callback() {
+            @Override public boolean isLongPressDragEnabled() { return false; }
+            @Override public boolean isItemViewSwipeEnabled() { return false; }
+            @Override public int getMovementFlags(@NonNull RecyclerView rv, @NonNull RecyclerView.ViewHolder vh) {
+                return makeMovementFlags(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0);
+            }
+            @Override public boolean onMove(@NonNull RecyclerView rv, @NonNull RecyclerView.ViewHolder vh,
+                                           @NonNull RecyclerView.ViewHolder target) {
+                blockAdapter.moveItem(vh.getBindingAdapterPosition(), target.getBindingAdapterPosition());
+                return true;
+            }
+            @Override public void onSwiped(@NonNull RecyclerView.ViewHolder vh, int direction) { }
+        });
+        it.attachToRecyclerView(recyclerBlocks);
+        touchHelper[0] = it;
+        // 阅读进度：滚动防抖上报（保存与正文 dirty 完全独立）
+        recyclerBlocks.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
+                if (progressScrollTimer != null) mainHandler.removeCallbacks(progressScrollTimer);
+                progressScrollTimer = NoteEditActivity.this::saveNoteProgress;
+                mainHandler.postDelayed(progressScrollTimer, 800);
+                positionFloatingBar();
+            }
+        });
+    }
+
+    private void addBlock(int type) {
+        NoteBlocks.Block b = new NoteBlocks.Block();
+        b.type = type;
+        blocks.add(b);
+        blockAdapter.notifyItemInserted(blocks.size() - 1);
+        dirty = true;
     }
 
     // ==================== 工具栏 ====================
 
     private void wireToolbar() {
-        btnBold = findViewById(R.id.btnBold);
-        btnItalic = findViewById(R.id.btnItalic);
-        btnStrike = findViewById(R.id.btnStrike);
-        btnH1 = findViewById(R.id.btnH1);
-        btnH2 = findViewById(R.id.btnH2);
-        btnBullet = findViewById(R.id.btnBullet);
-        btnMore = findViewById(R.id.btnMore);
-        btnH3 = findViewById(R.id.btnH3);
-        btnOrdered = findViewById(R.id.btnOrdered);
-        btnInlineCode = findViewById(R.id.btnInlineCode);
-        btnLink = findViewById(R.id.btnLink);
-        btnImage = findViewById(R.id.btnImage);
-        btnAudio = findViewById(R.id.btnAudio);
-        btnDraw = findViewById(R.id.btnDraw);
+        findViewById(R.id.btnImage).setOnClickListener(v -> imagePicker.launch("image/*"));
+        findViewById(R.id.btnAudio).setOnClickListener(v -> recordPermission.launch(android.Manifest.permission.RECORD_AUDIO));
+        findViewById(R.id.btnDraw).setOnClickListener(v -> drawLauncher.launch(new Intent(this, NoteDrawActivity.class)));
+        // 顶部块类型栏（固定显示）：切换当前焦点块类型；无焦点块时在末尾插入新块
+        findViewById(R.id.btnBlockText).setOnClickListener(v -> setBlockType(NoteBlocks.TEXT, 1));
+        findViewById(R.id.btnBlockHeading).setOnClickListener(v -> setBlockType(NoteBlocks.HEADING, 1));
+        // 浮动格式条（焦点块上方偏左）：B/I/U/S 就地切换选中文字的格式（所见即所得）
+        findViewById(R.id.btnFloatBold).setOnClickListener(v -> toggleStyle(Typeface.BOLD));
+        findViewById(R.id.btnFloatItalic).setOnClickListener(v -> toggleStyle(Typeface.ITALIC));
+        findViewById(R.id.btnFloatUnderline).setOnClickListener(v -> toggleSpan(UnderlineSpan.class, new UnderlineSpan()));
+        findViewById(R.id.btnFloatStrike).setOnClickListener(v -> toggleSpan(StrikethroughSpan.class, new StrikethroughSpan()));
+    }
 
-        btnBold.setOnClickListener(v -> toggleInline(new StyleSpan(Typeface.BOLD), getString(R.string.note_edit_bold_sample)));
-        btnItalic.setOnClickListener(v -> toggleInline(new StyleSpan(Typeface.ITALIC), getString(R.string.note_edit_italic_sample)));
-        btnStrike.setOnClickListener(v -> toggleInline(new StrikethroughSpan(), getString(R.string.note_edit_strike_sample)));
-        btnInlineCode.setOnClickListener(v -> toggleInline(new NoteInlineCodeSpan(
-                editorStyle.colors.inlineCodeBgColor, editorStyle.colors.inlineCodeTextColor), getString(R.string.note_edit_code_sample)));
+    /** 顶部块类型栏：有焦点文本块则切换其类型（保留内容），否则在末尾插入新块 */
+    private void setBlockType(int type, int level) {
+        if (activeTextBlock != null && activeBlockPosition >= 0 && activeBlockPosition < blocks.size()) {
+            NoteBlocks.Block b = blocks.get(activeBlockPosition);
+            NoteBlocks.Block nb = new NoteBlocks.Block();
+            nb.type = type;
+            nb.level = level;
+            nb.text = b.text;
+            blocks.set(activeBlockPosition, nb);
+            blockAdapter.notifyItemChanged(activeBlockPosition);
+        } else {
+            NoteBlocks.Block b = new NoteBlocks.Block();
+            b.type = type;
+            b.level = level;
+            blocks.add(b);
+            blockAdapter.notifyItemInserted(blocks.size() - 1);
+            scrollToBlock(blocks.size() - 1);   // 新增块后界面滚动过去
+        }
+        dirty = true;
+    }
 
-        btnH1.setOnClickListener(v -> toggleHeading(1));
-        btnH2.setOnClickListener(v -> toggleHeading(2));
-        btnH3.setOnClickListener(v -> toggleHeading(3));
-        btnBullet.setOnClickListener(v -> toggleBullet());
-        btnOrdered.setOnClickListener(v -> toggleOrdered());
-        btnLink.setOnClickListener(v -> toggleLink());
+    /** 滚动到指定块（新增块后让界面跟过去） */
+    private void scrollToBlock(int position) {
+        recyclerBlocks.post(() -> recyclerBlocks.smoothScrollToPosition(position));
+    }
 
-        btnMore.setOnClickListener(v -> {
-            boolean show = moreRow.getVisibility() != View.VISIBLE;
-            moreRow.setVisibility(show ? View.VISIBLE : View.GONE);
-            setActive(btnMore, show);
+    /** 块顶部「＋」：弹出插入菜单（文本/标题/图片/音频），插到该块上方 */
+    private void showInsertAboveMenu(int position, View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor, android.view.Gravity.NO_GRAVITY, 0, R.style.Ios_PopupMenu);
+        menu.getMenu().add(0, 1, 0, getString(R.string.note_block_text));
+        menu.getMenu().add(0, 2, 0, getString(R.string.note_block_heading));
+        menu.getMenu().add(0, 3, 0, getString(R.string.note_edit_image_title));
+        menu.getMenu().add(0, 4, 0, getString(R.string.note_edit_recording_title));
+        menu.setOnMenuItemClickListener(item -> {
+            switch (item.getItemId()) {
+                case 1: insertBlockAt(NoteBlocks.TEXT, 1, position); break;
+                case 2: insertBlockAt(NoteBlocks.HEADING, 1, position); break;
+                case 3: pendingInsertIdx = position; imagePicker.launch("image/*"); break;
+                case 4: pendingInsertIdx = position;
+                        recordPermission.launch(android.Manifest.permission.RECORD_AUDIO); break;
+                default: break;
+            }
+            return true;
         });
-
-        btnImage.setOnClickListener(v -> imagePicker.launch("image/*"));
-        btnAudio.setOnClickListener(v -> recordPermission.launch(android.Manifest.permission.RECORD_AUDIO));
-        btnDraw.setOnClickListener(v -> drawLauncher.launch(new Intent(this, NoteDrawActivity.class)));
+        menu.show();
     }
 
-    private void wireEditor() {
-        // RichEditText 已自带 ListKeyListener；这里额外接入选择变化刷新工具栏
-        etContent.setOnClickListener(v -> refreshToolbarState());
+    /** 在指定位置插入文本类块并聚焦（「在上方插入」） */
+    private void insertBlockAt(int type, int level, int position) {
+        NoteBlocks.Block b = new NoteBlocks.Block();
+        b.type = type;
+        b.level = level;
+        blocks.add(position, b);
+        blockAdapter.notifyItemInserted(position);
+        dirty = true;
+        scrollToBlock(position);
+        focusTextBlockAt(position);
     }
 
-    // ---- 行内格式 ----
+    /** 媒体块落位：pendingInsertIdx 非空 → 插到该位置；否则追加末尾 */
+    private void insertOrAppendMedia(NoteBlocks.Block media) {
+        if (pendingInsertIdx != null) {
+            int idx = pendingInsertIdx;
+            pendingInsertIdx = null;
+            blocks.add(idx, media);
+            blockAdapter.notifyItemInserted(idx);
+            scrollToBlock(idx);
+        } else {
+            appendMediaBlock(media);
+        }
+        dirty = true;
+    }
 
-    private void toggleInline(@NonNull Object span, String sample) {
-        int[] r = selectionRange(sample);
-        Editable sp = etContent.getText();
-        boolean on = hasSpan(sp, r[0], r[1], span.getClass());
-        if (on) {
-            for (Object s : sp.getSpans(r[0], r[1], span.getClass())) {
-                sp.removeSpan(s);
+    /** 聚焦指定位置的文本块（「在上方插入」后可直接输入） */
+    private void focusTextBlockAt(int position) {
+        recyclerBlocks.post(() -> {
+            RecyclerView.ViewHolder vh = recyclerBlocks.findViewHolderForAdapterPosition(position);
+            if (vh != null) {
+                EditText et = vh.itemView.findViewWithTag("block_text");
+                if (et != null) {
+                    et.requestFocus();
+                }
+            }
+        });
+    }
+
+    /** StyleSpan（加粗/斜体）toggle：整段被同款式覆盖则移除，否则加样式 */
+    private void toggleStyle(int style) {
+        EditText et = activeTextBlock;
+        if (et == null || !requireSelection(et)) {
+            return;
+        }
+        Editable ed = et.getText();
+        int start = Math.min(et.getSelectionStart(), et.getSelectionEnd());
+        int end = Math.max(et.getSelectionStart(), et.getSelectionEnd());
+        boolean covered = false;
+        for (StyleSpan s : ed.getSpans(start, end, StyleSpan.class)) {
+            if (s.getStyle() == style && ed.getSpanStart(s) <= start && ed.getSpanEnd(s) >= end) {
+                covered = true;
+                break;
+            }
+        }
+        if (covered) {
+            for (StyleSpan s : ed.getSpans(start, end, StyleSpan.class)) {
+                if (s.getStyle() == style) {
+                    ed.removeSpan(s);
+                }
             }
         } else {
-            sp.setSpan(span, r[0], r[1], Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ed.setSpan(new StyleSpan(style), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
-        dirty = true;
-        refreshToolbarState();
+        syncBlockText();
     }
 
-    private void toggleLink() {
-        int[] r = selectionRange(getString(R.string.note_edit_link_sample));
-        EditText input = new EditText(this);
-        input.setHint("https://…");
-        new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.note_edit_insert_link))
-                .setView(input)
-                .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
-                    String url = input.getText().toString().trim();
-                    if (url.isEmpty()) {
-                        return;
-                    }
-                    etContent.getText().setSpan(new URLSpan(url), r[0], r[1],
-                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    dirty = true;
-                    refreshToolbarState();
-                })
+    /** 普通 span（下划线/删除线）toggle */
+    private void toggleSpan(Class<?> cls, Object span) {
+        EditText et = activeTextBlock;
+        if (et == null || !requireSelection(et)) {
+            return;
+        }
+        Editable ed = et.getText();
+        int start = Math.min(et.getSelectionStart(), et.getSelectionEnd());
+        int end = Math.max(et.getSelectionStart(), et.getSelectionEnd());
+        boolean covered = false;
+        for (Object s : ed.getSpans(start, end, cls)) {
+            if (ed.getSpanStart(s) <= start && ed.getSpanEnd(s) >= end) {
+                covered = true;
+                break;
+            }
+        }
+        if (covered) {
+            for (Object s : ed.getSpans(start, end, cls)) {
+                ed.removeSpan(s);
+            }
+        } else {
+            ed.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        syncBlockText();
+    }
+
+    /** 校验焦点文本块已选中文字（未选中则提示） */
+    private boolean requireSelection(EditText et) {
+        int start = et.getSelectionStart();
+        int end = et.getSelectionEnd();
+        if (start < 0 || end < 0 || start == end) {
+            Toast.makeText(this, getString(R.string.note_edit_select_text_first), Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        return true;
+    }
+
+    /** 工具栏改 span 后把块的 markdown 同步回去（setSpan 不触发 TextWatcher） */
+    private void syncBlockText() {
+        if (activeTextBlock == null || activeBlockPosition < 0 || activeBlockPosition >= blocks.size()) {
+            return;
+        }
+        NoteBlocks.Block b = blocks.get(activeBlockPosition);
+        String md = BlockRichText.toMarkdown(activeTextBlock.getText());
+        if (!md.equals(b.text)) {
+            b.text = md;
+            dirty = true;
+        }
+        activeTextBlock.invalidate();
+    }
+
+    /** 浮动格式条：显示并定位到焦点块上方偏左 */
+    private void showFloatingBar() {
+        if (activeTextBlock == null) {
+            floatBar.setVisibility(View.GONE);
+            return;
+        }
+        floatBar.setVisibility(View.VISIBLE);
+        floatBar.post(this::positionFloatingBar);
+    }
+
+    /** 按焦点块当前屏幕位置重算浮动条坐标（滚动/布局变化时跟随） */
+    private void positionFloatingBar() {
+        if (activeTextBlock == null || floatBar.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        float density = getResources().getDisplayMetrics().density;
+        int barH = floatBar.getMeasuredHeight();
+        if (barH <= 0) {
+            barH = Math.round(44 * density);
+        }
+        int[] etPos = new int[2];
+        int[] framePos = new int[2];
+        activeTextBlock.getLocationOnScreen(etPos);
+        blockFrame.getLocationOnScreen(framePos);
+        int x = etPos[0] - framePos[0];
+        int y = etPos[1] - framePos[1] - barH - Math.round(8 * density);
+        y = Math.max(Math.round(4 * density), y);
+        floatBar.setX(x);
+        floatBar.setY(y);
+    }
+
+    // ==================== 媒体插入 ====================
+
+    /** 图片/画画：写本地文件并追加图片块（local://，同步时上传改写） */
+    private void addImageBlock(byte[] bytes, String fileName, String mime) {
+        try {
+            String unique = System.currentTimeMillis() + "_" + fileName;
+            File f = new File(MediaFiles.localMediaDir(this), unique);
+            try (FileOutputStream out = new FileOutputStream(f)) {
+                out.write(bytes);
+            }
+            mainHandler.post(() -> {
+                NoteBlocks.Block b = new NoteBlocks.Block();
+                b.type = NoteBlocks.IMAGE;
+                b.mediaUrl = MediaFiles.localUrl(unique);
+                b.alt = getString(R.string.note_draw_title);
+                insertOrAppendMedia(b);
+            });
+        } catch (IOException e) {
+            mainHandler.post(() -> Toast.makeText(this, getString(R.string.note_edit_image_save_failed), Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    /** 追加媒体块（不再自动补文本块，文本由用户手动插入） */
+    private void appendMediaBlock(NoteBlocks.Block media) {
+        blocks.add(media);
+        blockAdapter.notifyItemInserted(blocks.size() - 1);
+        scrollToBlock(blocks.size() - 1);   // 追加后界面滚动过去
+        dirty = true;
+    }
+
+    /** 录音对话框：MediaRecorder 录音 → 追加音频块 */
+    private void startRecordingDialog() {
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.note_edit_recording_title))
                 .setNegativeButton(getString(R.string.common_cancel), null)
-                .show();
+                .create();
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(40, 24, 40, 8);
+        TextView status = new TextView(this);
+        status.setText(getString(R.string.note_edit_recording_hint));
+        status.setTextSize(15f);
+        status.setTextColor(getColor(R.color.text_secondary));
+        com.google.android.material.button.MaterialButton btn = new com.google.android.material.button.MaterialButton(this);
+        btn.setText(getString(R.string.note_edit_record_start));
+        btn.setPadding(0, 12, 0, 12);
+        content.addView(status);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = 24;
+        content.addView(btn, lp);
+        dialog.setView(content);
+
+        btn.setOnClickListener(v -> {
+            if (!recording[0]) {
+                try {
+                    recordingFile[0] = new File(getCacheDir(), "record_" + System.currentTimeMillis() + ".m4a");
+                    MediaRecorder r = Build.VERSION.SDK_INT >= 31
+                            ? new MediaRecorder(this)
+                            : new MediaRecorder();
+                    r.setAudioSource(MediaRecorder.AudioSource.MIC);
+                    r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+                    r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+                    r.setAudioSamplingRate(44100);
+                    r.setOutputFile(recordingFile[0].getAbsolutePath());
+                    r.prepare();
+                    r.start();
+                    activeRecorder[0] = r;
+                    recording[0] = true;
+                    recordingStartMs[0] = System.currentTimeMillis();
+                    status.setText(getString(R.string.note_edit_recording_status));
+                    btn.setText(getString(R.string.note_edit_record_stop));
+                } catch (Exception e) {
+                    Toast.makeText(this, getString(R.string.note_edit_recording_start_failed, e.getMessage()), Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                try {
+                    activeRecorder[0].stop();
+                } catch (Exception ignored) {
+                }
+                try {
+                    activeRecorder[0].release();
+                } catch (Exception ignored) {
+                }
+                activeRecorder[0] = null;
+                recording[0] = false;
+                long dur = System.currentTimeMillis() - recordingStartMs[0];
+                btn.setEnabled(false);
+                dialog.dismiss();
+                addAudioBlock(recordingFile[0], dur);
+            }
+        });
+        dialog.setOnDismissListener(d -> {
+            if (recording[0] && activeRecorder[0] != null) {
+                try { activeRecorder[0].stop(); } catch (Exception ignored) { }
+                try { activeRecorder[0].release(); } catch (Exception ignored) { }
+                activeRecorder[0] = null;
+                recording[0] = false;
+            }
+        });
+        dialog.show();
     }
 
-    /** 选中区间；折叠时扩展到当前词；无词可包则插入示例文字并选中 */
-    private int[] selectionRange(String sample) {
-        int s = etContent.getSelectionStart();
-        int e = etContent.getSelectionEnd();
-        if (s != e) {
-            return new int[]{s, e};
+    /** 录音文件 → 本地 note_media + 音频块（带时长；优先用墙钟时长，避免 MediaPlayer/Retriever 误读） */
+    private void addAudioBlock(File rec, long wallDurationMs) {
+        if (rec == null || !rec.exists()) return;
+        ioExecutor.execute(() -> {
+            try {
+                byte[] bytes = readAllFile(rec);
+                if (bytes.length == 0) {
+                    mainHandler.post(() -> Toast.makeText(this,
+                            getString(R.string.note_edit_recording_empty), Toast.LENGTH_SHORT).show());
+                    return;
+                }
+                String fileName = System.currentTimeMillis() + "_recording.m4a";
+                File f = new File(MediaFiles.localMediaDir(this), fileName);
+                try (FileOutputStream out = new FileOutputStream(f)) {
+                    out.write(bytes);
+                }
+                long dur = wallDurationMs > 0 ? wallDurationMs : audioDurationMs(f.getAbsolutePath());
+                String url = MediaFiles.localUrl(fileName) + "?mediaType=audio";
+                if (dur > 0) {
+                    url += "&duration=" + dur;
+                }
+                final String finalUrl = url;
+                final long finalDur = dur;
+                mainHandler.post(() -> {
+                    NoteBlocks.Block b = new NoteBlocks.Block();
+                    b.type = NoteBlocks.AUDIO;
+                    b.mediaUrl = finalUrl;
+                    b.duration = finalDur;
+                    insertOrAppendMedia(b);
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> Toast.makeText(this,
+                        getString(R.string.note_edit_recording_upload_failed), Toast.LENGTH_SHORT).show());
+            }
+        });
+    }
+
+    /** 用 MediaMetadataRetriever 读音频时长（ms） */
+    private long audioDurationMs(String path) {
+        try {
+            android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
+            try {
+                mmr.setDataSource(path);
+                String d = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+                return d != null ? Long.parseLong(d) : -1;
+            } finally {
+                try { mmr.release(); } catch (Exception ignored) { }
+            }
+        } catch (Exception e) {
+            return -1;
         }
-        CharSequence t = etContent.getText();
-        int ws = s, we = s;
-        while (ws > 0 && !Character.isWhitespace(t.charAt(ws - 1))) ws--;
-        while (we < t.length() && !Character.isWhitespace(t.charAt(we))) we++;
-        if (ws == we) {
-            Editable sp = etContent.getText();
-            sp.insert(s, sample);
-            etContent.setSelection(s, s + sample.length());
-            return new int[]{s, s + sample.length()};
-        }
-        etContent.setSelection(ws, we);
-        return new int[]{ws, we};
     }
 
-    // ---- 段落格式 ----
-
-    private void toggleHeading(int level) {
-        ensureNonEmpty();
-        Editable sp = etContent.getText();
-        int sel = etContent.getSelectionStart();
-        int[] line = ParagraphHelper.lineRange(sp, sel);
-        NoteHeadingSpan existing = first(sp, line[0], line[1] + 1, NoteHeadingSpan.class);
-        if (existing != null) {
-            sp.removeSpan(existing);
+    private byte[] readAll(Uri uri) throws IOException {
+        java.io.InputStream in = getContentResolver().openInputStream(uri);
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            out.write(buf, 0, n);
         }
-        if (existing == null || existing.getLevel() != level) {
-            sp.setSpan(new NoteHeadingSpan(level, editorStyle.colors.headingColor),
-                    line[0], line[1] + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        dirty = true;
-        refreshToolbarState();
+        in.close();
+        return out.toByteArray();
     }
 
-    private void toggleBullet() {
-        ensureNonEmpty();
-        Editable sp = etContent.getText();
-        int sel = etContent.getSelectionStart();
-        int[] line = ParagraphHelper.lineRange(sp, sel);
-        NoteBulletSpan bullet = first(sp, line[0], line[1] + 1, NoteBulletSpan.class);
-        NoteOrderedSpan ordered = first(sp, line[0], line[1] + 1, NoteOrderedSpan.class);
-        if (bullet != null) {
-            sp.removeSpan(bullet);
-        } else {
-            if (ordered != null) sp.removeSpan(ordered);
-            sp.setSpan(new NoteBulletSpan(editorStyle.listMarginPx, editorStyle.bulletRadiusPx,
-                    editorStyle.colors.bulletColor), line[0], line[1] + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        dirty = true;
-        refreshToolbarState();
-    }
-
-    private void toggleOrdered() {
-        ensureNonEmpty();
-        Editable sp = etContent.getText();
-        int sel = etContent.getSelectionStart();
-        int[] line = ParagraphHelper.lineRange(sp, sel);
-        NoteBulletSpan bullet = first(sp, line[0], line[1] + 1, NoteBulletSpan.class);
-        NoteOrderedSpan ordered = first(sp, line[0], line[1] + 1, NoteOrderedSpan.class);
-        if (ordered != null) {
-            sp.removeSpan(ordered);
-        } else {
-            if (bullet != null) sp.removeSpan(bullet);
-            sp.setSpan(new NoteOrderedSpan(1, editorStyle.listMarginPx, editorStyle.colors.orderedColor),
-                    line[0], line[1] + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        dirty = true;
-        refreshToolbarState();
-    }
-
-    private void ensureNonEmpty() {
-        if (etContent.getText().length() == 0) {
-            etContent.getText().append('\n');
+    private byte[] readAllFile(File f) throws IOException {
+        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
         }
     }
 
-    // ---- 工具栏激活态 ----
-
-    private void refreshToolbarState() {
-        int sel = etContent.getSelectionStart();
-        if (sel < 0) sel = 0;
-        Editable sp = etContent.getText();
-        setActive(btnBold, hasStyleSpan(sp, sel, Typeface.BOLD));
-        setActive(btnItalic, hasStyleSpan(sp, sel, Typeface.ITALIC));
-        setActive(btnStrike, hasSpan(sp, sel, StrikethroughSpan.class));
-        setActive(btnInlineCode, hasSpan(sp, sel, NoteInlineCodeSpan.class));
-        setActive(btnH1, ParagraphHelper.headingLevel(sp, sel) == 1);
-        setActive(btnH2, ParagraphHelper.headingLevel(sp, sel) == 2);
-        setActive(btnH3, ParagraphHelper.headingLevel(sp, sel) == 3);
-        setActive(btnBullet, ParagraphHelper.isBullet(sp, sel));
-        setActive(btnOrdered, ParagraphHelper.isOrdered(sp, sel));
-    }
-
-    private void setActive(com.google.android.material.button.MaterialButton btn, boolean active) {
-        if (btn != null) {
-            int color = active ? getColor(R.color.accent) : getColor(R.color.text_primary);
-            btn.setTextColor(color);
-            btn.setIconTint(android.content.res.ColorStateList.valueOf(color));
-        }
-    }
-
-    private static boolean hasStyleSpan(Spannable sp, int sel, int style) {
-        int s = Math.max(0, sel == sp.length() ? sel - 1 : sel);
-        int e = Math.min(sp.length(), s + 1);
-        if (s >= e) return false;
-        StyleSpan[] spans = sp.getSpans(s, e, StyleSpan.class);
-        for (StyleSpan ss : spans) {
-            if (ss.getStyle() == style) return true;
-        }
-        return false;
-    }
-
-    private static boolean hasSpan(Spannable sp, int sel, Class<?> cls) {
-        int s = Math.max(0, sel == sp.length() ? sel - 1 : sel);
-        int e = Math.min(sp.length(), s + 1);
-        if (s >= e) return false;
-        return sp.getSpans(s, e, cls).length > 0;
-    }
-
-    private static boolean hasSpan(Spannable sp, int start, int end, Class<?> cls) {
-        return sp.getSpans(start, Math.min(end, sp.length()), cls).length > 0;
-    }
-
-    private static <T> T first(Spanned sp, int start, int end, Class<T> cls) {
-        T[] spans = sp.getSpans(start, Math.min(end, sp.length()), cls);
-        return spans.length > 0 ? spans[0] : null;
-    }
-
-    // ==================== 笔记加载 / 保存 ====================
+    // ==================== 加载 / 保存 ====================
 
     private void loadNote(long localId) {
         LocalNote n = dao.getById(localId);
-        if (n == null) { finish(); return; }
+        if (n == null) {
+            finish();
+            return;
+        }
         currentNote = n;
         if (etTitle.getText().toString().isEmpty()) {
             etTitle.setText(n.title != null ? n.title : "");
         }
-        SpannableStringBuilder sb = ModelToSpanned.toSpannable(
-                MarkdownParser.parse(n.content != null ? n.content : ""), editorStyle);
-        etContent.setText(sb);
+        blocks.clear();
+        blocks.addAll(NoteBlocks.fromDoc(MarkdownParser.parse(n.content != null ? n.content : "")));
+        blockAdapter.notifyDataSetChanged();
         dirty = false;
-        loadMediaImages();
-        refreshToolbarState();
         resumeNoteProgress();
-        // 同步冲突标记 → 打开时提示「覆盖/重载」
         if (n.conflict) {
             showConflictDialog(false);
         }
-    }
-
-    // ==================== 阅读进度（续读 + 上报，与 Web 共用 SCROLL_PERCENT）====================
-
-    /** 续读：拉取服务端笔记进度后自动滚动到记录位置（仅已同步的笔记） */
-    private void resumeNoteProgress() {
-        if (currentNote == null || currentNote.serverId == null) return;
-        String noteId = currentNote.serverId;
-        new Thread(() -> {
-            double pct = ProgressReporter.fetchNoteProgress(client, noteId);
-            mainHandler.post(() -> applyNoteProgress(pct));
-        }).start();
-    }
-
-    /** 应用滚动位置：布局完成后计算最大滚动距离，短笔记（不足一屏）不滚动 */
-    private void applyNoteProgress(double pct) {
-        if (pct <= 0.01) return;
-        etContent.post(() -> {
-            int max = noteScrollRange();
-            if (max > 0) {
-                etContent.scrollTo(0, (int) (pct * max));
-                Toast.makeText(this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    /** 上报笔记滚动进度（0~1；回顶 pct=0 也保存以清除历史；短笔记不存；新建/未同步笔记不上报） */
-    private void saveNoteProgress() {
-        if (currentNote == null || currentNote.serverId == null) return;
-        int max = noteScrollRange();
-        if (max <= 0) return;
-        double pct = Math.min(1, Math.max(0, (double) etContent.getScrollY() / max));
-        ProgressReporter.saveNoteProgress(client, currentNote.serverId, pct);
-    }
-
-    /** 正文最大滚动距离：文本总高 - 可视高（含上下 padding），不足一屏为 0 */
-    private int noteScrollRange() {
-        android.text.Layout layout = etContent.getLayout();
-        if (layout == null) return 0;
-        int visible = etContent.getHeight()
-                - etContent.getCompoundPaddingTop() - etContent.getCompoundPaddingBottom();
-        return Math.max(0, layout.getHeight() - visible);
     }
 
     private void save(final boolean finishAfter) {
         if (saving) return;
         saving = true;
         String title = etTitle.getText().toString().trim();
-        String content = MarkdownEmitter.emit(SpanExtractor.extract(etContent.getText()));
+        String content = MarkdownEmitter.emit(NoteBlocks.toDoc(blocks));
 
-        // 离线优先：写本地 Room（标 dirty），在线模式由同步推送 outbox
         if (currentNote == null) {
             currentNote = new LocalNote();
             currentNote.serverUrl = session.getDataPartition();
@@ -560,15 +774,15 @@ public class NoteEditActivity extends AppCompatActivity {
         }
     }
 
-    /** 乐观并发冲突弹窗：覆盖（丢对方改动）/ 重新加载（丢本地改动） */
+    /** 乐观并发冲突弹窗：覆盖 / 重新加载 */
     private void showConflictDialog(final boolean finishAfter) {
         new AlertDialog.Builder(this)
                 .setTitle(getString(R.string.note_edit_conflict_title))
                 .setMessage(getString(R.string.note_edit_conflict_message))
                 .setPositiveButton(getString(R.string.note_edit_overwrite), (d, w) -> {
                     if (currentNote != null) {
-                        currentNote.baseUpdatedAt = null;   // 不带 baseUpdatedAt 强制覆盖
-                        currentNote.conflict = false;        // 覆盖即解决冲突，不再重复弹窗
+                        currentNote.baseUpdatedAt = null;
+                        currentNote.conflict = false;
                     }
                     save(finishAfter);
                 })
@@ -577,19 +791,19 @@ public class NoteEditActivity extends AppCompatActivity {
                 .show();
     }
 
-    /** 重新加载服务端最新内容（冲突「重载」），并写回本地缓存 */
+    /** 重新加载服务端最新内容（冲突「重载」） */
     private void reloadNote(final boolean finishAfter) {
         if (currentNote == null || currentNote.serverId == null) {
             finish();
             return;
         }
-        client.getNote(currentNote.serverId).enqueue(new UiCallback<ApiResponse<NoteDetail>>(this) {
+        client.getNote(currentNote.serverId).enqueue(new com.baiflow.android.network.UiCallback<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>>(this) {
             @Override
-            protected void onUiResponse(Call<ApiResponse<NoteDetail>> call,
-                                        Response<ApiResponse<NoteDetail>> response) {
+            protected void onUiResponse(retrofit2.Call<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> call,
+                                        retrofit2.Response<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()
                         && response.body().getData() != null) {
-                    NoteDetail detail = response.body().getData();
+                    com.baiflow.android.model.NoteDetail detail = response.body().getData();
                     currentNote.title = detail.getTitle() != null ? detail.getTitle() : "";
                     currentNote.content = detail.getContent() != null ? detail.getContent() : "";
                     currentNote.baseUpdatedAt = detail.getUpdatedAt();
@@ -598,425 +812,60 @@ public class NoteEditActivity extends AppCompatActivity {
                     currentNote.updatedAt = System.currentTimeMillis();
                     dao.update(currentNote);
                     etTitle.setText(currentNote.title);
-                    etContent.setText(ModelToSpanned.toSpannable(
-                            MarkdownParser.parse(currentNote.content), editorStyle));
+                    blocks.clear();
+                    blocks.addAll(NoteBlocks.fromDoc(MarkdownParser.parse(currentNote.content)));
+                    blockAdapter.notifyDataSetChanged();
                     dirty = false;
-                    loadMediaImages();
-                    refreshToolbarState();
-                    resumeNoteProgress();
                     Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_reloaded), Toast.LENGTH_SHORT).show();
                     if (finishAfter) finish();
-                } else if (response.code() < 500) {
-                    String msg = response.body() != null ? response.body().getMessage() : getString(R.string.common_load_failed);
-                    Toast.makeText(NoteEditActivity.this, msg, Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
-            protected void onUiFailure(Call<ApiResponse<NoteDetail>> call, Throwable t) {
-                // 网络失败已由 UiCallback 统一提示
+            protected void onUiFailure(retrofit2.Call<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> call, Throwable t) {
             }
         });
     }
 
-    // ==================== 媒体：图片 / 录音 / 画画 ====================
+    // ==================== 阅读进度 ====================
 
-    /** 读取图片 URI → 上传 → 插入图片 span（replaceTarget 非空则替换旧图） */
-    private void readImageAndInsert(Uri uri, NoteImageSpan replace) {
-        ioExecutor.execute(() -> {
-            try {
-                byte[] bytes = readAll(uri);
-                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                if (bmp == null) {
-                    mainHandler.post(() -> Toast.makeText(this, getString(R.string.note_edit_image_decode_failed), Toast.LENGTH_SHORT).show());
-                    return;
-                }
-                // JPEG 压缩（Q88）控制体积，避免 PNG 无损编码撑大照片超 20MB 上限
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                bmp.compress(Bitmap.CompressFormat.JPEG, 88, out);
-                byte[] jpeg = out.toByteArray();
-                if (replace != null) {
-                    mainHandler.post(() -> insertImageMedia(jpeg, "image.jpg", "image/jpeg", "IMAGE", getString(R.string.note_edit_image_alt), replace));
-                } else {
-                    mainHandler.post(() -> insertImageMedia(jpeg, "image.jpg", "image/jpeg", "IMAGE", getString(R.string.note_edit_image_alt), null));
-                }
-            } catch (Exception e) {
-                mainHandler.post(() -> Toast.makeText(this, getString(R.string.note_edit_image_read_failed), Toast.LENGTH_SHORT).show());
+    private void resumeNoteProgress() {
+        if (currentNote == null || currentNote.serverId == null) return;
+        String noteId = currentNote.serverId;
+        new Thread(() -> {
+            double pct = ProgressReporter.fetchNoteProgress(client, noteId);
+            mainHandler.post(() -> applyNoteProgress(pct));
+        }).start();
+    }
+
+    /** 恢复到上次阅读位置：滚动块列表 */
+    private void applyNoteProgress(double pct) {
+        if (pct <= 0.01) return;
+        recyclerBlocks.post(() -> {
+            int max = recyclerBlocks.computeVerticalScrollRange() - recyclerBlocks.computeVerticalScrollExtent();
+            if (max > 0) {
+                recyclerBlocks.scrollBy(0, (int) (pct * max));
+                Toast.makeText(this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    /** 上传图片字节并在光标处插入 span */
-    private void insertImageMedia(byte[] bytes, String fileName, String mime, String mediaType, String alt) {
-        insertImageMedia(bytes, fileName, mime, mediaType, alt, null);
-    }
-
-    /**
-     * 插入图片 span（离线优先）：图片存本地 note_media 目录，正文用 {@code local://} 引用，
-     * 同步时由 SyncService 上传并改写为服务端 URL。
-     */
-    private void insertImageMedia(byte[] bytes, String fileName, String mime, String mediaType,
-                                  String alt, NoteImageSpan replace) {
-        try {
-            String unique = System.currentTimeMillis() + "_" + fileName;
-            File f = new File(MediaFiles.localMediaDir(this), unique);
-            try (FileOutputStream out = new FileOutputStream(f)) {
-                out.write(bytes);
-            }
-            Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-            String url = MediaFiles.localUrl(unique);
-            if (replace != null) {
-                replaceImageSpan(replace, null, url, alt, bmp);
-            } else {
-                insertImageSpan(null, url, alt, bmp);
-            }
-            dirty = true;
-        } catch (IOException e) {
-            Toast.makeText(this, getString(R.string.note_edit_image_save_failed), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void insertImageSpan(String mediaId, String url, String alt, Bitmap bmp) {
-        Editable sp = etContent.getText();
-        int sel = etContent.getSelectionStart();
-        if (sel < 0) sel = sp.length();
-        sp.insert(sel, String.valueOf(ModelToSpanned.PLACEHOLDER));
-        NoteImageSpan span = new NoteImageSpan(mediaId, url, alt,
-                editorStyle.newImagePlaceholder(), editorStyle.maxImageWidthPx);
-        if (bmp != null) span.setBitmap(bmp, this);
-        sp.setSpan(span, sel, sel + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        dirty = true;
-        refreshToolbarState();
-    }
-
-    private void replaceImageSpan(NoteImageSpan old, String mediaId, String url, String alt, Bitmap bmp) {
-        Editable sp = etContent.getText();
-        int start = sp.getSpanStart(old);
-        int end = sp.getSpanEnd(old);
-        if (start < 0 || end < 0) return;
-        sp.removeSpan(old);
-        sp.delete(start, end);
-        // 在原位置插入新占位
-        sp.insert(start, String.valueOf(ModelToSpanned.PLACEHOLDER));
-        NoteImageSpan span = new NoteImageSpan(mediaId, url, alt,
-                editorStyle.newImagePlaceholder(), editorStyle.maxImageWidthPx);
-        if (bmp != null) span.setBitmap(bmp, this);
-        sp.setSpan(span, start, start + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        dirty = true;
-    }
-
-    // ---- 录音 ----
-
-    private void startRecordingDialog() {
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.note_edit_recording_title))
-                .setNegativeButton(getString(R.string.common_cancel), null)
-                .create();
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(40, 24, 40, 8);
-        TextView status = new TextView(this);
-        status.setText(getString(R.string.note_edit_recording_hint));
-        status.setTextSize(15f);
-        status.setTextColor(getColor(R.color.text_secondary));
-        com.google.android.material.button.MaterialButton btn = new com.google.android.material.button.MaterialButton(this);
-        btn.setText(getString(R.string.note_edit_record_start));
-        btn.setPadding(0, 12, 0, 12);
-        content.addView(status);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = 24;
-        content.addView(btn, lp);
-        dialog.setView(content);
-
-        final MediaRecorder[] recorder = new MediaRecorder[1];
-        final File[] file = new File[1];
-        final boolean[] recording = {false};
-
-        btn.setOnClickListener(v -> {
-            if (!recording[0]) {
-                try {
-                    file[0] = new File(getCacheDir(), "record_" + System.currentTimeMillis() + ".m4a");
-                    MediaRecorder r = Build.VERSION.SDK_INT >= 31
-                            ? new MediaRecorder(this)
-                            : new MediaRecorder();
-                    r.setAudioSource(MediaRecorder.AudioSource.MIC);
-                    r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-                    r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-                    r.setAudioSamplingRate(44100);
-                    r.setOutputFile(file[0].getAbsolutePath());
-                    r.prepare();
-                    r.start();
-                    recorder[0] = r;
-                    recording[0] = true;
-                    status.setText(getString(R.string.note_edit_recording_status));
-                    btn.setText(getString(R.string.note_edit_record_stop));
-                } catch (Exception e) {
-                    Toast.makeText(this, getString(R.string.note_edit_recording_start_failed, e.getMessage()), Toast.LENGTH_SHORT).show();
-                }
-            } else {
-                try {
-                    recorder[0].stop();
-                } catch (Exception ignored) {
-                }
-                try {
-                    recorder[0].release();
-                } catch (Exception ignored) {
-                }
-                recorder[0] = null;
-                recording[0] = false;
-                status.setText(getString(R.string.note_edit_processing));
-                btn.setEnabled(false);
-                dialog.dismiss();
-                uploadAudio(file[0]);
-            }
-        });
-        dialog.setOnDismissListener(d -> releaseRecorderQuietly(recorder[0], recording[0]));
-        dialog.show();
-    }
-
-    private void releaseRecorderQuietly(MediaRecorder r, boolean recording) {
-        if (r != null) {
-            try { if (recording) r.stop(); } catch (Exception ignored) { }
-            try { r.release(); } catch (Exception ignored) { }
-        }
-    }
-
-    private void uploadAudio(File file) {
-        ioExecutor.execute(() -> {
-            try {
-                byte[] bytes = readFile(file);
-                if (bytes.length == 0) {
-                    mainHandler.post(() -> Toast.makeText(this, getString(R.string.note_edit_recording_empty), Toast.LENGTH_SHORT).show());
-                    return;
-                }
-                mainHandler.post(() -> uploadAudioBytes(bytes));
-            } catch (Exception e) {
-                mainHandler.post(() -> Toast.makeText(this, getString(R.string.note_edit_recording_read_failed), Toast.LENGTH_SHORT).show());
-            }
-        });
-    }
-
-    /** 插入录音 span（离线优先）：存本地文件，正文用 local://?mediaType=audio 引用，同步时上传 */
-    private void uploadAudioBytes(byte[] bytes) {
-        try {
-            String fileName = System.currentTimeMillis() + "_recording.m4a";
-            File f = new File(MediaFiles.localMediaDir(this), fileName);
-            try (FileOutputStream out = new FileOutputStream(f)) {
-                out.write(bytes);
-            }
-            insertAudioSpan(null, MediaFiles.localUrl(fileName) + "?mediaType=audio");
-        } catch (IOException e) {
-            Toast.makeText(this, getString(R.string.note_edit_recording_upload_failed), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void insertAudioSpan(String mediaId, String url) {
-        Editable sp = etContent.getText();
-        int sel = etContent.getSelectionStart();
-        if (sel < 0) sel = sp.length();
-        sp.insert(sel, String.valueOf(ModelToSpanned.PLACEHOLDER));
-        NoteAudioSpan span = new NoteAudioSpan(mediaId, url, getString(R.string.note_edit_audio_alt),
-                editorStyle.colors.audioChipColor, editorStyle.colors.audioTextColor,
-                editorStyle.audioPaddingPx, editorStyle.audioChipHeightPx);
-        sp.setSpan(span, sel, sel + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        dirty = true;
-    }
-
-    // ---- 媒体点击 ----
-
-    private void showImageMenu(NoteImageSpan span) {
-        String[] options = {getString(R.string.note_edit_image_view), getString(R.string.note_edit_image_replace), getString(R.string.common_delete)};
-        new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.note_edit_image_title))
-                .setItems(options, (d, which) -> {
-                    if (which == 0) {
-                        viewImage(span);
-                    } else if (which == 1) {
-                        replaceTarget = span;
-                        imagePicker.launch("image/*");
-                    } else {
-                        deleteSpan(span);
-                    }
-                })
-                .show();
-    }
-
-    private void viewImage(NoteImageSpan span) {
-        Bitmap bmp = bitmapOf(span);
-        if (bmp == null) {
-            Toast.makeText(this, getString(R.string.note_edit_image_not_loaded), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        ImageView iv = new ImageView(this);
-        iv.setImageBitmap(bmp);
-        new AlertDialog.Builder(this)
-                .setView(iv)
-                .setNegativeButton(getString(R.string.common_close), null)
-                .show();
-    }
-
-    private Bitmap bitmapOf(NoteImageSpan span) {
-        if (span != null && span.getMediaUrl() != null) {
-            return bitmapCache.get(span.getMediaUrl());
-        }
-        return null;
-    }
-
-    private void deleteSpan(NoteImageSpan span) {
-        Editable sp = etContent.getText();
-        int start = sp.getSpanStart(span);
-        int end = sp.getSpanEnd(span);
-        if (start >= 0 && end > start) {
-            sp.removeSpan(span);
-            sp.delete(start, end);
-            dirty = true;
-        }
-    }
-
-    private void playAudio(NoteAudioSpan span) {
-        // 本地媒体文件优先（离线新建 / 同步缓存的音频）
-        File local = MediaFiles.resolveLocal(this, span.getMediaUrl());
-        if (local != null && local.exists()) {
-            startPlaying(local);
-            return;
-        }
-        String mediaId = span.getMediaId();
-        if (mediaId == null || mediaId.isEmpty()) return;
-        if (audioPlayer != null) {
-            try {
-                audioPlayer.stop();
-                audioPlayer.release();
-            } catch (Exception ignored) {
-            }
-            audioPlayer = null;
-        }
-        Toast.makeText(this, getString(R.string.note_edit_playing), Toast.LENGTH_SHORT).show();
-        ioExecutor.execute(() -> {
-            try {
-                Response<ResponseBody> resp = client.getNoteMedia(mediaId).execute();
-                if (resp.isSuccessful() && resp.body() != null) {
-                    byte[] bytes = resp.body().bytes();
-                    File f = new File(getCacheDir(), "audio_" + System.currentTimeMillis() + ".m4a");
-                    try (FileOutputStream out = new FileOutputStream(f)) {
-                        out.write(bytes);
-                    }
-                    mainHandler.post(() -> startPlaying(f));
-                } else {
-                    mainHandler.post(() -> Toast.makeText(this, getString(R.string.note_edit_audio_load_failed), Toast.LENGTH_SHORT).show());
-                }
-            } catch (Exception e) {
-                mainHandler.post(() -> Toast.makeText(this, getString(R.string.note_edit_audio_load_failed), Toast.LENGTH_SHORT).show());
-            }
-        });
-    }
-
-    private void startPlaying(File f) {
-        try {
-            audioPlayer = new MediaPlayer();
-            audioPlayer.setDataSource(f.getAbsolutePath());
-            audioPlayer.setOnCompletionListener(mp -> {
-                try { mp.release(); } catch (Exception ignored) { }
-                if (audioPlayer == mp) audioPlayer = null;
-            });
-            audioPlayer.setOnErrorListener((mp, what, extra) -> {
-                try { mp.release(); } catch (Exception ignored) { }
-                if (audioPlayer == mp) audioPlayer = null;
-                return true;
-            });
-            audioPlayer.prepare();
-            audioPlayer.start();
-        } catch (Exception e) {
-            Toast.makeText(this, getString(R.string.note_edit_play_failed), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    // ---- 回读媒体图片 ----
-
-    private void loadMediaImages() {
-        Editable sp = etContent.getText();
-        NoteImageSpan[] imgs = sp.getSpans(0, sp.length(), NoteImageSpan.class);
-        for (NoteImageSpan img : imgs) {
-            String url = img.getMediaUrl();
-            if (url == null) continue;
-            if (bitmapCache.containsKey(url)) {
-                img.setBitmap(bitmapCache.get(url), this);
-                continue;
-            }
-            // 本地文件优先（离线新建 / 同步缓存的服务端媒体）
-            File local = MediaFiles.resolveLocal(this, url);
-            if (local != null && local.exists()) {
-                Bitmap bmp = BitmapFactory.decodeFile(local.getAbsolutePath());
-                if (bmp != null) {
-                    bitmapCache.put(url, bmp);
-                    img.setBitmap(bmp, this);
-                }
-                continue;
-            }
-            // 服务端媒体（在线）拉取
-            String mid = img.getMediaId();
-            if (mid == null || mid.isEmpty()) continue;
-            ioExecutor.execute(() -> {
-                try {
-                    Response<ResponseBody> resp = client.getNoteMedia(mid).execute();
-                    if (resp.isSuccessful() && resp.body() != null) {
-                        byte[] bytes = resp.body().bytes();
-                        Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                        if (bmp == null) return;
-                        bitmapCache.put(url, bmp);
-                        mainHandler.post(() -> {
-                            NoteImageSpan[] now = etContent.getText().getSpans(0, etContent.length(),
-                                    NoteImageSpan.class);
-                            for (NoteImageSpan cur : now) {
-                                if (url.equals(cur.getMediaUrl())) {
-                                    cur.setBitmap(bmp, NoteEditActivity.this);
-                                }
-                            }
-                            etContent.requestLayout();
-                        });
-                    }
-                } catch (Exception ignored) {
-                }
-            });
-        }
-    }
-
-    // ---- 工具 ----
-
-    private byte[] readAll(Uri uri) throws IOException {
-        java.io.InputStream in = getContentResolver().openInputStream(uri);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buf = new byte[8192];
-        int n;
-        while ((n = in.read(buf)) > 0) {
-            out.write(buf, 0, n);
-        }
-        in.close();
-        return out.toByteArray();
-    }
-
-    private byte[] readFile(File f) throws IOException {
-        try (FileInputStream in = new FileInputStream(f)) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                out.write(buf, 0, n);
-            }
-            return out.toByteArray();
-        }
+    /** 保存当前阅读位置（块列表滚动比例） */
+    private void saveNoteProgress() {
+        if (currentNote == null || currentNote.serverId == null) return;
+        int range = recyclerBlocks.computeVerticalScrollRange();
+        int extent = recyclerBlocks.computeVerticalScrollExtent();
+        int max = range - extent;
+        if (max <= 0) return;
+        int offset = recyclerBlocks.computeVerticalScrollOffset();
+        double pct = Math.min(1, Math.max(0, (double) offset / max));
+        ProgressReporter.saveNoteProgress(client, currentNote.serverId, pct);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (audioPlayer != null) {
-            try {
-                audioPlayer.release();
-            } catch (Exception ignored) {
-            }
-            audioPlayer = null;
-        }
+        if (progressScrollTimer != null) mainHandler.removeCallbacks(progressScrollTimer);
         ioExecutor.shutdown();
     }
 }

@@ -28,7 +28,8 @@ public final class EditorStyle {
         audioPaddingPx = Math.round(8 * density);
         audioChipHeightPx = Math.round(22 * density);
         int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
-        maxImageWidthPx = Math.max(200, screenWidth - Math.round(48 * density));
+        // 图片缩到内容宽度的约 60%（全宽过大，且与文字挤在一起观感差）
+        maxImageWidthPx = Math.max(200, Math.round((screenWidth - Math.round(48 * density)) * 0.6f));
     }
 
     /** 图片未加载完成时的占位 drawable（灰底圆角块） */

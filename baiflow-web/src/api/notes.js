@@ -36,6 +36,15 @@ export function deleteNote(id, viewUserId) {
   return http.delete(`/notes/${id}`, { params })
 }
 
+/** 上传笔记媒体（图片/音频/画画），返回 NoteMediaInfo（含 id / url） */
+export function uploadNoteMedia(file, mediaType) {
+  const form = new FormData()
+  form.append('file', file)
+  if (mediaType) form.append('mediaType', mediaType)
+  // 不手动设 Content-Type：让浏览器自动带 multipart boundary，否则部分后端解析失败
+  return http.post('/notes/media', form)
+}
+
 /** 查询笔记阅读进度 */
 export function getNoteProgress(id) {
   return http.get(`/notes/${id}/progress`)

@@ -40,7 +40,7 @@ public final class KeyboardUtil {
         return true;
     }
 
-    /** 递归判断屏幕坐标点是否落在任一 EditText（含 RichEditText 子类）内 */
+    /** 递归判断屏幕坐标点是否落在任一 EditText 内 */
     private static boolean isPointInsideAnyEditText(View view, float x, float y) {
         if (view instanceof EditText) {
             int[] loc = new int[2];

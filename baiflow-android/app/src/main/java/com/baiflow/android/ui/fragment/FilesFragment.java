@@ -180,7 +180,42 @@ public class FilesFragment extends Fragment {
             loadUsers();
         }
 
+        // 恢复重建前的文件夹导航状态（旋转/进程回收等导致 Activity 重建时保持当前目录，不再回根/上一级）
+        if (savedInstanceState != null) {
+            currentRootId = savedInstanceState.getString("state_root_id");
+            currentRootName = savedInstanceState.getString("state_root_name");
+            currentParentId = savedInstanceState.getString("state_parent_id");
+            currentViewUserId = savedInstanceState.getString("state_view_user");
+            java.io.Serializable stack = savedInstanceState.getSerializable("state_folder_stack");
+            if (stack instanceof ArrayList<?>) {
+                for (Object o : (ArrayList<?>) stack) {
+                    if (o instanceof FileItem) {
+                        // 保存序为 当前..根，addLast 后栈头=当前目录
+                        folderStack.addLast((FileItem) o);
+                    }
+                }
+                currentParentId = folderStack.isEmpty() ? null : folderStack.peek().getId();
+                rebuildPath();
+            }
+            if (currentRootId != null) {
+                loadFiles();
+            }
+        }
+
         loadStorageRoots();
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString("state_root_id", currentRootId);
+        outState.putString("state_root_name", currentRootName);
+        outState.putString("state_parent_id", currentParentId);
+        outState.putString("state_view_user", currentViewUserId);
+        if (!folderStack.isEmpty()) {
+            // ArrayList 迭代序 = ArrayDeque 头到尾 = 当前目录..根目录
+            outState.putSerializable("state_folder_stack", new ArrayList<>(folderStack));
+        }
     }
 
     // ---- 存储根目录：自动选第一个可用根（不再用下拉框） ----
@@ -311,9 +346,6 @@ public class FilesFragment extends Fragment {
             }
             return true;
         });
-        // 菜单关闭后强制恢复「新建」按钮的蓝色（anchor 即该按钮，按压态可能未清除）
-        menu.setOnDismissListener(m ->
-                ((com.baiflow.android.widget.AnimatedTextButton) anchor).resetColor());
         menu.show();
     }
 
@@ -648,21 +680,72 @@ public class FilesFragment extends Fragment {
     }
 
     private void showFileContextMenu(FileItem item) {
-        String[] options = item.isDirectory() ? new String[]{getString(R.string.common_delete)} : new String[]{getString(R.string.files_download), getString(R.string.common_delete)};
+        String rename = getString(R.string.files_rename);
+        String[] options = item.isDirectory()
+                ? new String[]{rename, getString(R.string.common_delete)}
+                : new String[]{rename, getString(R.string.files_download), getString(R.string.common_delete)};
         new AlertDialog.Builder(requireContext())
                 .setTitle(item.getName())
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
+                        showRenameDialog(item);
+                    } else if (which == 1) {
                         if (item.isDirectory()) {
                             confirmDelete(item);
                         } else {
                             downloadFile(item);
                         }
-                    } else if (which == 1) {
+                    } else if (which == 2) {
                         confirmDelete(item);
                     }
                 })
                 .show();
+    }
+
+    /** 重命名：预填原名并全选，确定后调后端重命名 → 刷新列表 */
+    private void showRenameDialog(FileItem item) {
+        final EditText input = new EditText(requireContext());
+        input.setHint(getString(R.string.files_rename_hint));
+        String name = item.getName() != null ? item.getName() : "";
+        input.setText(name);
+        input.setSelection(0, name.length());
+        new AlertDialog.Builder(requireContext())
+                .setTitle(getString(R.string.files_rename))
+                .setView(input)
+                .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
+                    String newName = input.getText().toString().trim();
+                    if (newName.isEmpty()) {
+                        Toast.makeText(requireContext(), getString(R.string.files_name_required), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    rename(item, newName);
+                })
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .show();
+    }
+
+    private void rename(FileItem item, String newName) {
+        String token = privacyTokens.get(currentParentId);
+        client.renameFile(item.getId(), newName, token)
+                .enqueue(new UiCallback<ApiResponse<FileItem>>(requireContext()) {
+                    @Override
+                    protected void onUiResponse(Call<ApiResponse<FileItem>> call,
+                                                Response<ApiResponse<FileItem>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
+                            Toast.makeText(requireContext(), getString(R.string.files_rename_success), Toast.LENGTH_SHORT).show();
+                            loadFiles();
+                        } else if (response.code() < 500) {
+                            String msg = response.body() != null ? response.body().getMessage()
+                                    : getString(R.string.files_rename_failed);
+                            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    protected void onUiFailure(Call<ApiResponse<FileItem>> call, Throwable t) {
+                        // 网络失败已由 UiCallback 统一提示
+                    }
+                });
     }
 
     private void confirmDelete(FileItem item) {

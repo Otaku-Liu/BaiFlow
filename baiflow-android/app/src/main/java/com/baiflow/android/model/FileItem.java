@@ -4,8 +4,10 @@ import com.google.gson.annotations.SerializedName;
 
 /**
  * 文件/文件夹信息（对应后端 FileItemInfo）。
+ * 实现 Serializable：FilesFragment 用它持久化文件夹导航栈，Activity 重建后恢复当前目录。
  */
-public class FileItem {
+public class FileItem implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     @SerializedName("id")
     private String id;
     @SerializedName("storageRootId")

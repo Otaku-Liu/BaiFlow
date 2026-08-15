@@ -11,7 +11,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | 登录 | `/login` | 用户名密码登录 |
 | 主布局 | `/` | 侧边栏 + 顶栏 + 内容区，需登录 |
 | 文件中心 | `/` 内 | 管理员用户切换、面包屑（上传时间）、文件列表（双击/按钮预览，无类型列）、上传/下载/重命名/删除、隐私文件夹 |
-| 随手记 | `/` 内 | 笔记列表 + Vditor 编辑器（IR 即时渲染 + 工具栏含代码块按钮）、搜索、SSE 实时同步、跨设备续读进度、笔记媒体渲染（图片/音频，经 `?token=` 鉴权） |
+| 随手记 | `/` 内 | 笔记列表 + **所见即所得块编辑器**（`NoteBlockEditor`：文本/标题块 + 图片/音频媒体，contenteditable 就地渲染行内格式、编辑即预览；浮动 B/I/U/S 格式条；顶部「＋」在上方插入）、搜索、SSE 实时同步、跨设备续读进度、笔记媒体渲染（经 `?token=` 鉴权） |
 | 分享管理 | `/` 内 | 分享链接创建/查看/撤销、访问日志（管理员） |
 | 用户管理 | `/` 内 | 管理员可见：用户列表、创建/编辑、批量删除、重置密码 |
 | 操作日志 | `/` 内 | 管理员可见：`el-sub-menu` 子菜单入口 |
@@ -32,7 +32,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | Store | 职责 |
 |---|---|
 | `authStore` | token、用户信息、登录状态、`isAdmin` 判断 |
-| `fileStore` | 当前 Storage Root、面包屑路径、文件列表、隐私令牌 |
+| `fileStore` | 当前 Storage Root、面包屑路径、文件列表、隐私令牌；`FilesView.vue` 用 localStorage（`baiflow_file_breadcrumb`）持久化路径，刷新浏览器后保持当前目录 |
 
 ## 组件与 Composables
 
@@ -40,7 +40,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 |---|---|
 | `components/ConfirmDialog.vue` | 基于 `el-dialog` 的通用确认弹窗，替代 `ElMessageBox.confirm`，确保所有弹窗样式统一 |
 | `components/PreviewDrawer.vue` | 文件预览抽屉，按 MIME 类型路由到 5 种渲染器（img/video/audio/iframe/pre） |
-| `views/NotesView.vue` | 随手记页：左侧笔记列表 + 右侧 Vditor 编辑器（IR 即时渲染，输出 Markdown 源；工具栏含自定义代码块按钮）、10s 自动保存 + 手动保存、编辑区滚动保存 SCROLL_PERCENT、SSE 收 NOTE_UPDATED 刷新列表/别端保存时未在编辑则同步正文、乐观并发冲突（覆盖/重载）；`rewriteMediaAuth()` 把 `/api/notes/media/{id}` 的 `<img>`/`<audio>` 追加 `?token=<会话token>`（复用 SSE 的 token 鉴权）|
+| `views/NotesView.vue` + `components/NoteBlockEditor.vue` + `utils/noteBlocks.js` | 随手记页：左侧笔记列表 + 右侧**块编辑器**（文本/标题/列表/引用/代码/图片/音频块，媒体是 `<img>`/`<audio>` 真实组件；`noteBlocks.js` 做 Markdown↔块转换，落库仍是 Markdown）、10s 自动保存 + 手动保存、编辑区滚动保存 SCROLL_PERCENT、SSE 收 NOTE_UPDATED 刷新列表/别端保存时未在编辑则同步正文、乐观并发冲突（覆盖/重载）；媒体 URL 直接带 `?token=<会话token>` 渲染 |
 | `composables/useConfirmDialog.js` | 提供 `confirm()` promise 式 API，搭配 `ConfirmDialog` 使用 |
 | `composables/usePlaybackProgress.js` | 播放/阅读进度管理：查询历史进度、打开时**自动恢复位置**并提示「已恢复到上次观看位置」（不再弹跳转确认）、10s 自动保存、关闭时最终保存；滚动百分比按「滚动范围（scrollHeight - clientHeight）」计算，与 Android 一致 |
 | `composables/useSse.js` | SSE 长连接封装：`EventSource` 连 `/api/events?token=<会话token>`，按事件名注册回调，组件卸载关闭 |
@@ -48,7 +48,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | `utils/mime.js` | 扩展名→MIME 映射表、MIME 主类型判定（image/video/audio/pdf/markdown/text/unknown）、预览支持判断、进度类型推断（SECONDS/PAGE/SCROLL_PERCENT） |
 | `utils/format.js` | `formatDateTime`、`formatSize`、`formatSpeed` |
 
-文件预览抽屉的 Markdown 渲染使用 showdown 库将源码转 HTML；随手记笔记编辑器使用 Vditor（IR 即时渲染，见上「随手记」）。
+文件预览抽屉的 Markdown 渲染使用 showdown 库将源码转 HTML；随手记笔记编辑器为块式所见即所得（块存「行内 markdown 源」，contenteditable 就地渲染行内格式，编辑即预览；HTML↔Markdown 经 showdown + turndown 往返）。
 
 笔记媒体（图片/录音/画画）在正文中以 `/api/notes/media/{id}` 相对路径引用，浏览器 `<img>/<audio>` 带不了 `Authorization` 头，`NotesView.vue` 在渲染后把媒体 URL 追加 `?token=<当前会话token>`（后端 `SessionAuthenticationFilter` 已支持 `?token=` 兜底），并把 `mediaType=audio` 的链接转成 `<audio controls>`。
 

@@ -53,7 +53,7 @@ public final class DocModel {
     }
 
     /** 行内 */
-    public sealed interface Inline permits TextRun, Bold, Italic, Strike, InlineCode, Link, Image {
+    public sealed interface Inline permits TextRun, Bold, Italic, Strike, Underline, InlineCode, Link, Image {
     }
 
     /** 纯文本（未经识别的字符一律归此，原样透传） */
@@ -70,6 +70,10 @@ public final class DocModel {
 
     /** 删除线 */
     public record Strike(List<Inline> children) implements Inline {
+    }
+
+    /** 下划线（HTML {@code <u>}，与 Web 端 Vditor 对齐） */
+    public record Underline(List<Inline> children) implements Inline {
     }
 
     /** 行内代码 */

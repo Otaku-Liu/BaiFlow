@@ -6,7 +6,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.pdf.PdfRenderer;
 import android.media.MediaMetadataRetriever;
-import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -16,14 +15,18 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.MediaController;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.VideoView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.ui.AspectRatioFrameLayout;
+import androidx.media3.ui.PlayerControlView;
+import androidx.media3.ui.PlayerView;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
@@ -60,15 +63,17 @@ public class PreviewActivity extends AppCompatActivity {
 
     private FrameLayout previewContainer;
     private LinearLayout loadingContainer, errorContainer, unsupportedContainer;
-    private MediaPlayer audioPlayer;
+    private ExoPlayer audioPlayer;
 
     // 进度相关：视频/音频续播 + 文本/Markdown 续读，与 Web 共用同一份数据
-    private VideoView videoView;
+    private ExoPlayer videoPlayer;
+    private PlayerView videoPlayerView;
     private ScrollView textScrollView;
     private Runnable videoTimerTask;   // 视频 10s 定时上报
     private Runnable audioTimerTask;   // 音频 10s 定时上报
     private Runnable scrollTimer;      // 文本/Markdown 滚动防抖上报
-    private final int[] pendingSeekMs = {0};  // 音频续播目标（ms），prepared 后消费
+    private long videoPendingSeekMs;   // 视频续播目标（ms），就绪后消费
+    private long audioPendingSeekMs;   // 音频续播目标（ms），就绪后消费
     private boolean videoPlayed;       // 视频已开始播放（允许存 0 清除历史）
     private boolean audioPlayed;       // 音频已开始播放（允许存 0 清除历史）
 
@@ -214,39 +219,43 @@ public class PreviewActivity extends AppCompatActivity {
     private void renderAudio(byte[] bytes) {
         try {
             File f = writeTemp(bytes, fileName);
-            audioPlayer = new MediaPlayer();
-            audioPlayer.setDataSource(f.getAbsolutePath());
-            // 续播：prepared 后先 seek 到记录位置再播放（seek 在 prepared 后才能调用）
-            audioPlayer.setOnPreparedListener(mp -> {
-                audioPlayed = true;
-                if (pendingSeekMs[0] > 0) {
-                    try {
-                        mp.seekTo(pendingSeekMs[0]);
-                        Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
-                    } catch (Exception ignored) {
-                    }
-                    pendingSeekMs[0] = 0;
-                }
-                mp.start();
-                startAudioTimer();
-            });
-            audioPlayer.prepareAsync();
-            // 拉取进度（可能晚于 prepared：已播放则直接 seek，未播放则由 prepared 监听消费）
+            ExoPlayer player = new ExoPlayer.Builder(this).build();
+            audioPlayer = player;
+            // 音频无画面，用纯控制器（播放/暂停 + 进度条 + 时长），常驻显示
+            PlayerControlView controlView = new PlayerControlView(this);
+            controlView.setPlayer(player);
+            controlView.setShowTimeoutMs(0);   // 0 = 不自动隐藏
+            controlView.show();                // 音频没有可点击画面，控制器立即显示并保持
+            // 续播：拉进度 → 就绪后 seek（未就绪先挂起 audioPendingSeekMs）
             new Thread(() -> {
                 double s = ProgressReporter.fetchFileProgress(client, fileId);
                 mainHandler.post(() -> {
-                    if (s <= 0) return;
-                    pendingSeekMs[0] = (int) (s * 1000);
-                    if (audioPlayer != null && audioPlayer.isPlaying()) {
-                        try {
-                            audioPlayer.seekTo(pendingSeekMs[0]);
-                            pendingSeekMs[0] = 0;
-                            Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
-                        } catch (Exception ignored) {
-                        }
+                    if (audioPlayer != player || s <= 0) return;
+                    audioPendingSeekMs = (long) (s * 1000);
+                    if (player.getPlaybackState() == Player.STATE_READY) {
+                        applyAudioPendingSeek(player);
                     }
                 });
             }).start();
+            player.addListener(new Player.Listener() {
+                @Override
+                public void onPlaybackStateChanged(int state) {
+                    if (state == Player.STATE_READY && audioPendingSeekMs > 0) {
+                        applyAudioPendingSeek(player);
+                    }
+                }
+
+                @Override
+                public void onIsPlayingChanged(boolean isPlaying) {
+                    if (isPlaying && !audioPlayed) {
+                        audioPlayed = true;
+                        startAudioTimer();
+                    }
+                }
+            });
+            player.setMediaItem(MediaItem.fromUri(Uri.fromFile(f)));
+            player.prepare();
+            player.setPlayWhenReady(true);
 
             TextView tv = new TextView(this);
             tv.setText(getString(R.string.preview_playing,
@@ -254,7 +263,14 @@ public class PreviewActivity extends AppCompatActivity {
             tv.setTextSize(16f);
             tv.setTextColor(0xFF1D1D1F);
             tv.setGravity(android.view.Gravity.CENTER);
-            previewContainer.addView(tv, new FrameLayout.LayoutParams(
+            // 垂直布局：文件名文字 + 常驻控制器
+            LinearLayout column = new LinearLayout(this);
+            column.setOrientation(LinearLayout.VERTICAL);
+            column.setGravity(android.view.Gravity.CENTER);
+            column.addView(tv);
+            column.addView(controlView, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            previewContainer.addView(column, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         } catch (Exception e) {
             showError();
@@ -264,46 +280,89 @@ public class PreviewActivity extends AppCompatActivity {
     private void renderVideo(byte[] bytes) {
         try {
             File f = writeTemp(bytes, fileName);
-            // 横屏视频（旋转元数据 90/270）自动横屏播放
+            // 横屏视频（旋转 90/270 或有效宽高为横）自动横屏播放
             if (isLandscapeVideo(f)) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             }
-            VideoView vv = new VideoView(this);
-            videoView = vv;
-            MediaController mc = new MediaController(this);
-            vv.setMediaController(mc);
-            // 续播：prepared 后 start，随后拉进度 seek（VideoView 在 prepare 前后都接受 seekTo）
-            vv.setOnPreparedListener(mp -> {
-                if (videoView == vv) {
-                    videoPlayed = true;
-                    vv.start();
-                    startVideoTimer(vv);
-                }
-            });
-            vv.setVideoURI(Uri.fromFile(f));
-            previewContainer.addView(vv, new FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+            // 应用内播放器：ExoPlayer + PlayerView（正确处理旋转元数据、宽高比、控制器时长显示）
+            PlayerView playerView = new PlayerView(this);
+            videoPlayerView = playerView;
+            playerView.setUseController(true);
+            playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
+            playerView.setControllerShowTimeoutMs(3000);
+            ExoPlayer player = new ExoPlayer.Builder(this).build();
+            videoPlayer = player;
+            playerView.setPlayer(player);
+            // 续播：拉进度 → 就绪后 seek（未就绪先挂起 videoPendingSeekMs）
             new Thread(() -> {
                 double s = ProgressReporter.fetchFileProgress(client, fileId);
                 mainHandler.post(() -> {
-                    if (videoView == vv && s > 0) {
-                        vv.seekTo((int) (s * 1000));
-                        Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
+                    if (videoPlayer != player || s <= 0) return;
+                    videoPendingSeekMs = (long) (s * 1000);
+                    if (player.getPlaybackState() == Player.STATE_READY) {
+                        applyVideoPendingSeek(player);
                     }
                 });
             }).start();
+            player.addListener(new Player.Listener() {
+                @Override
+                public void onPlaybackStateChanged(int state) {
+                    if (state == Player.STATE_READY && videoPendingSeekMs > 0) {
+                        applyVideoPendingSeek(player);
+                    }
+                }
+
+                @Override
+                public void onIsPlayingChanged(boolean isPlaying) {
+                    if (isPlaying && !videoPlayed) {
+                        videoPlayed = true;
+                        startVideoTimer();
+                    }
+                }
+            });
+            player.setMediaItem(MediaItem.fromUri(Uri.fromFile(f)));
+            player.prepare();
+            player.setPlayWhenReady(true);
+            // 视频在容器内居中：非满屏（如 16:9 视频在更宽屏上左右留边）不贴左上角
+            previewContainer.addView(playerView, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.view.Gravity.CENTER));
         } catch (Exception e) {
             showError();
         }
     }
 
-    /** 通过视频旋转元数据判断是否为横屏视频（90/270 为横屏，0/180 为竖屏） */
+    /**
+     * 判断视频是否为横屏：旋转元数据 + 有效宽高综合判断。
+     * 手机拍摄的横屏视频旋转元数据为 90/270；下载/转码的视频通常旋转为 0 但画面本身是横的
+     * （宽 > 高）。只查旋转会漏判后者，导致不触发横屏、竖屏容器里贴顶显示留大片空白。
+     */
     private boolean isLandscapeVideo(File f) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
             retriever.setDataSource(f.getAbsolutePath());
             String rot = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
-            return "90".equals(rot) || "270".equals(rot);
+            String wStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+            String hStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+            int rotation = 0;
+            int w = 0;
+            int h = 0;
+            try {
+                rotation = Integer.parseInt(rot);
+            } catch (Exception ignored) { }
+            try {
+                w = Integer.parseInt(wStr);
+                h = Integer.parseInt(hStr);
+            } catch (Exception ignored) { }
+            if (w > 0 && h > 0) {
+                // 应用旋转后的有效宽高：旋转 90/270 时宽高互换
+                boolean swapped = rotation % 180 == 90;
+                int effW = swapped ? h : w;
+                int effH = swapped ? w : h;
+                return effW > effH;
+            }
+            // 读取不到尺寸时退化为仅旋转判断
+            return rotation % 180 == 90;
         } catch (Exception e) {
             // 无法读取元数据时按竖屏处理，不强制旋转
             return false;
@@ -387,13 +446,13 @@ public class PreviewActivity extends AppCompatActivity {
     // ==================== 进度上报辅助 ====================
 
     /** 视频每 10s 上报当前秒数（与 Web 预览节奏一致） */
-    private void startVideoTimer(VideoView vv) {
+    private void startVideoTimer() {
         if (videoTimerTask != null) mainHandler.removeCallbacks(videoTimerTask);
         videoTimerTask = new Runnable() {
             @Override
             public void run() {
-                if (videoView == vv) {
-                    saveVideoProgress(vv);
+                if (videoPlayer != null) {
+                    saveVideoProgress();
                     mainHandler.postDelayed(this, 10000);
                 }
             }
@@ -419,22 +478,36 @@ public class PreviewActivity extends AppCompatActivity {
     /** 音频上报：已播放过才允许存 0（seek 回开头时清除历史），未播放则避免误存 0 覆盖历史 */
     private void saveAudioProgress() {
         if (audioPlayer == null) return;
-        try {
-            int pos = audioPlayer.getCurrentPosition();
-            if (pos > 0 || audioPlayed) {
-                ProgressReporter.saveFileProgress(client, fileId,
-                        ProgressReporter.TYPE_SECONDS, pos / 1000.0);
-            }
-        } catch (Exception ignored) {
+        long pos = audioPlayer.getCurrentPosition();
+        if (pos > 0 || audioPlayed) {
+            ProgressReporter.saveFileProgress(client, fileId,
+                    ProgressReporter.TYPE_SECONDS, pos / 1000.0);
         }
     }
 
     /** 视频上报：已播放过才允许存 0（seek 回开头时清除历史），未播放则避免误存 0 覆盖历史 */
-    private void saveVideoProgress(VideoView vv) {
-        int pos = vv.getCurrentPosition();
+    private void saveVideoProgress() {
+        if (videoPlayer == null) return;
+        long pos = videoPlayer.getCurrentPosition();
         if (pos > 0 || videoPlayed) {
             ProgressReporter.saveFileProgress(client, fileId, ProgressReporter.TYPE_SECONDS, pos / 1000.0);
         }
+    }
+
+    /** 视频续播：应用挂起的 seek 并清 0 */
+    private void applyVideoPendingSeek(ExoPlayer player) {
+        if (videoPendingSeekMs <= 0) return;
+        player.seekTo(videoPendingSeekMs);
+        videoPendingSeekMs = 0;
+        Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
+    }
+
+    /** 音频续播：应用挂起的 seek 并清 0 */
+    private void applyAudioPendingSeek(ExoPlayer player) {
+        if (audioPendingSeekMs <= 0) return;
+        player.seekTo(audioPendingSeekMs);
+        audioPendingSeekMs = 0;
+        Toast.makeText(PreviewActivity.this, R.string.progress_resumed, Toast.LENGTH_SHORT).show();
     }
 
     /** 文本/Markdown 续读：自动滚动到记录百分比（布局完成后计算最大滚动距离） */
@@ -462,22 +535,35 @@ public class PreviewActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        // 离开页面暂停播放（旋转由 configChanges 处理，不触发 onPause）
+        if (videoPlayer != null) videoPlayer.pause();
+        if (audioPlayer != null) audioPlayer.pause();
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (videoTimerTask != null) mainHandler.removeCallbacks(videoTimerTask);
         if (audioTimerTask != null) mainHandler.removeCallbacks(audioTimerTask);
         if (scrollTimer != null) mainHandler.removeCallbacks(scrollTimer);
         // 退出前保存最终进度
-        if (videoView != null) {
-            saveVideoProgress(videoView);
+        if (videoPlayer != null) {
+            saveVideoProgress();
         }
         if (audioPlayer != null) {
             saveAudioProgress();
-            try {
-                audioPlayer.release();
-            } catch (Exception ignored) {
-            }
+            audioPlayer.release();
             audioPlayer = null;
+        }
+        if (videoPlayerView != null) {
+            videoPlayerView.setPlayer(null);
+            videoPlayerView = null;
+        }
+        if (videoPlayer != null) {
+            videoPlayer.release();
+            videoPlayer = null;
         }
         if (textScrollView != null) {
             saveTextProgress(textScrollView);

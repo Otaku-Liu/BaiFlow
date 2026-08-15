@@ -1,5 +1,5 @@
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
+import { notify } from '../utils/notify'
 import { getNoteProgress, saveNoteProgress } from '../api/notes'
 
 /**
@@ -25,7 +25,7 @@ export function useNoteProgress(noteIdRef) {
         const max = el.scrollHeight - el.clientHeight
         if (max > 0) el.scrollTop = pct * max
       }
-      ElMessage({ message: t('common.resumed'), type: 'success', duration: 2000 })
+      notify({ message: t('common.resumed'), type: 'success', duration: 2000 })
     } catch { /* 无进度或查询失败，忽略 */ }
   }
 

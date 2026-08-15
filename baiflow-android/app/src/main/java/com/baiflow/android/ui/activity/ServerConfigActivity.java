@@ -66,6 +66,7 @@ public class ServerConfigActivity extends AppCompatActivity {
 
     private void testAndConnect() {
         String url = etServerUrl.getText().toString().trim();
+        android.util.Log.d("ServerConfig", "testAndConnect click, raw=" + url);
         if (url.isEmpty()) {
             showError(getString(R.string.server_url_required));
             return;
@@ -78,6 +79,7 @@ public class ServerConfigActivity extends AppCompatActivity {
         while (url.endsWith("/")) {
             url = url.substring(0, url.length() - 1);
         }
+        android.util.Log.d("ServerConfig", "final url=" + url + " apiBase=" + session.getApiBaseUrl());
 
         setLoading(true);
         showError("");
@@ -85,6 +87,7 @@ public class ServerConfigActivity extends AppCompatActivity {
         final String finalUrl = url;
         new Thread(() -> {
             boolean ok = client.checkHealth(finalUrl);
+            android.util.Log.d("ServerConfig", "checkHealth result=" + ok);
             mainHandler.post(() -> {
                 setLoading(false);
                 if (ok) {

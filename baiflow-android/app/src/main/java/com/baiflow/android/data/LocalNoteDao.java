@@ -13,12 +13,12 @@ import java.util.List;
 public interface LocalNoteDao {
 
     /** 某分区的可见笔记列表（不含 TOMBSTONE），按修改时间倒序 */
-    @Query("SELECT * FROM bf_local_note WHERE serverUrl = :serverUrl AND source != 'TOMBSTONE' ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM bf_local_note WHERE serverUrl = :serverUrl AND source != 'TOMBSTONE' ORDER BY createdAt DESC")
     List<LocalNote> listByServer(String serverUrl);
 
     /** 某分区关键字搜索（标题/正文模糊） */
     @Query("SELECT * FROM bf_local_note WHERE serverUrl = :serverUrl AND source != 'TOMBSTONE' "
-            + "AND (title LIKE :kw OR content LIKE :kw) ORDER BY updatedAt DESC")
+            + "AND (title LIKE :kw OR content LIKE :kw) ORDER BY createdAt DESC")
     List<LocalNote> search(String serverUrl, String kw);
 
     @Query("SELECT * FROM bf_local_note WHERE id = :id")

@@ -62,6 +62,11 @@ dependencies {
     // Markdown 删除线（~~text~~）渲染
     implementation 'io.noties.markwon:ext-strikethrough:4.6.2'
 
+    // Media3 ExoPlayer（应用内播放器：视频/音频预览，正确处理旋转/比例/时长）
+    // 版本与 compileSdk 34 兼容（1.4.x 编译目标 API 34；1.5+ 需 compileSdk 35/36）
+    implementation 'androidx.media3:media3-exoplayer:1.4.1'
+    implementation 'androidx.media3:media3-ui:1.4.1'
+
     // 单元测试（纯 JVM：MarkdownParser/Emitter 往返测试；适配层用 Robolectric）
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.11.1'

@@ -15,7 +15,7 @@
 | 功能定位 | 便签/笔记（标题 + Markdown 正文） |
 | 手机端 | Android App |
 | 数据存储 | 独立笔记表 `bf_note`，正文存 DB（不进文件中心） |
-| 内容格式 | Markdown（Web 用 Vditor 编辑器渲染；Android 用**所见即所得富文本编辑器**——不手写源码，工具栏实现加粗/标题/列表等，存储仍为 md 源） |
+| 内容格式 | Markdown（Web 用**所见即所得块编辑器**：contenteditable 就地渲染行内格式、编辑即预览，HTML↔Markdown 经 showdown+turndown 往返；Android 用**块式富文本编辑器**——不手写源码，工具栏实现加粗/标题等，存储仍为 md 源） |
 | Android 媒体 | 图片/录音/画画：上传到服务器**专用媒体目录**（不进文件中心列表），引用写进正文 Markdown，Web/Android 多端预览 |
 | 编辑器实现 | 手写透传式 Markdown 解析/发射器 + Spannable 适配层（纯 JVM 可测，未知内容原样透传不丢数据） |
 | 内容同步 | SSE 推送 `NOTE_UPDATED` + 打开时拉取 |
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 
 | # | 文件 | 操作 | 说明 |
 |---|---|---|---|
-| 7 | `views/NotesView.vue` | **新建** | 左侧列表 + 右侧 Vditor 编辑器（IR 即时渲染，输出 Markdown 源，工具栏含自定义代码块按钮；原 showdown 预览切换已由 Vditor 取代） |
+| 7 | `views/NotesView.vue` | **新建** | 左侧列表 + 右侧所见即所得块编辑器 `NoteBlockEditor.vue`（文本/标题块 + 图片/音频媒体；contenteditable 就地渲染行内格式、编辑即预览；浮动 B/I/U/S 格式条跟随焦点块上方偏左、execCommand 就地格式化；顶部常显块类型栏） |
 | 8 | `api/notes.js` | **新建** | CRUD + 进度 API 封装 |
 | 9 | 路由 + 侧边栏 | 修改 | 加「随手记」入口 |
 | 10 | SSE 监听 + 进度 | 修改 | 收 `NOTE_UPDATED` 刷新当前笔记；滚动防抖保存 SCROLL_PERCENT |
@@ -140,17 +140,25 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 **列表页 `NotesFragment`**（替换占位页）：
 - `Ios.Header`「随手记」+ 新建；搜索框（keyword 防抖 500ms）；管理员 `viewUserId` 切换（对齐文件页）；下拉刷新 + 空状态；长按删除
 
-**富文本编辑器 `NoteEditActivity`**：
-- 所见即所得编辑：工具栏 B/I/S/H1-H3/无序有序列表/引用/代码块/行内码/链接 +「更多」展开图片/录音/画画
-- 正文用 `RichEditText`（Spannable），打开 Markdown→Spannable、保存 Spannable→Markdown 往返
-- 实现：纯 JVM `MarkdownParser`/`MarkdownEmitter`/`DocModel`（透传未知块，零数据丢失）+ Android 适配层 `ModelToSpanned`/`SpanExtractor`/自建段落 span；`ListKeyListener` 处理回车延续列表；JUnit 往返属性测试 + Robolectric 适配层测试
+**富文本编辑器 `NoteEditActivity`**（所见即所得块编辑器）：
+- 正文为块列表（每块一个真实 View：文本 EditText / 图片 / 音频），加载 Markdown→`NoteBlocks.fromDoc`→RecyclerView、保存 `NoteBlocks.toDoc`→Markdown；块内存「行内 md 源」
+- **所见即所得**：文本块经 `BlockRichText`（渲染 `MarkdownParser.parseInlines`+`ModelToSpanned.appendInlines`、回写 `SpanExtractor.extractInlines`+`MarkdownEmitter.emitInlines`）渲染行内 markdown 的格式效果，编辑即预览；`BlockRichTextTest`（Robolectric）保证往返稳定；文本块用 `BlockEditText` 自定义选中菜单（系统剪切/复制/粘贴/全选旁并排 加粗/斜体/下划线/删除线，不再遮挡格式条，选中菜单开合时自动隐藏/恢复浮动条）
+- 图片块位图缓存（`LruCache`，mediaUrl→Bitmap），滑动复用时不反复异步加载，避免画画等图片块闪烁；异步回填校验 holder 未被复用
+- 工具栏单行常显：块类型（文本/标题，切换当前焦点块类型，无焦点块时在末尾插入新块；标题不再区分 H1/H2/H3）+ 竖线分隔 + 媒体（图片/录音/画画），与 Web 一致；浮动格式条（焦点块上方偏左显示，B/I/U/S = 加粗/斜体/下划线/删除线，就地切换选中文字 span）
+- 空行是块间分隔，不生成可见空块（`NoteBlocks.fromDoc` 跳过空行、`toDoc` 在块间注入 `\n\n`，与 Web blocksToMarkdown 一致）
+- 块卡片撑满整行宽、块间 8dp 间距（ItemDecoration）；每块顶部居中「＋」（白底圆）可**在上方插入**（文本/标题/图片/录音，与 Web 的插入横线一致，媒体经 pendingInsertIdx 落到指定位置）；新增块后界面自动滚动过去
+- 音频块：宽度**拉满整块**，右侧留出 32dp 给右上角删除 ×（不被遮挡）；播放/暂停用 TextView 而非系统 Button（避免默认样式导致按钮显示不全）；进入时按钮正确显示 ▶（仅准备完成未播放）
+- 录音时长：录音时用**墙钟时长**（stop-start）写入 URL `&duration=`（避免 MediaPlayer/Retriever 误读，如 1s 读成 2s），播放组件优先用该已知时长显示
+- 插入媒体（图片/录音/画画）后**不再自动补空文本块**——文本由用户手动插入（Web 与 Android 一致）
+- 引用块已移除：旧引用内容打开后映射为普通文本块（内容保留，`>` 丢弃）；下划线用 `<u>...</u>`（与 Web 对齐）
+- 实现：纯 JVM `MarkdownParser`/`MarkdownEmitter`/`DocModel`（透传未知内容，零数据丢失）+ `NoteBlocks` 块模型；JUnit/Robolectric 测试
 - 返回时自动保存（PATCH/POST）
 
-**媒体（图片/录音/画画）**：
-- 图片：系统选择器选图 → 压缩 → 上传 → 插入 `NoteImageSpan`；点击查看/替换/删除
-- 录音：`MediaRecorder`（RECORD_AUDIO 权限）→ 上传 → 插入 `NoteAudioSpan`，点击经鉴权接口拉取后播放
-- 画画：`NoteDrawActivity`（Canvas）→ PNG → 上传 → 插入图片 span
-- 回读：正文中已有媒体引用时，后台拉取图片字节换真实位图（LRU 缓存）；音频引用还原为可点击播放 chip
+**媒体（图片/录音/画画）**（Web/Android 均为独立媒体块，非行内 span）：
+- 图片：系统选择器选图 → 上传 → 追加图片块（`ImageView`，本地/服务端加载）；Android 侧位图按 mediaUrl 缓存（`LruCache`），滑动复用不闪烁，异步回填校验 holder 未被复用
+- 录音：`MediaRecorder`（RECORD_AUDIO 权限）→ 上传 → 追加音频块（`NoteAudioPlayerView`：播放/暂停 + 进度条；时长用墙钟写入 `&duration=`，优先展示避免误读）
+- 画画：`NoteDrawActivity`（Canvas）→ PNG → 上传 → 追加图片块
+- 两端插入媒体后不再自动补文本块，文本手动插入；媒体块经整行 markdown 引用（`![alt](url)` / `[录音](url?mediaType=audio&duration=ms)`）序列化，两端互认
 
 ### Phase 3（离线 + 同步，待实施）
 - **Room**：`NoteEntity` + DAO，本地缓存列表与正文

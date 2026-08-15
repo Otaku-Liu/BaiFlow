@@ -63,7 +63,7 @@ public class NoteServiceImpl implements NoteService {
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(Note::getTitle, keyword).or().like(Note::getContent, keyword));
         }
-        wrapper.orderByDesc(Note::getUpdatedAt);
+        wrapper.orderByDesc(Note::getCreatedAt);
 
         IPage<Note> pageResult = noteMapper.selectPage(new Page<>(page, size), wrapper);
         return pageResult.convert(NoteSummary::from);

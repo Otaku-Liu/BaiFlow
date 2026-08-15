@@ -49,7 +49,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 ## M
 
 - **Markdown**
-  笔记正文格式。随手记笔记 Web 端用 Vditor 编辑器（IR 即时渲染）编辑/渲染；文件预览抽屉的 .md 文件预览用 showdown 渲染为 HTML；Android 端用所见即所得富文本编辑器（工具栏实现加粗/标题/列表等，不手写源码），存储仍为 Markdown 源。
+  笔记正文格式。随手记笔记 Web 端与 Android 端均为**所见即所得块编辑器**（块存「行内 markdown 源」，contenteditable/Spannable 就地渲染行内格式、编辑即预览；Web 用 showdown+turndown 往返，Android 用 BlockRichText 往返），存储仍为 Markdown 源；文件预览抽屉的 .md 文件预览用 showdown 渲染为 HTML。
 
 ## N
 

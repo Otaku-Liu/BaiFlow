@@ -45,7 +45,7 @@ Apple 色板：#007AFF 主色、#1D1D1F 主文字、#F5F5F7 背景、#86868B 次
 | 分段控件 | `Ios.Segmented` | 自定义 `SegmentedControl` View（待补充） |
 | 弹窗 | `Ios.Dialog` | 圆角、白底、统一按钮（待补充） |
 | 标题栏 | `Ios.Header` + `.Title`（居中）+ `.BackLabel`（上一级名） | 居中标题 + 左侧 chevron+上一级名，无阴影 |
-| 编辑器工具栏 | `Ios.ToolbarButton`（文本式按钮）+ `Ios.ToolbarRow`（容器行） | 随手记富文本编辑器工具栏，激活态由代码改文字颜色 |
+| 编辑器工具栏 | `Ios.ToolbarButton`（文本式按钮）+ `Ios.ToolbarRow`（容器行） | 随手记块编辑器工具栏，激活态由代码改文字颜色 |
 
 ### 4.3 drawable
 

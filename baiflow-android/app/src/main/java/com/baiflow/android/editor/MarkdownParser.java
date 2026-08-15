@@ -22,9 +22,12 @@ public final class MarkdownParser {
     private static final Pattern FENCE = Pattern.compile("^(`{3,}|~{3,})(.*)$");
 
     // ---- 行内（按顺序优先匹配：图片 > 链接 > 行内代码 > 粗斜体 > 加粗 > 删除线 > 斜体）----
-    private static final Pattern IMAGE = Pattern.compile("^!\\[([^]]*)]\\((\\S+)\\)");
-    private static final Pattern LINK = Pattern.compile("^\\[([^]]*)]\\((\\S+)\\)");
+    // URL 用 [^)\s]+（到第一个 ) 或空白即止）：\S+ 贪婪会在无空格的相邻链接/图片间一路吃到最后一个 )，
+    // 把后续的 ![图] 和 [录音] 全部吞进第一个链接的 URL，导致图片节点丢失
+    private static final Pattern IMAGE = Pattern.compile("^!\\[([^]]*)]\\(([^)\\s]+)\\)");
+    private static final Pattern LINK = Pattern.compile("^\\[([^]]*)]\\(([^)\\s]+)\\)");
     private static final Pattern INLINE_CODE = Pattern.compile("^(\\`{1,})(.*?)\\1");
+    private static final Pattern UNDERLINE = Pattern.compile("^<u>(.*?)</u>");
     private static final Pattern BOLD_ITALIC = Pattern.compile("^\\*\\*\\*(.+?)\\*\\*\\*");
     private static final Pattern BOLD = Pattern.compile("^\\*\\*(.+?)\\*\\*");
     private static final Pattern STRIKE = Pattern.compile("^~~(.+?)~~");
@@ -179,6 +182,12 @@ public final class MarkdownParser {
                     i += m.end();
                     continue;
                 }
+            }
+            if ((m = UNDERLINE.matcher(rest)).find() && !m.group(1).isEmpty()) {
+                flush(text, out);
+                out.add(new DocModel.Underline(parseInlines(m.group(1))));
+                i += m.end();
+                continue;
             }
             if ((m = BOLD_ITALIC.matcher(rest)).find() && validEmphasis(m.group(1))) {
                 flush(text, out);

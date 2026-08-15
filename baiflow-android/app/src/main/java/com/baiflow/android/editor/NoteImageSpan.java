@@ -29,7 +29,16 @@ public class NoteImageSpan extends ReplacementSpan {
         this.maxWidthPx = maxWidthPx;
         this.drawable = placeholder;
         if (placeholder != null) {
-            placeholder.setBounds(0, 0, placeholder.getIntrinsicWidth(), placeholder.getIntrinsicHeight());
+            // GradientDrawable 等不报告 intrinsic size（-1），直接用会清空占位 bounds 导致完全不可见
+            int w = placeholder.getIntrinsicWidth();
+            int h = placeholder.getIntrinsicHeight();
+            if (w > 0 && h > 0) {
+                placeholder.setBounds(0, 0, w, h);
+            } else if (placeholder.getBounds().width() <= 0 || placeholder.getBounds().height() <= 0) {
+                // 无 intrinsic 也无 bounds：给默认尺寸兜底
+                placeholder.setBounds(0, 0, Math.max(1, maxWidthPx),
+                        Math.max(1, Math.round(maxWidthPx * 0.6f)));
+            }
         }
     }
 
@@ -77,16 +86,12 @@ public class NoteImageSpan extends ReplacementSpan {
         }
         Rect b = d.getBounds();
         if (fm != null) {
-            // 图片垂直居中于行高
-            int height = b.height();
-            int ascent = fm.ascent;
-            int top = fm.top;
-            int baseline = fm.bottom - fm.descent;
-            int offset = (baseline - height) / 2;
-            fm.ascent = ascent - offset;
-            fm.top = top - offset;
-            fm.descent = ascent + height;
-            fm.bottom = top + height;
+            // 图片底部对齐行基线区域；图片比行高时只向上扩展行高，
+            // 避免旧算法把 ascent 算成正值导致图片上移、遮挡上一行内容
+            int lineHeight = fm.descent - fm.ascent;
+            int extra = Math.max(0, b.height() - lineHeight);
+            fm.top = fm.top - extra;
+            fm.ascent = fm.ascent - extra;
         }
         return b.width();
     }

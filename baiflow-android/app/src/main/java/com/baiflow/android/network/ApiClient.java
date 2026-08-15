@@ -31,8 +31,13 @@ public class ApiClient {
     private ApiService apiService;
     private String currentBaseUrl;
 
-    /** 连通性探测专用客户端（短超时），供服务器配置页检测 /api/health */
+    /** 连通性探测专用客户端（短超时），供服务器配置页检测 /api/health；带日志便于排查连不上服务器 */
     private final OkHttpClient healthClient = new OkHttpClient.Builder()
+            .addInterceptor(chain -> {
+                Log.i(TAG, "--> GET " + chain.request().url());
+                return chain.proceed(chain.request());
+            })
+            .addInterceptor(new LoggingInterceptor())
             .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
             .build();
@@ -230,6 +235,13 @@ public class ApiClient {
                 @Header("X-Privacy-Access-Token") String privacyToken
         );
 
+        @PATCH("files/{id}/rename")
+        Call<ApiResponse<FileItem>> renameFile(
+                @Path("id") String id,
+                @Body Map<String, String> body,
+                @Header("X-Privacy-Access-Token") String privacyToken
+        );
+
         @POST("files/{id}/privacy/verify")
         Call<ApiResponse<Map<String, Object>>> verifyPrivacy(
                 @Path("id") String id,
@@ -329,19 +341,28 @@ public class ApiClient {
      * 供服务器配置页在后台线程调用；短超时快速反馈。
      */
     public boolean checkHealth(String baseUrl) {
+        String url = baseUrl + "/api/health";
+        Log.i(TAG, "checkHealth url=" + url);
         Request request = new Request.Builder()
-                .url(baseUrl + "/api/health")
+                .url(url)
                 .get()
                 .build();
         try (Response response = healthClient.newCall(request).execute()) {
+            Log.d(TAG, "checkHealth response code=" + response.code());
             if (!response.isSuccessful()) return false;
             String body = response.body() != null ? response.body().string() : "";
+            Log.d(TAG, "checkHealth body=" + body);
             try {
                 return new JSONObject(body).optInt("code") == 0;
             } catch (org.json.JSONException e) {
+                Log.w(TAG, "checkHealth body not json", e);
                 return false;
             }
         } catch (IOException e) {
+            Log.w(TAG, "checkHealth io failed: " + url, e);
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "checkHealth failed: " + url, e);
             return false;
         }
     }
@@ -376,6 +397,12 @@ public class ApiClient {
 
     public Call<ApiResponse<Map<String, Object>>> deleteFile(String id, String privacyToken) {
         return getService().deleteFile(id, privacyToken);
+    }
+
+    public Call<ApiResponse<FileItem>> renameFile(String id, String newName, String privacyToken) {
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("newName", newName);
+        return getService().renameFile(id, body, privacyToken);
     }
 
     public Call<ApiResponse<Map<String, Object>>> verifyPrivacy(String folderId, String password) {

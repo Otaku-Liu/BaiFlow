@@ -2,9 +2,9 @@ package com.baiflow.android.editor;
 
 import android.graphics.Typeface;
 import android.text.Spanned;
-import android.text.style.QuoteSpan;
 import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
+import android.text.style.UnderlineSpan;
 import android.text.style.URLSpan;
 
 import java.util.ArrayList;
@@ -13,10 +13,7 @@ import java.util.List;
 import java.util.TreeSet;
 
 /**
- * SpannableStringBuilder → Doc（编辑器状态还原为文档模型）。
- * <p>
- * 以段落 span（{@link NoteParagraphMarker} + {@link QuoteSpan}）为边界切分文本，
- * 段落格式映射到对应块，未覆盖的区间按行重组为普通段落/空行。
+ * Spannable 行内 → Doc（块所见即所得回写，经 {@link BlockRichText} 使用）。
  * 行内格式用「边界切分 + 固定优先级链式包裹」近似嵌套（重叠 span 摊平为相邻节点，
  * 文本不丢失，属 v1 接受的取舍）。
  */
@@ -25,118 +22,8 @@ public final class SpanExtractor {
     private SpanExtractor() {
     }
 
-    public static DocModel.Doc extract(Spanned s) {
-        List<Para> paras = new ArrayList<>();
-        NoteParagraphMarker[] markers = s.getSpans(0, s.length(), NoteParagraphMarker.class);
-        for (NoteParagraphMarker m : markers) {
-            paras.add(new Para(m, s.getSpanStart(m), s.getSpanEnd(m)));
-        }
-        QuoteSpan[] quotes = s.getSpans(0, s.length(), QuoteSpan.class);
-        for (QuoteSpan q : quotes) {
-            paras.add(new Para(q, s.getSpanStart(q), s.getSpanEnd(q)));
-        }
-        paras.sort(Comparator.comparingInt(p -> p.start));
-
-        List<DocModel.Block> blocks = new ArrayList<>();
-        List<List<DocModel.Inline>> pendingBullets = new ArrayList<>();
-        List<List<DocModel.Inline>> pendingOrdered = new ArrayList<>();
-        List<DocModel.Inline> pendingQuote = null;
-
-        int p = 0;
-        for (Para para : paras) {
-            if (para.start < p) {
-                continue; // 重叠防御：跳过已被覆盖的段落
-            }
-            if (para.start > p) {
-                flushLists(blocks, pendingBullets, pendingOrdered, pendingQuote);
-                pendingQuote = null;
-                addPlainGap(s, p, para.start, blocks);
-                p = para.start;
-            }
-            int contentEnd = para.end;
-            if (contentEnd > p && s.charAt(contentEnd - 1) == '\n') {
-                contentEnd--;
-            }
-
-            if (para.span instanceof NoteHeadingSpan h) {
-                flushLists(blocks, pendingBullets, pendingOrdered, pendingQuote);
-                pendingQuote = null;
-                blocks.add(new DocModel.HeadingBlock(h.getLevel(), extractInlines(s, p, contentEnd)));
-            } else if (para.span instanceof NoteBulletSpan) {
-                pendingBullets.add(extractInlines(s, p, contentEnd));
-            } else if (para.span instanceof NoteOrderedSpan) {
-                pendingOrdered.add(extractInlines(s, p, contentEnd));
-            } else if (para.span instanceof NoteCodeBlockSpan cb) {
-                flushLists(blocks, pendingBullets, pendingOrdered, pendingQuote);
-                pendingQuote = null;
-                blocks.add(new DocModel.CodeBlock(cb.getLanguage(), s.subSequence(p, contentEnd).toString()));
-            } else if (para.span instanceof QuoteSpan) {
-                flushLists(blocks, pendingBullets, pendingOrdered, pendingQuote);
-                pendingQuote = extractInlines(s, p, contentEnd);
-            }
-            p = para.end;
-        }
-        flushLists(blocks, pendingBullets, pendingOrdered, pendingQuote);
-        if (p < s.length()) {
-            addPlainGap(s, p, s.length(), blocks);
-        }
-        return new DocModel.Doc(blocks);
-    }
-
-    private static void flushLists(List<DocModel.Block> blocks,
-                                   List<List<DocModel.Inline>> bullets,
-                                   List<List<DocModel.Inline>> ordered,
-                                   List<DocModel.Inline> quote) {
-        if (!bullets.isEmpty()) {
-            blocks.add(new DocModel.BulletListBlock(new ArrayList<>(bullets)));
-            bullets.clear();
-        }
-        if (!ordered.isEmpty()) {
-            blocks.add(new DocModel.OrderedListBlock(new ArrayList<>(ordered)));
-            ordered.clear();
-        }
-        if (quote != null) {
-            blocks.add(new DocModel.QuoteBlock(quote));
-        }
-    }
-
-    /** 未覆盖区间：按行重组 — 连续非空行 → 一个段落（保留软换行），空行 → BlankBlock */
-    private static void addPlainGap(Spanned s, int start, int end, List<DocModel.Block> blocks) {
-        List<DocModel.Block> out = new ArrayList<>();
-        int i = start;
-        List<int[]> paraLines = new ArrayList<>();
-        while (i < end) {
-            int lineEnd = i;
-            while (lineEnd < end && s.charAt(lineEnd) != '\n') {
-                lineEnd++;
-            }
-            boolean blank = ParagraphHelper.isBlank(s, i, lineEnd);
-            if (blank) {
-                if (!paraLines.isEmpty()) {
-                    out.add(makeParagraph(s, paraLines));
-                    paraLines.clear();
-                }
-                out.add(new DocModel.BlankBlock());
-            } else {
-                paraLines.add(new int[]{i, lineEnd});
-            }
-            i = lineEnd + 1;
-        }
-        if (!paraLines.isEmpty()) {
-            out.add(makeParagraph(s, paraLines));
-        }
-        blocks.addAll(out);
-    }
-
-    private static DocModel.TextBlock makeParagraph(Spanned s, List<int[]> lines) {
-        int firstStart = lines.get(0)[0];
-        int lastEnd = lines.get(lines.size() - 1)[1];
-        return new DocModel.TextBlock(extractInlines(s, firstStart, lastEnd));
-    }
-
-    // ---- 行内提取 ----
-
-    private static final int K_LINK = 4;
+    private static final int K_LINK = 5;
+    private static final int K_UNDERLINE = 4;
     private static final int K_BOLD = 3;
     private static final int K_ITALIC = 2;
     private static final int K_STRIKE = 1;
@@ -145,7 +32,7 @@ public final class SpanExtractor {
     private record SpanRef(int kind, int start, int end, Object span, String url) {
     }
 
-    private static List<DocModel.Inline> extractInlines(Spanned s, int start, int end) {
+    static List<DocModel.Inline> extractInlines(Spanned s, int start, int end) {
         List<SpanRef> refs = new ArrayList<>();
         for (StyleSpan sp : s.getSpans(start, end, StyleSpan.class)) {
             int ss = clamp(s.getSpanStart(sp), start, end);
@@ -153,6 +40,13 @@ public final class SpanExtractor {
             if (ss < se) {
                 int kind = sp.getStyle() == Typeface.BOLD ? K_BOLD : K_ITALIC;
                 refs.add(new SpanRef(kind, ss, se, sp, null));
+            }
+        }
+        for (UnderlineSpan sp : s.getSpans(start, end, UnderlineSpan.class)) {
+            int ss = clamp(s.getSpanStart(sp), start, end);
+            int se = clamp(s.getSpanEnd(sp), start, end);
+            if (ss < se) {
+                refs.add(new SpanRef(K_UNDERLINE, ss, se, sp, null));
             }
         }
         for (StrikethroughSpan sp : s.getSpans(start, end, StrikethroughSpan.class)) {
@@ -229,7 +123,7 @@ public final class SpanExtractor {
                 continue;
             }
 
-            // 链式包裹：由内到外 CODE < STRIKE < ITALIC < BOLD < LINK
+            // 链式包裹：由内到外 CODE < STRIKE < ITALIC < BOLD < UNDERLINE < LINK
             flush(text, out);
             active.sort(Comparator.comparingInt(SpanRef::kind));
             DocModel.Inline node = new DocModel.TextRun(segText);
@@ -258,15 +152,13 @@ public final class SpanExtractor {
     private static DocModel.Inline wrap(SpanRef r, DocModel.Inline inner) {
         switch (r.kind()) {
             case K_LINK:
-                if (r.span() instanceof URLSpan) {
-                    return new DocModel.Link(r.url(), List.of(inner));
-                }
-                // 媒体 span 已在 mediaNode 分支处理，这里不会到达
-                return inner;
+                return new DocModel.Link(r.url(), List.of(inner));
             case K_BOLD:
                 return new DocModel.Bold(List.of(inner));
             case K_ITALIC:
                 return new DocModel.Italic(List.of(inner));
+            case K_UNDERLINE:
+                return new DocModel.Underline(List.of(inner));
             case K_STRIKE:
                 return new DocModel.Strike(List.of(inner));
             case K_CODE:
@@ -332,8 +224,5 @@ public final class SpanExtractor {
 
     private static int clamp(int v, int lo, int hi) {
         return Math.max(lo, Math.min(hi, v));
-    }
-
-    private record Para(Object span, int start, int end) {
     }
 }

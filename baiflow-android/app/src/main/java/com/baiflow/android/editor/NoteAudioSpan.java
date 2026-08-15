@@ -2,34 +2,35 @@ package com.baiflow.android.editor;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.RectF;
 import android.text.style.ReplacementSpan;
 
 /**
- * 音频 span — 替代文本中单个 {@code ￼} 占位符，绘制「▶ 录音」圆角胶囊。
- * 点击由 {@link RichEditText#onTouchEvent} 拦截播放。
+ * 音频 span — 文本按钮样式（无自绘图形）：用 ▶/⏸ 字符 + 「录音 mm:ss」文本表示。
+ * {@code playing} / {@code durationMs} 由调用方更新后重绘（invalidate）。
  * 序列化时输出 {@code [录音](/api/notes/media/{mediaId}?mediaType=audio)}。
  */
 public class NoteAudioSpan extends ReplacementSpan {
 
+    private static final String PLAY = "▶";   // ▶
+    private static final String PAUSE = "⏸";  // ⏸
+
     private final String mediaId;
     private final String mediaUrl;
     private final String alt;
-    private final int chipColor;
     private final int textColor;
     private final int paddingH;
-    private final int chipHeight;
+
+    private long durationMs = -1;   // 解析出的时长（ms），未知为 -1
+    private boolean playing;        // 当前是否在播放
 
     public NoteAudioSpan(String mediaId, String mediaUrl, String alt,
                          int chipColor, int textColor, int paddingH, int chipHeight) {
         this.mediaId = mediaId;
         this.mediaUrl = mediaUrl;
         this.alt = alt != null ? alt : "录音";
-        this.chipColor = chipColor;
         this.textColor = textColor;
         this.paddingH = paddingH;
-        this.chipHeight = chipHeight;
+        // chipColor / chipHeight 不再用于自绘（文本按钮样式），保留构造参数避免改动调用方
     }
 
     public String getMediaId() {
@@ -44,46 +45,52 @@ public class NoteAudioSpan extends ReplacementSpan {
         return alt;
     }
 
+    /** 设置已解析时长（ms）并触发重绘（调用方负责 invalidate） */
+    public void setDurationMs(long durationMs) {
+        this.durationMs = durationMs;
+    }
+
+    /** 设置播放/暂停态并触发重绘（调用方负责 invalidate） */
+    public void setPlaying(boolean playing) {
+        this.playing = playing;
+    }
+
     @Override
     public int getSize(Paint paint, CharSequence text, int start, int end, Paint.FontMetricsInt fm) {
-        float labelW = paint.measureText(alt);
-        int w = (int) (paddingH * 2 + labelW + chipHeight);
+        // 按固定宽度测量（时长用 00:00 占位），时长更新后宽度稳定，无需重新布局
+        float w = paint.measureText(PLAY + " " + alt + "  00:00") + paddingH * 2;
         if (fm != null) {
-            int ascent = fm.ascent;
-            int offset = (fm.descent - fm.ascent - chipHeight) / 2;
-            fm.ascent = ascent - offset;
-            fm.top = fm.top - offset;
-            fm.descent = ascent + chipHeight + offset;
-            fm.bottom = fm.top + chipHeight + 2 * offset;
+            // 占位符字符本身可能无度量：显式用字体 metrics 撑起正常行高，
+            // 否则行高塌陷 → 音频不可见、且内容总高度错乱导致滚动异常
+            Paint.FontMetricsInt nf = paint.getFontMetricsInt();
+            fm.top = nf.top;
+            fm.ascent = nf.ascent;
+            fm.descent = nf.descent;
+            fm.bottom = nf.bottom;
         }
-        return w;
+        return Math.round(w);
     }
 
     @Override
     public void draw(Canvas canvas, CharSequence text, int start, int end,
                      float x, int top, int y, int bottom, Paint paint) {
-        RectF chip = new RectF(x, (top + bottom - chipHeight) / 2f,
-                x + getSize(paint, text, start, end, null), (top + bottom + chipHeight) / 2f);
         int oldColor = paint.getColor();
-
-        paint.setColor(chipColor);
-        canvas.drawRoundRect(chip, chipHeight / 2f, chipHeight / 2f, paint);
-
-        // 播放三角
         paint.setColor(textColor);
-        float triH = chipHeight * 0.4f;
-        float cx = chip.left + paddingH + chipHeight * 0.35f;
-        float cy = chip.centerY();
-        Path path = new Path();
-        path.moveTo(cx, cy - triH);
-        path.lineTo(cx, cy + triH);
-        path.lineTo(cx + triH * 0.9f, cy);
-        path.close();
-        canvas.drawPath(path, paint);
-
-        // 标签
-        paint.setTextSize(paint.getTextSize() * 0.9f);
-        canvas.drawText(alt, chip.left + paddingH * 2 + chipHeight * 0.6f, cy + 1, paint);
+        canvas.drawText(label(), x + paddingH, y, paint);
         paint.setColor(oldColor);
+    }
+
+    private String label() {
+        return (playing ? PAUSE : PLAY) + " " + alt + "  " + formatDuration();
+    }
+
+    private String formatDuration() {
+        if (durationMs < 0) {
+            return "--:--";
+        }
+        long totalSec = durationMs / 1000;
+        long m = totalSec / 60;
+        long s = totalSec % 60;
+        return m + ":" + (s < 10 ? "0" : "") + s;
     }
 }

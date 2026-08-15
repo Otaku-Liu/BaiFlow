@@ -65,9 +65,9 @@
 每个用户对每个文件只存一条记录。`position_type` 区分视频秒数、PDF 页码、文本滚动百分比，支持跨设备断点续看。**删除文件时级联删除该文件的全部进度行**。
 
 ### note — 随手记笔记
-`id, user_id, title, content(LONGTEXT, Markdown), status(ACTIVE/DELETED 软删除), created_at, updated_at, deleted_at`
+`id, user_id, title, content(LONGTEXT, 块结构序列化的 Markdown), status(ACTIVE/DELETED 软删除), created_at, updated_at, deleted_at`
 
-笔记独立于文件系统，正文直接落库。`updated_at` 由服务端显式刷新，作为乐观并发（保存携带 `baseUpdatedAt` 比对）的时间基准。`status` 软删除标记随增量拉取同步。
+笔记独立于文件系统，正文直接落库。编辑器改为**块结构**（文本/标题/列表/引用/代码/图片/音频块，每块一个真实组件），落库格式仍为 **Markdown**（块↔Markdown 转换，服务端不解析，纯客户端契约）。`updated_at` 由服务端显式刷新，作为乐观并发（保存携带 `baseUpdatedAt` 比对）的时间基准。`status` 软删除标记随增量拉取同步。
 
 ### note_progress — 笔记阅读进度
 `id, user_id, note_id, position_type(SCROLL_PERCENT), position_value, created_at, updated_at`

@@ -5,14 +5,12 @@
     <string name="common_save">Save</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_confirm">OK</string>
-    <string name="common_close">Close</string>
     <string name="common_delete">Delete</string>
     <string name="common_deleted">Deleted</string>
     <string name="common_delete_failed">Delete failed</string>
     <string name="common_confirm_delete">Confirm Delete</string>
     <string name="common_delete_message">Delete \"%1$s\"?</string>
     <string name="common_save_failed">Save failed</string>
-    <string name="common_load_failed">Load failed</string>
     <string name="network_no_connection">No network connection. Check your network settings.</string>
     <string name="cannot_reach_server">Cannot reach the server. Check the network and retry later.</string>
     <string name="server_error">Server error. Please retry later.</string>
@@ -39,7 +37,6 @@
     <string name="mine_mode_online">Online mode</string>
     <string name="mine_mode_offline">Offline mode</string>
     <string name="files_offline_unavailable">Offline / no server configured. File center unavailable.</string>
-    <string name="transfer_offline_unavailable">Offline / no server configured. Transfers unavailable.</string>
 
     <!-- ==================== Bottom navigation ==================== -->
     <string name="nav_files">Files</string>
@@ -78,6 +75,10 @@
     <string name="files_folder_create_failed">Create failed</string>
     <string name="files_name_required">Please enter a name</string>
     <string name="files_upload">Upload</string>
+    <string name="files_rename">Rename</string>
+    <string name="files_rename_hint">New name</string>
+    <string name="files_rename_success">Renamed</string>
+    <string name="files_rename_failed">Rename failed</string>
     <string name="files_view_user">View User</string>
     <string name="files_empty">This folder is empty</string>
     <string name="files_folder">Folder</string>
@@ -105,19 +106,18 @@
     <string name="notes_search_hint">Search notes</string>
     <string name="notes_empty">No notes yet. Tap New to create one.</string>
     <string name="notes_untitled">Untitled</string>
-    <string name="notes_my_notes">My Notes</string>
 
     <!-- ==================== Note editor ==================== -->
     <string name="note_edit_title_hint">Title</string>
-    <string name="note_edit_content_hint">Start typing…</string>
+    <string name="note_edit_bold">Bold</string>
+    <string name="note_edit_italic">Italic</string>
+    <string name="note_edit_underline">Underline</string>
+    <string name="note_edit_strike">Strikethrough</string>
+    <string name="note_edit_select_text_first">Select text in a block first</string>
+    <string name="note_block_text">Text</string>
+    <string name="note_block_heading">Heading</string>
     <string name="note_edit_new_title">New Note</string>
     <string name="note_edit_edit_title">Edit Note</string>
-    <string name="note_edit_bold_sample">bold text</string>
-    <string name="note_edit_italic_sample">italic text</string>
-    <string name="note_edit_strike_sample">strikethrough text</string>
-    <string name="note_edit_code_sample">code</string>
-    <string name="note_edit_link_sample">link</string>
-    <string name="note_edit_insert_link">Insert Link</string>
     <string name="note_edit_saved">Saved</string>
     <string name="note_edit_conflict_title">Conflict Detected</string>
     <string name="note_edit_conflict_message">This note was modified on another device. Overwriting will lose their changes; reloading will lose your unsaved changes.</string>
@@ -125,28 +125,17 @@
     <string name="note_edit_reload">Reload</string>
     <string name="note_edit_reloaded">Reloaded</string>
     <string name="note_edit_mic_permission_required">Microphone permission is required to record audio</string>
-    <string name="note_edit_image_alt">Image</string>
     <string name="note_edit_image_title">Image</string>
     <string name="note_edit_image_decode_failed">Failed to decode image</string>
-    <string name="note_edit_image_read_failed">Failed to read image</string>
-    <string name="note_edit_image_upload_failed">Failed to upload image</string>
-    <string name="note_edit_image_view">View</string>
-    <string name="note_edit_image_replace">Replace</string>
-    <string name="note_edit_image_not_loaded">Image not loaded yet</string>
     <string name="note_edit_recording_title">Record</string>
     <string name="note_edit_recording_hint">Tap to start recording</string>
     <string name="note_edit_record_start">Start</string>
     <string name="note_edit_record_stop">Stop</string>
     <string name="note_edit_recording_status">Recording…</string>
-    <string name="note_edit_processing">Processing…</string>
     <string name="note_edit_recording_start_failed">Failed to start recording: %1$s</string>
     <string name="note_edit_recording_empty">Recording is empty</string>
-    <string name="note_edit_recording_read_failed">Failed to read recording</string>
     <string name="note_edit_recording_upload_failed">Failed to upload recording</string>
-    <string name="note_edit_audio_alt">Recording</string>
-    <string name="note_edit_audio_filename">Recording.m4a</string>
     <string name="note_edit_playing">Playing…</string>
-    <string name="note_edit_audio_load_failed">Failed to load audio</string>
     <string name="note_edit_play_failed">Playback failed</string>
 
     <!-- ==================== Drawing ==================== -->

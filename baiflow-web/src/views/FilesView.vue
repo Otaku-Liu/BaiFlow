@@ -194,7 +194,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Upload, FolderAdd, UploadFilled } from '@element-plus/icons-vue'
@@ -230,6 +230,30 @@ const roots = ref([])
 const rootId = ref('')
 const viewUsers = ref([])
 const viewUserId = ref('')
+
+// ---- 浏览路径持久化：刷新浏览器后保持当前目录（localStorage，沿用 baiflow_ 前缀惯例）----
+const FILE_PATH_KEY = 'baiflow_file_breadcrumb'
+
+function persistFilePath() {
+  try {
+    localStorage.setItem(FILE_PATH_KEY, JSON.stringify({
+      rootId: rootId.value,
+      breadcrumb: fileStore.breadcrumb,
+      viewUserId: viewUserId.value || ''
+    }))
+  } catch { /* localStorage 不可用时忽略，不影响浏览 */ }
+}
+
+function restoreFilePath() {
+  try {
+    const raw = localStorage.getItem(FILE_PATH_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+// 路径（根/面包屑/管理员查看的用户空间）变化即落盘，覆盖 navigateTo/goUp/换用户空间 等所有入口
+watch(() => [fileStore.currentRootId, fileStore.breadcrumb, viewUserId.value], persistFilePath, { deep: true })
+
 const loading = ref(false)
 const showUploadDialog = ref(false)
 const showNewFolderDialog = ref(false)
@@ -301,6 +325,15 @@ onMounted(async () => {
       if (authStore.user?.id) {
         viewUserId.value = authStore.user.id
       }
+    }
+  }
+
+  // 恢复刷新前浏览的路径：存储根一致才恢复（面包屑 + 管理员查看的用户空间）
+  const saved = restoreFilePath()
+  if (saved && saved.rootId === rootId.value) {
+    fileStore.breadcrumb = Array.isArray(saved.breadcrumb) ? saved.breadcrumb : []
+    if (saved.viewUserId && authStore.isAdmin) {
+      viewUserId.value = saved.viewUserId
     }
   }
 

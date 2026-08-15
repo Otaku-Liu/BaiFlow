@@ -9,7 +9,7 @@ Java + Retrofit + OkHttp + WorkManager + Foreground Service + SharedPreferences
 - 登录、文件列表（底部三栏：文件 / 随手记 / 我的）、上传手机文件、下载服务器文件
 - 长任务前台通知
 - 文件页与 Web 对齐：自动使用第一个可用存储根；管理员可「查看用户」切换 viewUserId
-- 随手记：富文本所见即所得笔记编辑器（加粗/标题/列表/引用/代码块 + 图片/录音/画画媒体），见 `docs/07-quick-notes.md`
+- 随手记：所见即所得块式笔记编辑器（文本/标题块 + 图片/录音/画画媒体；块内渲染行内格式、编辑即预览；B/I/U/S 浮动格式条 + 顶部块类型栏；引用已移除），见 `docs/07-quick-notes.md`
 
 ## 模块
 
@@ -36,6 +36,7 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 - 下载计次由后端记录（见 `docs/13-download-records.md`）
 - **下载落公共 Download 文件夹**：API 29+ 走 `MediaStore.Downloads`（作用域存储，无需权限，系统「下载」/文件管理器可见）；API 26-28 写 `Environment.DIRECTORY_DOWNLOADS`，下载前申请 `WRITE_EXTERNAL_STORAGE`
 - **不支持预览的文件**：点按弹「暂不支持在线预览」对话框（含「下载」按钮），**不自动下载**，手动点「下载」才下载
+- **预览渲染**：视频/音频用 Media3 ExoPlayer（视频 `PlayerView`、音频 `PlayerControlView`，正确处理旋转元数据、宽高比、控制器时长）；横屏视频按「旋转 90/270 或有效宽高为横」自动转横屏
 
 ## 浏览进度（跨端同步）
 
@@ -46,8 +47,8 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 ## 页面
 
 - 登录 / 服务器配置（连通性检测）→ **MainActivity**（底部三栏，`ViewPager2` 滑动 + 底部导航双向同步）
-  - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「新建」（下拉：新建文件夹 / 上传文件）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等）；不支持预览的文件点按弹下载确认框
-  - **随手记** `NotesFragment`：列表/搜索/删除 → `NoteEditActivity`（富文本）→ `NoteDrawActivity`（画画）
+  - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「三点」菜单（下拉：新建文件夹 / 上传文件）；长按文件/文件夹弹操作菜单（重命名 / 下载 / 删除，重命名走 `PATCH /api/files/{id}/rename`）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等）；不支持预览的文件点按弹下载确认框
+  - **随手记** `NotesFragment`：列表/搜索/删除 → `NoteEditActivity`（**所见即所得块编辑器**：RecyclerView 每块一个真实 View，文本 EditText 经 `BlockRichText` 渲染行内 markdown 的格式效果、编辑即预览，图片 ImageView，音频 `NoteAudioPlayerView`；加载 Markdown→`NoteBlocks.fromDoc`、保存 `NoteBlocks.toDoc`→Markdown，落库仍是 Markdown）→ `NoteDrawActivity`（画画）
   - **我的** `MineFragment`：分组（账号/通用/同步）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认
 
 ## 多语言（i18n）

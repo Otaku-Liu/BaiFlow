@@ -48,15 +48,15 @@
                 android:scaleType="fitCenter"
                 android:contentDescription="@string/files_refresh" />
 
-            <com.baiflow.android.widget.AnimatedTextButton
+            <com.baiflow.android.widget.AnimatedTintImageView
                 android:id="@+id/btnNew"
-                style="@style/Ios.Button.Text"
-                android:layout_width="wrap_content"
+                android:layout_width="40dp"
                 android:layout_height="match_parent"
-                android:gravity="center"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:text="@string/files_new" />
+                android:padding="10dp"
+                android:src="@drawable/ic_tool_more"
+                android:tint="@color/text_accent_selector"
+                android:scaleType="fitCenter"
+                android:contentDescription="@string/files_new" />
         </LinearLayout>
     </FrameLayout>
 

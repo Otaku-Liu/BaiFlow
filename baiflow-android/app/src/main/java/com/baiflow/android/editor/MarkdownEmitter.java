@@ -87,7 +87,8 @@ public final class MarkdownEmitter {
         }
     }
 
-    private static String emitInlines(List<DocModel.Inline> inlines) {
+    /** 行内 → markdown 源（块编辑器取文本块的原始 markdown 用） */
+    public static String emitInlines(List<DocModel.Inline> inlines) {
         StringBuilder sb = new StringBuilder();
         for (DocModel.Inline in : inlines) {
             if (in instanceof DocModel.TextRun t) {
@@ -98,6 +99,8 @@ public final class MarkdownEmitter {
                 sb.append('*').append(emitInlines(i.children())).append('*');
             } else if (in instanceof DocModel.Strike st) {
                 sb.append("~~").append(emitInlines(st.children())).append("~~");
+            } else if (in instanceof DocModel.Underline u) {
+                sb.append("<u>").append(emitInlines(u.children())).append("</u>");
             } else if (in instanceof DocModel.InlineCode c) {
                 String d = backtickDelimiters(c.code());
                 sb.append(d).append(c.code()).append(d);

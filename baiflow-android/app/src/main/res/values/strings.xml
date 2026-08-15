@@ -5,14 +5,12 @@
     <string name="common_save">保存</string>
     <string name="common_cancel">取消</string>
     <string name="common_confirm">确定</string>
-    <string name="common_close">关闭</string>
     <string name="common_delete">删除</string>
     <string name="common_deleted">已删除</string>
     <string name="common_delete_failed">删除失败</string>
     <string name="common_confirm_delete">确认删除</string>
     <string name="common_delete_message">确定要删除 \"%1$s\" 吗？</string>
     <string name="common_save_failed">保存失败</string>
-    <string name="common_load_failed">加载失败</string>
     <string name="network_no_connection">无网络连接，请检查网络设置</string>
     <string name="cannot_reach_server">无法连接服务器，请检查网络或稍后重试</string>
     <string name="server_error">服务器异常，请稍后重试</string>
@@ -39,7 +37,6 @@
     <string name="mine_mode_online">在线模式</string>
     <string name="mine_mode_offline">离线模式</string>
     <string name="files_offline_unavailable">离线模式 / 未配置服务器，文件中心不可用</string>
-    <string name="transfer_offline_unavailable">离线模式 / 未配置服务器，传输不可用</string>
 
     <!-- ==================== 底部导航 ==================== -->
     <string name="nav_files">文件</string>
@@ -78,6 +75,10 @@
     <string name="files_folder_create_failed">创建失败</string>
     <string name="files_name_required">请输入名称</string>
     <string name="files_upload">上传</string>
+    <string name="files_rename">重命名</string>
+    <string name="files_rename_hint">新的名称</string>
+    <string name="files_rename_success">重命名成功</string>
+    <string name="files_rename_failed">重命名失败</string>
     <string name="files_view_user">查看用户</string>
     <string name="files_empty">此目录为空</string>
     <string name="files_folder">文件夹</string>
@@ -107,19 +108,18 @@
     <string name="notes_search_hint">搜索笔记</string>
     <string name="notes_empty">暂无笔记，点右上角新建</string>
     <string name="notes_untitled">无标题</string>
-    <string name="notes_my_notes">我的笔记</string>
 
     <!-- ==================== 笔记编辑 ==================== -->
     <string name="note_edit_title_hint">标题</string>
-    <string name="note_edit_content_hint">开始记录…</string>
+    <string name="note_edit_bold">加粗</string>
+    <string name="note_edit_italic">斜体</string>
+    <string name="note_edit_underline">下划线</string>
+    <string name="note_edit_strike">删除线</string>
+    <string name="note_edit_select_text_first">请先在文本块中选中文字</string>
+    <string name="note_block_text">文本</string>
+    <string name="note_block_heading">标题</string>
     <string name="note_edit_new_title">新建随手记</string>
     <string name="note_edit_edit_title">编辑随手记</string>
-    <string name="note_edit_bold_sample">加粗文字</string>
-    <string name="note_edit_italic_sample">斜体文字</string>
-    <string name="note_edit_strike_sample">删除线文字</string>
-    <string name="note_edit_code_sample">代码</string>
-    <string name="note_edit_link_sample">链接</string>
-    <string name="note_edit_insert_link">插入链接</string>
     <string name="note_edit_saved">已保存</string>
     <string name="note_edit_conflict_title">检测到冲突</string>
     <string name="note_edit_conflict_message">这篇笔记已在其他设备被修改。覆盖会丢失对方的改动，重新加载会丢失你本次未保存的改动。</string>
@@ -127,28 +127,17 @@
     <string name="note_edit_reload">重新加载</string>
     <string name="note_edit_reloaded">已重新加载</string>
     <string name="note_edit_mic_permission_required">需要麦克风权限才能录音</string>
-    <string name="note_edit_image_alt">图片</string>
     <string name="note_edit_image_title">图片</string>
     <string name="note_edit_image_decode_failed">图片解析失败</string>
-    <string name="note_edit_image_read_failed">读取图片失败</string>
-    <string name="note_edit_image_upload_failed">图片上传失败</string>
-    <string name="note_edit_image_view">查看</string>
-    <string name="note_edit_image_replace">替换</string>
-    <string name="note_edit_image_not_loaded">图片尚未加载</string>
     <string name="note_edit_recording_title">录音</string>
     <string name="note_edit_recording_hint">点击开始录音</string>
     <string name="note_edit_record_start">开始</string>
     <string name="note_edit_record_stop">停止</string>
     <string name="note_edit_recording_status">录音中…</string>
-    <string name="note_edit_processing">处理中…</string>
     <string name="note_edit_recording_start_failed">录音启动失败：%1$s</string>
     <string name="note_edit_recording_empty">录音内容为空</string>
-    <string name="note_edit_recording_read_failed">录音读取失败</string>
     <string name="note_edit_recording_upload_failed">录音上传失败</string>
-    <string name="note_edit_audio_alt">录音</string>
-    <string name="note_edit_audio_filename">录音.m4a</string>
     <string name="note_edit_playing">播放中…</string>
-    <string name="note_edit_audio_load_failed">音频加载失败</string>
     <string name="note_edit_play_failed">播放失败</string>
 
     <!-- ==================== 画画 ==================== -->

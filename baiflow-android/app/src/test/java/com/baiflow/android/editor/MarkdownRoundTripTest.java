@@ -49,6 +49,14 @@ public class MarkdownRoundTripTest {
     }
 
     @Test
+    public void roundTrip_underline() {
+        assertEquals("<u>under</u>", roundTrip("<u>under</u>"));
+        assertEquals("<u>**bold**</u>", roundTrip("<u>**bold**</u>"));
+        // 未闭合的 <u> 原样透传，不丢文本
+        assertEquals("a <u> b", roundTrip("a <u> b"));
+    }
+
+    @Test
     public void roundTrip_linkAndImage() {
         assertEquals("[text](http://x.com)", roundTrip("[text](http://x.com)"));
         assertEquals("![alt](/api/notes/media/abc)", roundTrip("![alt](/api/notes/media/abc)"));
@@ -136,7 +144,7 @@ public class MarkdownRoundTripTest {
             "# 标题\n\n正文段落 **加粗** 与 *斜体*。",
             "- 甲\n- 乙\n\n> 引用",
             "1. 一\n2. 二\n```python\nprint('x')\n```",
-            "**a** *b* ~~c~~ `d` [e](http://f) ![g](/api/notes/media/1)",
+            "**a** *b* ~~c~~ <u>u</u> `d` [e](http://f) ![g](/api/notes/media/1)",
             "| h1 | h2 |\n|---|---|\n| 1 | 2 |\n\n## 标题\n",
             "[录音](/api/notes/media/9?mediaType=audio)\n\n# 记录",
             "第一行\n第二行\n\n> **引用**\n\n```\n裸围栏\n```"
@@ -173,6 +181,16 @@ public class MarkdownRoundTripTest {
         String out = roundTrip(md);
         assertTrue(out, out.contains("/api/notes/media/a1b2"));
         assertTrue(out, out.contains("/api/notes/media/c3d4?mediaType=audio"));
+    }
+
+    @Test
+    public void adjacentMediaNoSpace_keepsImageAndAllAudio() {
+        // 回归：相邻的 录音+图片+录音 中间无空格，旧 \S+ 贪婪会把 ![图] 和第二个 [录音] 吞进第一个链接 URL
+        String md = "[录音](/api/notes/media/a1?mediaType=audio)![图](/api/notes/media/a2)[录音](/api/notes/media/a3?mediaType=audio)";
+        String out = roundTrip(md);
+        assertTrue(out, out.contains("/api/notes/media/a1?mediaType=audio"));
+        assertTrue(out, out.contains("/api/notes/media/a2"));
+        assertTrue(out, out.contains("/api/notes/media/a3?mediaType=audio"));
     }
 
     private static void assertTrue(String message, boolean cond) {

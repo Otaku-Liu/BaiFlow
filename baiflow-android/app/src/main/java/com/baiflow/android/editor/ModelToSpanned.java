@@ -1,23 +1,19 @@
 package com.baiflow.android.editor;
 
 import android.graphics.Typeface;
-import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
-import android.text.style.QuoteSpan;
 import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
+import android.text.style.UnderlineSpan;
 import android.text.style.URLSpan;
 
 import java.util.List;
 
 /**
- * Doc → SpannableStringBuilder（编辑器状态）。
- * <p>
- * 段落格式用 {@link Spanned.SPAN_EXCLUSIVE_EXCLUSIVE}（标题/列表/引用，单行段落模型）；
- * 代码块跨多行，用 {@link Spanned#SPAN_EXCLUSIVE_INCLUSIVE} 固定区间。
- * 行内格式 {@code SPAN_EXCLUSIVE_EXCLUSIVE}。音频链接（url 带 mediaType=audio）
- * 转成可播放的 {@link NoteAudioSpan}，图片转成 {@link NoteImageSpan}（占位符字符）。
+ * Doc 行内 → Spannable（块所见即所得渲染，经 {@link BlockRichText} 使用）。
+ * 行内格式 {@code SPAN_EXCLUSIVE_EXCLUSIVE}；音频链接（url 带 mediaType=audio）
+ * 转成 {@link NoteAudioSpan}，图片转成 {@link NoteImageSpan}（占位符字符）。
  */
 public final class ModelToSpanned {
 
@@ -27,58 +23,7 @@ public final class ModelToSpanned {
     private ModelToSpanned() {
     }
 
-    public static SpannableStringBuilder toSpannable(DocModel.Doc doc, EditorStyle style) {
-        SpannableStringBuilder sb = new SpannableStringBuilder();
-        for (DocModel.Block b : doc.blocks()) {
-            if (b instanceof DocModel.BlankBlock) {
-                sb.append('\n');
-            } else if (b instanceof DocModel.TextBlock tb) {
-                appendInlines(sb, tb.inlines(), style);
-                sb.append('\n');
-            } else if (b instanceof DocModel.HeadingBlock h) {
-                int st = sb.length();
-                appendInlines(sb, h.inlines(), style);
-                sb.append('\n');
-                sb.setSpan(new NoteHeadingSpan(h.level(), style.colors.headingColor),
-                        st, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            } else if (b instanceof DocModel.BulletListBlock bl) {
-                for (List<DocModel.Inline> item : bl.items()) {
-                    int st = sb.length();
-                    appendInlines(sb, item, style);
-                    sb.append('\n');
-                    sb.setSpan(new NoteBulletSpan(style.listMarginPx, style.bulletRadiusPx,
-                                    style.colors.bulletColor),
-                            st, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                }
-            } else if (b instanceof DocModel.OrderedListBlock ol) {
-                int n = 1;
-                for (List<DocModel.Inline> item : ol.items()) {
-                    int st = sb.length();
-                    appendInlines(sb, item, style);
-                    sb.append('\n');
-                    sb.setSpan(new NoteOrderedSpan(n++, style.listMarginPx, style.colors.orderedColor),
-                            st, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                }
-            } else if (b instanceof DocModel.QuoteBlock q) {
-                int st = sb.length();
-                appendInlines(sb, q.inlines(), style);
-                sb.append('\n');
-                sb.setSpan(new QuoteSpan(style.colors.quoteColor), st, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            } else if (b instanceof DocModel.CodeBlock cb) {
-                int st = sb.length();
-                sb.append(cb.code());
-                if (sb.length() == st || sb.charAt(sb.length() - 1) != '\n') {
-                    sb.append('\n');
-                }
-                sb.setSpan(new NoteCodeBlockSpan(cb.language(), style.codeMarginPx,
-                                style.colors.codeBgColor, style.colors.codeGutterColor),
-                        st, sb.length(), Spanned.SPAN_EXCLUSIVE_INCLUSIVE);
-            }
-        }
-        return sb;
-    }
-
-    private static void appendInlines(SpannableStringBuilder sb, List<DocModel.Inline> inlines, EditorStyle style) {
+    static void appendInlines(SpannableStringBuilder sb, List<DocModel.Inline> inlines, EditorStyle style) {
         for (DocModel.Inline in : inlines) {
             if (in instanceof DocModel.TextRun t) {
                 sb.append(t.text());
@@ -94,6 +39,10 @@ public final class ModelToSpanned {
                 int st = sb.length();
                 appendInlines(sb, stk.children(), style);
                 sb.setSpan(new StrikethroughSpan(), st, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else if (in instanceof DocModel.Underline u) {
+                int st = sb.length();
+                appendInlines(sb, u.children(), style);
+                sb.setSpan(new UnderlineSpan(), st, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else if (in instanceof DocModel.InlineCode c) {
                 int st = sb.length();
                 sb.append(c.code());
@@ -107,6 +56,8 @@ public final class ModelToSpanned {
                     NoteAudioSpan span = new NoteAudioSpan(mediaIdOf(l.url()), l.url(), audioAlt(l),
                             style.colors.audioChipColor, style.colors.audioTextColor,
                             style.audioPaddingPx, style.audioChipHeightPx);
+                    // 录音 URL 带 &duration=ms，重进笔记时直接恢复时长显示
+                    span.setDurationMs(audioDurationFrom(l.url()));
                     sb.setSpan(span, st, st + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 } else {
                     int st = sb.length();
@@ -125,6 +76,25 @@ public final class ModelToSpanned {
 
     private static boolean isAudioUrl(String url) {
         return url != null && url.contains("mediaType=audio");
+    }
+
+    /** 从音频 URL 的 &duration=ms 参数读时长（录音时写入，重进笔记恢复显示）；无则 -1 */
+    static long audioDurationFrom(String url) {
+        if (url == null) {
+            return -1;
+        }
+        int q = url.indexOf("duration=");
+        if (q < 0) {
+            return -1;
+        }
+        int end = url.indexOf('&', q);
+        String v = end < 0 ? url.substring(q + "duration=".length())
+                : url.substring(q + "duration=".length(), end);
+        try {
+            return Long.parseLong(v);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     /** 从 /api/notes/media/{id}[?...] 提取 mediaId */
@@ -150,15 +120,5 @@ public final class ModelToSpanned {
         }
         String label = sb.toString().trim();
         return label.isEmpty() ? "录音" : label;
-    }
-
-    /** 判断是否为音频链接（供 SpanExtractor 复用） */
-    static boolean isAudioReference(String url) {
-        return isAudioUrl(url);
-    }
-
-    /** Spannable 是否为可编辑（占位符字符） */
-    static boolean isPlaceholderChar(char c) {
-        return c == PLACEHOLDER;
     }
 }
