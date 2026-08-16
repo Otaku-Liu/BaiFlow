@@ -66,12 +66,25 @@ public class AuthController {
 
     /**
      * 强制下线某登录设备（本人任意会话；管理员可下线任意用户的会话）。
+     * 后端会撤销该设备名下的全部会话（保留当前会话不误杀）。
      */
     @DeleteMapping("/sessions/{id}")
     public ApiResponse<Map<String, Object>> revokeSession(@PathVariable String id,
-                                                          Authentication auth) {
-        authService.revokeSession(auth.getPrincipal().toString(), isAdmin(auth), id);
+                                                          Authentication auth,
+                                                          HttpServletRequest request) {
+        authService.revokeSession(auth.getPrincipal().toString(), isAdmin(auth), id,
+                AuthTokens.extract(request));
         return ApiResponse.success(Map.of("result", "已强制下线"));
+    }
+
+    /**
+     * 删除某登录设备（仅可删除离线设备）：清理其历史会话 + 删除登录历史记录，并写审计日志。
+     */
+    @DeleteMapping("/devices")
+    public ApiResponse<Map<String, Object>> deleteDevice(@RequestParam String deviceName,
+                                                         Authentication auth) {
+        authService.deleteDevice(auth.getPrincipal().toString(), deviceName);
+        return ApiResponse.success(Map.of("result", "已删除"));
     }
 
     private boolean isAdmin(Authentication auth) {

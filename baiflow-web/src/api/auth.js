@@ -44,3 +44,8 @@ export function listDevices() {
 export function revokeSession(id) {
   return http.delete(`/auth/sessions/${id}`)
 }
+
+/** 删除指定登录设备（撤销其全部会话 + 删除登录历史记录） */
+export function deleteDevice(deviceName) {
+  return http.delete('/auth/devices', { params: { deviceName } })
+}

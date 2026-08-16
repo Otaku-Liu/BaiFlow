@@ -98,5 +98,13 @@ public interface AuthService {
      * @param isAdmin   是否管理员
      * @param sessionId 目标会话 ID
      */
-    void revokeSession(String userId, boolean isAdmin, String sessionId);
+    void revokeSession(String userId, boolean isAdmin, String sessionId, String currentToken);
+
+    /**
+     * 删除某登录设备（仅可删除离线设备）：清理其历史会话 + 删除登录历史记录。
+     *
+     * @param userId     当前用户 ID
+     * @param deviceName 目标设备名
+     */
+    void deleteDevice(String userId, String deviceName);
 }

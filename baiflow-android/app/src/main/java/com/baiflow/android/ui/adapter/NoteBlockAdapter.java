@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.text.Editable;
+import android.text.Spannable;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -26,7 +27,6 @@ import com.baiflow.android.editor.BlockRichText;
 import com.baiflow.android.editor.EditorStyle;
 import com.baiflow.android.editor.NoteBlocks;
 import com.baiflow.android.network.ApiClient;
-import com.baiflow.android.ui.view.BlockEditText;
 import com.baiflow.android.ui.view.NoteAudioPlayerView;
 
 import java.io.File;
@@ -53,17 +53,11 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
 
         void onStartDrag(RecyclerView.ViewHolder holder);
 
-        /** 文本块 EditText 获得焦点（浮动格式条跟随块显示；position 供块类型切换用） */
+        /** 文本块 EditText 获得焦点（记录最近聚焦块，供工具栏/格式栏 B/I/U/S 操作） */
         void onTextBlockFocused(int position, EditText et);
-
-        /** 文本块 EditText 失去焦点（浮动格式条隐藏） */
-        void onTextBlockFocusLost();
 
         /** 点击块顶部「＋」：在该块上方插入新块（anchor 为 ＋ 按钮，供弹出菜单定位） */
         void onInsertAbove(int position, View anchor);
-
-        /** 文本选中菜单（ActionMode）开合：开合时隐藏/恢复浮动格式条 */
-        void onTextSelectionChanged(boolean selecting);
     }
 
     private final List<NoteBlocks.Block> blocks;
@@ -96,9 +90,28 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         root.setLayoutParams(new RecyclerView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.setBackgroundResource(R.drawable.bg_block_card);
-        root.setPadding(dp(ctx, 12), dp(ctx, 10), dp(ctx, 12), dp(ctx, 8));
+        root.setPadding(dp(ctx, 12), dp(ctx, 6), dp(ctx, 12), dp(ctx, 8));
 
-        // 内容行：拖动柄 + 具体内容
+        // 插入条（卡片顶部，全宽，点击在块上方插入）：居中蓝色「＋」。
+        // ＋ 为普通 TextView 文字绘制，不依赖 drawable 背景，保证可见；
+        // 整条可点，置于卡内顶部、不凸出，避免被相邻卡片遮挡或裁剪
+        FrameLayout insertBar = new FrameLayout(ctx);
+        FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(ctx, 28));
+        barLp.gravity = Gravity.TOP;
+        barLp.rightMargin = dp(ctx, 30);   // 给右上角删除 × 让位
+        root.addView(insertBar, barLp);
+
+        TextView insert = new TextView(ctx);
+        insert.setText("＋");
+        insert.setTextColor(ctx.getColor(R.color.accent));
+        insert.setTextSize(20f);
+        insert.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams insLp = new FrameLayout.LayoutParams(dp(ctx, 28), dp(ctx, 28));
+        insLp.gravity = Gravity.CENTER;
+        insertBar.addView(insert, insLp);
+
+        // 内容行：拖动柄 + 具体内容（位于插入条下方）
         LinearLayout content = new LinearLayout(ctx);
         content.setOrientation(LinearLayout.HORIZONTAL);
         content.setGravity(Gravity.CENTER_VERTICAL);
@@ -140,7 +153,7 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             typeBtn.setPadding(0, dp(ctx, 4), dp(ctx, 4), 0);
             content.addView(typeBtn, new LinearLayout.LayoutParams(dp(ctx, 40), ViewGroup.LayoutParams.WRAP_CONTENT));
 
-            BlockEditText et = new BlockEditText(ctx);
+            EditText et = new EditText(ctx);
             et.setBackground(null);
             et.setTextColor(0xFF1D1D1F);
             et.setTextSize(15f);
@@ -150,8 +163,10 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             body = et;
         }
 
-        root.addView(content, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        contentLp.topMargin = dp(ctx, 28);   // 位于插入条下方
+        root.addView(content, contentLp);
 
         // 右上角删除 ×（常显，点击删除本块）
         TextView del = new TextView(ctx);
@@ -164,26 +179,15 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         delLp.gravity = Gravity.TOP | Gravity.END;
         root.addView(del, delLp);
 
-        // 顶部居中「＋」（白底圆）：在该块上方插入，悬在两卡之间的分隔处，完整可见
-        TextView insert = new TextView(ctx);
-        insert.setText("＋");
-        insert.setTextColor(0xFF007AFF);
-        insert.setTextSize(14f);
-        insert.setGravity(Gravity.CENTER);
-        insert.setBackgroundResource(R.drawable.bg_insert_plus);
-        FrameLayout.LayoutParams insLp = new FrameLayout.LayoutParams(dp(ctx, 22), dp(ctx, 22));
-        insLp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        insLp.topMargin = -dp(ctx, 22);
-        root.addView(insert, insLp);
         root.setClipChildren(false);
 
         Holder holder;
         if (viewType == NoteBlocks.IMAGE) {
-            holder = new ImageHolder(root, content, (ImageView) body, drag, del, insert);
+            holder = new ImageHolder(root, content, (ImageView) body, drag, del, insertBar);
         } else if (viewType == NoteBlocks.AUDIO) {
-            holder = new AudioHolder(root, content, (NoteAudioPlayerView) body, drag, del, insert);
+            holder = new AudioHolder(root, content, (NoteAudioPlayerView) body, drag, del, insertBar);
         } else {
-            holder = new TextHolder(root, content, (EditText) body, drag, del, insert);
+            holder = new TextHolder(root, content, (EditText) body, drag, del, insertBar);
         }
         return holder;
     }
@@ -242,9 +246,9 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         final View body;
         final TextView drag;
         final TextView del;
-        final TextView insert;
+        final View insert;   // 插入条（整条可点，anchor 用）
 
-        Holder(FrameLayout root, LinearLayout content, View body, TextView drag, TextView del, TextView insert) {
+        Holder(FrameLayout root, LinearLayout content, View body, TextView drag, TextView del, View insert) {
             super(root);
             this.content = content;
             this.body = body;
@@ -260,28 +264,14 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         private final EditText et;
         private boolean suppress;
 
-        TextHolder(FrameLayout root, LinearLayout content, EditText et, TextView drag, TextView del, TextView insert) {
+        TextHolder(FrameLayout root, LinearLayout content, EditText et, TextView drag, TextView del, View insert) {
             super(root, content, et, drag, del, insert);
             this.typeBtn = (TextView) content.getChildAt(1);
             this.et = et;
-            if (et instanceof BlockEditText) {
-                BlockEditText bet = (BlockEditText) et;
-                // 选中菜单里点加粗/斜体等 → span 已改 → 回写 markdown
-                bet.setOnSpanAppliedListener(() -> {
-                    NoteBlocks.Block bl = blocks.get(getBindingAdapterPosition());
-                    if (bl == null) return;
-                    bl.text = BlockRichText.toMarkdown(bet.getText());
-                    listener.onChanged();
-                });
-                // 选中菜单开合 → 隐藏/恢复浮动格式条
-                bet.setActionModeStateListener(listener::onTextSelectionChanged);
-            }
             typeBtn.setOnClickListener(v -> showTypeMenu(v, getBindingAdapterPosition()));
             et.setOnFocusChangeListener((v, hasFocus) -> {
                 if (hasFocus) {
                     listener.onTextBlockFocused(getBindingAdapterPosition(), et);
-                } else {
-                    listener.onTextBlockFocusLost();
                 }
             });
             et.addTextChangedListener(new TextWatcher() {
@@ -322,8 +312,12 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
                 et.setTypeface(et.getTypeface(), android.graphics.Typeface.NORMAL);
             }
             suppress = true;
-            // 所见即所得：渲染行内 markdown 的格式效果（加粗/斜体/下划线/删除线等）
-            et.setText(BlockRichText.toSpannable(b.text, editorStyle));
+            // 所见即所得：渲染行内 markdown 的格式效果（加粗/斜体/下划线/删除线等）。
+            // 文本未变时跳过 setText，避免重绑（滚动/键盘 resize 等）把正在编辑块的选中/光标重置
+            Spannable rendered = BlockRichText.toSpannable(b.text, editorStyle);
+            if (!rendered.toString().equals(et.getText().toString())) {
+                et.setText(rendered);
+            }
             suppress = false;
         }
 
@@ -351,7 +345,7 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         private final ImageView iv;
         private String boundUrl;   // 当前绑定的图片 URL（异步回填前校验，防止复用错图）
 
-        ImageHolder(FrameLayout root, LinearLayout content, ImageView iv, TextView drag, TextView del, TextView insert) {
+        ImageHolder(FrameLayout root, LinearLayout content, ImageView iv, TextView drag, TextView del, View insert) {
             super(root, content, iv, drag, del, insert);
             this.iv = iv;
         }
@@ -404,7 +398,7 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     class AudioHolder extends Holder {
         private final NoteAudioPlayerView pv;
 
-        AudioHolder(FrameLayout root, LinearLayout content, NoteAudioPlayerView pv, TextView drag, TextView del, TextView insert) {
+        AudioHolder(FrameLayout root, LinearLayout content, NoteAudioPlayerView pv, TextView drag, TextView del, View insert) {
             super(root, content, pv, drag, del, insert);
             this.pv = pv;
         }

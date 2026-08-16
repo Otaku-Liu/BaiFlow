@@ -136,68 +136,72 @@
         android:layout_height="1dp"
         android:background="@color/divider" />
 
-    <!-- 正文块编辑器（RecyclerView，每块一个真实 View）+ 浮动格式条（焦点块上方偏左） -->
-    <FrameLayout
-        android:id="@+id/blockFrame"
+    <!-- 格式栏（常显第二行）：加粗 / 斜体 / 下划线 / 删除线。
+         选中文字后点击应用，再点一次取消；focusable=false 不抢焦点，保住选中不丢失 -->
+    <HorizontalScrollView
+        android:id="@+id/formatRow"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:background="@color/white">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerBlocks"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@color/white"
-            android:clipToPadding="false"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="12dp"
-            android:paddingBottom="12dp"
-            android:scrollbars="vertical" />
-
-        <!-- 浮动格式条：B / I / U / S，出现在焦点文本块上方偏左 -->
         <LinearLayout
-            android:id="@+id/floatFormatBar"
+            style="@style/Ios.ToolbarRow"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="@drawable/bg_float_bar"
-            android:elevation="10dp"
-            android:paddingStart="4dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="4dp"
-            android:paddingBottom="2dp"
-            android:visibility="gone">
+            android:layout_height="wrap_content">
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFloatBold"
+                android:id="@+id/btnToolbarBold"
                 style="@style/Ios.ToolbarButton"
                 app:icon="@drawable/ic_tool_bold"
-                app:iconSize="18dp"
+                app:iconSize="20dp"
                 app:iconTint="@color/text_primary"
+                android:focusable="false"
                 android:contentDescription="@string/note_edit_bold" />
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFloatItalic"
+                android:id="@+id/btnToolbarItalic"
                 style="@style/Ios.ToolbarButton"
                 app:icon="@drawable/ic_tool_italic"
-                app:iconSize="18dp"
+                app:iconSize="20dp"
                 app:iconTint="@color/text_primary"
+                android:focusable="false"
                 android:contentDescription="@string/note_edit_italic" />
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFloatUnderline"
+                android:id="@+id/btnToolbarUnderline"
                 style="@style/Ios.ToolbarButton"
                 app:icon="@drawable/ic_tool_underline"
-                app:iconSize="18dp"
+                app:iconSize="20dp"
                 app:iconTint="@color/text_primary"
+                android:focusable="false"
                 android:contentDescription="@string/note_edit_underline" />
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFloatStrike"
+                android:id="@+id/btnToolbarStrike"
                 style="@style/Ios.ToolbarButton"
                 app:icon="@drawable/ic_tool_strike"
-                app:iconSize="18dp"
+                app:iconSize="20dp"
                 app:iconTint="@color/text_primary"
+                android:focusable="false"
                 android:contentDescription="@string/note_edit_strike" />
         </LinearLayout>
-    </FrameLayout>
+    </HorizontalScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider" />
+
+    <!-- 正文块编辑器（RecyclerView，每块一个真实 View） -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerBlocks"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/white"
+        android:clipToPadding="false"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:scrollbars="vertical" />
 
 </LinearLayout>

@@ -18,3 +18,8 @@ export function notify(options) {
 export function notifyError(msg) {
   return notify({ message: msg, type: 'error', duration: 2500 })
 }
+
+/** 顶替式成功消息 */
+export function notifySuccess(msg) {
+  return notify({ message: msg, type: 'success', duration: 1500 })
+}

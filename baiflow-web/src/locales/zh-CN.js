@@ -273,6 +273,7 @@ export default {
     resumeTo: '上次读到 {pct}%，是否继续阅读？',
     synced: '这篇笔记已在其他设备更新',
     saveFailed: '保存失败',
+    saved: '保存成功',
     loadFailed: '加载失败',
     deleteFailed: '删除失败',
     conflictTitle: '检测到冲突',

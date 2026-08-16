@@ -87,7 +87,7 @@ Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体�
 ### user_device — 用户登录设备
 `id, user_id, device_name, device_type(ANDROID/WEB), first_login_at, last_login_at, updated_at`
 
-登录设备登记（按 `user_id + device_name` 唯一）：每次登录 upsert，**登出不删，保留登录历史**。在线状态由「是否存在未过期会话（bf_auth_session）」判定，本表只存历史。
+登录设备登记（按 `user_id + device_name` 唯一）：每次登录 upsert，**登出不删，保留登录历史**。在线状态由「是否存在未过期会话（bf_auth_session）」判定；`GET /api/auth/devices` 返回本表**全部历史 + 在线/离线状态**，强制下线（撤销该设备全部会话）后变为离线，`DELETE /api/auth/devices` 删除离线设备记录后不再展示。
 
 > 以上 5 张表统一由可重复迁移 `db/R__V1_init.sql` 创建（**项目约定：新表一律追加进 `R__V1_init.sql`，不单独建迁移脚本**；可重复迁移文件有改动即自动重新执行，全表 `IF NOT EXISTS` 幂等），**所有表与字段均带 COMMENT 注释**，便于管理与理解。
 

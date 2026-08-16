@@ -273,6 +273,7 @@ export default {
     resumeTo: 'Last read at {pct}%. Continue reading?',
     synced: 'This note was updated on another device',
     saveFailed: 'Save failed',
+    saved: 'Saved',
     loadFailed: 'Load failed',
     deleteFailed: 'Delete failed',
     conflictTitle: 'Conflict detected',

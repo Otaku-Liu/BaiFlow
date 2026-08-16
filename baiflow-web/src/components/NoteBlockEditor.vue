@@ -773,33 +773,24 @@ function remove(idx) {
   margin-top: 4px;
 }
 
-/* 悬停横线 + ＋：在上方插入，点击＋选类型 */
+/* 悬停「＋」：在上方插入，点击＋选类型（灰色横线已移除；抬高并留上下边距；
+   pointer-events:none 让透明区域不拦截点击，只有「＋」本身可点） */
 .block-insert-line {
   position: absolute;
-  top: -1px;
+  top: -17px;
   left: 50%;
   transform: translateX(-50%);
   width: 52px;
-  height: 14px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   transition: opacity 0.15s;
   z-index: 3;
+  pointer-events: none;
 }
 .block:hover .block-insert-line { opacity: 1; }
-.block-insert-line::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 2px;
-  border-radius: 1px;
-  background: #c7c7cc;
-}
-.block-insert-line:hover::before { background: #007AFF; }
 .block-insert-plus {
   position: relative;
   width: 14px;
@@ -814,6 +805,7 @@ function remove(idx) {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .block-empty {

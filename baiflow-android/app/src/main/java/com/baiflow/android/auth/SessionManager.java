@@ -1,12 +1,17 @@
 package com.baiflow.android.auth;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
+
+import com.baiflow.android.ui.activity.LoginActivity;
 
 /**
  * 会话管理器 — 使用 SharedPreferences 存储 token、服务器地址和用户信息。
  * <p>
- * 负责登录态维护：token 存取、登录状态判断、清除会话。
+ * 负责登录态维护：token 存取、登录状态判断、清除会话；会话被吊销（401）时跳登录页。
  */
 public class SessionManager {
     private static final String PREF_NAME = "baiflow_session";
@@ -18,10 +23,12 @@ public class SessionManager {
     private static final String KEY_ROLE = "role";
 
     private static SessionManager instance;
+    private final Context appContext;
     private final SharedPreferences prefs;
 
     private SessionManager(Context context) {
-        prefs = context.getApplicationContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        appContext = context.getApplicationContext();
+        prefs = appContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
     }
 
     public static synchronized SessionManager getInstance(Context context) {
@@ -159,5 +166,23 @@ public class SessionManager {
     /** 彻底清除（换服务器为本地模式 / 清除应用数据语义）：清全部 */
     public void clearAll() {
         prefs.edit().clear().apply();
+    }
+
+    /**
+     * 会话被吊销（401）：清会话并强制回到登录页。
+     * 长会话被 Web 端强制下线/过期时，网络层收到 401 调用本方法，把用户踢回登录界面
+     * （而非停留在原页面只报「无法浏览数据」）。
+     */
+    public void kickToLogin() {
+        clearSession();
+        final Context ctx = appContext;
+        if (ctx == null) {
+            return;
+        }
+        new Handler(Looper.getMainLooper()).post(() -> {
+            Intent intent = new Intent(ctx, LoginActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            ctx.startActivity(intent);
+        });
     }
 }

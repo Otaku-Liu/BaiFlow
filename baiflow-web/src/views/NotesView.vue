@@ -59,7 +59,7 @@ import { useSse } from '../composables/useSse'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useNoteProgress } from '../composables/useNoteProgress'
 import { markdownToBlocks, blocksToMarkdown } from '../utils/noteBlocks'
-import { notifyError } from '../utils/notify'
+import { notifyError, notifySuccess } from '../utils/notify'
 import { formatDateTime } from '../utils/format'
 
 const { t } = useI18n()
@@ -156,6 +156,7 @@ async function saveNow() {
       noteUpdatedAt = data?.data?.updatedAt || noteUpdatedAt
     }
     dirty = false
+    notifySuccess(t('notes.saved'))
     loadList()
   } catch (e) {
     notifyError(e.response?.data?.message || t('notes.saveFailed'))

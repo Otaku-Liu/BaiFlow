@@ -16,7 +16,6 @@ import android.text.style.StyleSpan;
 import android.text.style.UnderlineSpan;
 import android.view.View;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -74,11 +73,9 @@ public class NoteEditActivity extends AppCompatActivity {
 
     private EditText etTitle;
     private RecyclerView recyclerBlocks;
-    private FrameLayout blockFrame;
-    private View floatBar;
     private NoteBlockAdapter blockAdapter;
     private EditorStyle editorStyle;
-    // 最近一次聚焦的文本块（浮动条 B/I/U/S 与顶部块类型栏的操作对象；失去焦点后仍保留，
+    // 最近一次聚焦的文本块（工具栏/格式栏 B/I/U/S 与顶部块类型栏的操作对象；失去焦点后仍保留，
     // 便于点击工具栏按钮时继续对原块操作，下一次聚焦时更新）
     private EditText activeTextBlock;
     private int activeBlockPosition = -1;
@@ -151,16 +148,8 @@ public class NoteEditActivity extends AppCompatActivity {
         etTitle = findViewById(R.id.etTitle);
         recyclerBlocks = findViewById(R.id.recyclerBlocks);
         editorStyle = new EditorStyle(this);
-        blockFrame = findViewById(R.id.blockFrame);
-        floatBar = findViewById(R.id.floatFormatBar);
         TextView headerTitle = findViewById(R.id.tvHeaderTitle);
         headerTitle.setText(localId < 0 ? getString(R.string.note_edit_new_title) : getString(R.string.note_edit_edit_title));
-        // 键盘开合/布局变化时浮动条跟随焦点块重新定位
-        blockFrame.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-            if (floatBar.getVisibility() == View.VISIBLE) {
-                positionFloatingBar();
-            }
-        });
 
         wireToolbar();
         setupBlockList();
@@ -201,7 +190,7 @@ public class NoteEditActivity extends AppCompatActivity {
         });
     }
 
-    /** 点击空白收起键盘；工具栏/浮动条上的点击不触发（避免格式化时焦点被清、浮动条消失） */
+    /** 点击空白收起键盘；工具栏/格式栏上的点击不触发（避免格式化时焦点被清、选中丢失） */
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
         if (!isToolbarTouch(ev)) {
@@ -210,13 +199,13 @@ public class NoteEditActivity extends AppCompatActivity {
         return super.dispatchTouchEvent(ev);
     }
 
-    /** 按下点是否落在工具栏（媒体/块类型）或浮动格式条上 */
+    /** 按下点是否落在工具栏（媒体/块类型）或格式栏（B/I/U/S）上 */
     private boolean isToolbarTouch(android.view.MotionEvent ev) {
         if (ev.getAction() != android.view.MotionEvent.ACTION_DOWN) {
             return false;
         }
-        return isPointInView(ev, floatBar)
-                || isPointInView(ev, findViewById(R.id.toolbarRow));
+        return isPointInView(ev, findViewById(R.id.toolbarRow))
+                || isPointInView(ev, findViewById(R.id.formatRow));
     }
 
     private boolean isPointInView(android.view.MotionEvent ev, View v) {
@@ -262,27 +251,17 @@ public class NoteEditActivity extends AppCompatActivity {
                 touchHelper[0].startDrag(holder);
             }
             @Override public void onTextBlockFocused(int position, EditText et) {
+                // 记录最近聚焦的文本块（工具栏/格式栏 B/I/U/S 的操作对象；失去焦点后仍保留）
                 activeTextBlock = et;
                 activeBlockPosition = position;
-                showFloatingBar();
-            }
-            @Override public void onTextBlockFocusLost() {
-                // 只隐藏浮动条，保留 activeTextBlock 供工具栏按钮对原块继续操作
-                floatBar.setVisibility(View.GONE);
             }
             @Override public void onInsertAbove(int position, View anchor) {
                 showInsertAboveMenu(position, anchor);
             }
-            @Override public void onTextSelectionChanged(boolean selecting) {
-                // 文本选中菜单弹出时隐藏浮动格式条，收起后恢复
-                if (selecting) {
-                    floatBar.setVisibility(View.GONE);
-                } else if (activeTextBlock != null) {
-                    showFloatingBar();
-                }
-            }
         }, client, editorStyle);
         recyclerBlocks.setAdapter(blockAdapter);
+        // 放行裁剪（防御性）：卡片内容越界绘制不被裁掉
+        recyclerBlocks.setClipChildren(false);
         // 块间间距（与 Web 的 margin-bottom 8px 一致；顶部「＋」插在间距处）
         recyclerBlocks.addItemDecoration(new RecyclerView.ItemDecoration() {
             @Override
@@ -314,7 +293,6 @@ public class NoteEditActivity extends AppCompatActivity {
                 if (progressScrollTimer != null) mainHandler.removeCallbacks(progressScrollTimer);
                 progressScrollTimer = NoteEditActivity.this::saveNoteProgress;
                 mainHandler.postDelayed(progressScrollTimer, 800);
-                positionFloatingBar();
             }
         });
     }
@@ -336,11 +314,11 @@ public class NoteEditActivity extends AppCompatActivity {
         // 顶部块类型栏（固定显示）：切换当前焦点块类型；无焦点块时在末尾插入新块
         findViewById(R.id.btnBlockText).setOnClickListener(v -> setBlockType(NoteBlocks.TEXT, 1));
         findViewById(R.id.btnBlockHeading).setOnClickListener(v -> setBlockType(NoteBlocks.HEADING, 1));
-        // 浮动格式条（焦点块上方偏左）：B/I/U/S 就地切换选中文字的格式（所见即所得）
-        findViewById(R.id.btnFloatBold).setOnClickListener(v -> toggleStyle(Typeface.BOLD));
-        findViewById(R.id.btnFloatItalic).setOnClickListener(v -> toggleStyle(Typeface.ITALIC));
-        findViewById(R.id.btnFloatUnderline).setOnClickListener(v -> toggleSpan(UnderlineSpan.class, new UnderlineSpan()));
-        findViewById(R.id.btnFloatStrike).setOnClickListener(v -> toggleSpan(StrikethroughSpan.class, new StrikethroughSpan()));
+        // 格式栏（常显第二行）：B/I/U/S 就地切换选中文字的格式（选中后点击应用、再点取消）
+        findViewById(R.id.btnToolbarBold).setOnClickListener(v -> toggleStyle(Typeface.BOLD));
+        findViewById(R.id.btnToolbarItalic).setOnClickListener(v -> toggleStyle(Typeface.ITALIC));
+        findViewById(R.id.btnToolbarUnderline).setOnClickListener(v -> toggleSpan(UnderlineSpan.class, UnderlineSpan::new));
+        findViewById(R.id.btnToolbarStrike).setOnClickListener(v -> toggleSpan(StrikethroughSpan.class, StrikethroughSpan::new));
     }
 
     /** 顶部块类型栏：有焦点文本块则切换其类型（保留内容），否则在末尾插入新块 */
@@ -429,10 +407,15 @@ public class NoteEditActivity extends AppCompatActivity {
         });
     }
 
-    /** StyleSpan（加粗/斜体）toggle：整段被同款式覆盖则移除，否则加样式 */
+    /** StyleSpan（加粗/斜体）toggle：整段被同款式覆盖则移除（span 切分，只去掉选中部分，范围外保留），否则加样式。
+     *  与 Web 的 execCommand 行为对齐：选中一段加粗的一部分再点取消，只取消选中的部分 */
     private void toggleStyle(int style) {
         EditText et = activeTextBlock;
-        if (et == null || !requireSelection(et)) {
+        if (et == null) {
+            Toast.makeText(this, getString(R.string.note_edit_select_text_first), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!requireSelection(et)) {
             return;
         }
         Editable ed = et.getText();
@@ -446,21 +429,27 @@ public class NoteEditActivity extends AppCompatActivity {
             }
         }
         if (covered) {
+            List<StyleSpan> spans = new ArrayList<>();
             for (StyleSpan s : ed.getSpans(start, end, StyleSpan.class)) {
                 if (s.getStyle() == style) {
-                    ed.removeSpan(s);
+                    spans.add(s);
                 }
             }
+            splitRemoveSpans(ed, start, end, spans.toArray(), () -> new StyleSpan(style));
         } else {
             ed.setSpan(new StyleSpan(style), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         syncBlockText();
     }
 
-    /** 普通 span（下划线/删除线）toggle */
-    private void toggleSpan(Class<?> cls, Object span) {
+    /** 普通 span（下划线/删除线）toggle；移除时 span 切分，只去选中部分（与 Web execCommand 对齐） */
+    private void toggleSpan(Class<?> cls, java.util.function.Supplier<?> factory) {
         EditText et = activeTextBlock;
-        if (et == null || !requireSelection(et)) {
+        if (et == null) {
+            Toast.makeText(this, getString(R.string.note_edit_select_text_first), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!requireSelection(et)) {
             return;
         }
         Editable ed = et.getText();
@@ -474,13 +463,37 @@ public class NoteEditActivity extends AppCompatActivity {
             }
         }
         if (covered) {
-            for (Object s : ed.getSpans(start, end, cls)) {
-                ed.removeSpan(s);
-            }
+            splitRemoveSpans(ed, start, end, ed.getSpans(start, end, cls), factory);
         } else {
-            ed.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ed.setSpan(factory.get(), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         syncBlockText();
+    }
+
+    /**
+     * 移除选中范围内指定 span 的样式，但保留选中范围外同款样式（span 切分，与 Web execCommand 对齐）：
+     * 复用原 span 缩到左段、新建一个 span 覆盖右段、选中区内的部分直接移除。
+     */
+    private void splitRemoveSpans(Editable ed, int start, int end, Object[] spans,
+                                  java.util.function.Supplier<?> newSpan) {
+        for (Object s : spans) {
+            int ss = ed.getSpanStart(s);
+            int se = ed.getSpanEnd(s);
+            int flags = ed.getSpanFlags(s);
+            boolean keepLeft = ss < start;
+            boolean keepRight = se > end;
+            if (keepLeft && keepRight) {
+                ed.setSpan(s, ss, start, flags);            // 复用原 span 作左段
+                ed.setSpan(newSpan.get(), end, se, flags);  // 右段新建
+            } else if (keepLeft) {
+                ed.setSpan(s, ss, start, flags);            // 缩到左段
+            } else if (keepRight) {
+                ed.setSpan(newSpan.get(), end, se, flags);  // 右段新建
+                ed.removeSpan(s);                           // 原 span 覆盖选中区，移除
+            } else {
+                ed.removeSpan(s);                           // 完全在选中区内
+            }
+        }
     }
 
     /** 校验焦点文本块已选中文字（未选中则提示） */
@@ -506,37 +519,6 @@ public class NoteEditActivity extends AppCompatActivity {
             dirty = true;
         }
         activeTextBlock.invalidate();
-    }
-
-    /** 浮动格式条：显示并定位到焦点块上方偏左 */
-    private void showFloatingBar() {
-        if (activeTextBlock == null) {
-            floatBar.setVisibility(View.GONE);
-            return;
-        }
-        floatBar.setVisibility(View.VISIBLE);
-        floatBar.post(this::positionFloatingBar);
-    }
-
-    /** 按焦点块当前屏幕位置重算浮动条坐标（滚动/布局变化时跟随） */
-    private void positionFloatingBar() {
-        if (activeTextBlock == null || floatBar.getVisibility() != View.VISIBLE) {
-            return;
-        }
-        float density = getResources().getDisplayMetrics().density;
-        int barH = floatBar.getMeasuredHeight();
-        if (barH <= 0) {
-            barH = Math.round(44 * density);
-        }
-        int[] etPos = new int[2];
-        int[] framePos = new int[2];
-        activeTextBlock.getLocationOnScreen(etPos);
-        blockFrame.getLocationOnScreen(framePos);
-        int x = etPos[0] - framePos[0];
-        int y = etPos[1] - framePos[1] - barH - Math.round(8 * density);
-        y = Math.max(Math.round(4 * density), y);
-        floatBar.setX(x);
-        floatBar.setY(y);
     }
 
     // ==================== 媒体插入 ====================

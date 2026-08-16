@@ -52,7 +52,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 
 笔记媒体（图片/录音/画画）在正文中以 `/api/notes/media/{id}` 相对路径引用，浏览器 `<img>/<audio>` 带不了 `Authorization` 头，`NotesView.vue` 在渲染后把媒体 URL 追加 `?token=<当前会话token>`（后端 `SessionAuthenticationFilter` 已支持 `?token=` 兜底），并把 `mediaType=audio` 的链接转成 `<audio controls>`。
 
-登录设备管理在 `HomeView.vue` 个人资料弹窗：「登录设备」列表（`GET /api/auth/sessions`）+「强制下线」按钮（`DELETE /api/auth/sessions/{id}`）；登录带 `X-Device-Type: WEB` 头建会话。
+登录设备管理在 `HomeView.vue` 个人资料弹窗：「登录设备」列表（`GET /api/auth/devices`，历史设备全展示并标注在线/离线）+ 在线设备「强制下线」（`DELETE /api/auth/sessions/{id}`，撤销全部会话变离线）+ **离线设备「删除」**（`DELETE /api/auth/devices?deviceName=`，移除登录历史记录，需确认）；登录带 `X-Device-Type: WEB` 头建会话。
 
 ## API 调用
 

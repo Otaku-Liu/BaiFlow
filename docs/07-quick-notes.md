@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 
 | # | 文件 | 操作 | 说明 |
 |---|---|---|---|
-| 7 | `views/NotesView.vue` | **新建** | 左侧列表 + 右侧所见即所得块编辑器 `NoteBlockEditor.vue`（文本/标题块 + 图片/音频媒体；contenteditable 就地渲染行内格式、编辑即预览；浮动 B/I/U/S 格式条跟随焦点块上方偏左、execCommand 就地格式化；顶部常显块类型栏） |
+| 7 | `views/NotesView.vue` | **新建** | 左侧列表 + 右侧所见即所得块编辑器 `NoteBlockEditor.vue`（文本/标题块 + 图片/音频媒体；contenteditable 就地渲染行内格式、编辑即预览；浮动 B/I/U/S 格式条跟随焦点块上方偏左、execCommand 就地格式化；顶部常显块类型栏；删除线渲染为 `<strike>`（保证 execCommand 再点取消稳定）；保存成功弹成功提示；插入线移除灰色横线只留「＋」） |
 | 8 | `api/notes.js` | **新建** | CRUD + 进度 API 封装 |
 | 9 | 路由 + 侧边栏 | 修改 | 加「随手记」入口 |
 | 10 | SSE 监听 + 进度 | 修改 | 收 `NOTE_UPDATED` 刷新当前笔记；滚动防抖保存 SCROLL_PERCENT |
@@ -142,11 +142,11 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 
 **富文本编辑器 `NoteEditActivity`**（所见即所得块编辑器）：
 - 正文为块列表（每块一个真实 View：文本 EditText / 图片 / 音频），加载 Markdown→`NoteBlocks.fromDoc`→RecyclerView、保存 `NoteBlocks.toDoc`→Markdown；块内存「行内 md 源」
-- **所见即所得**：文本块经 `BlockRichText`（渲染 `MarkdownParser.parseInlines`+`ModelToSpanned.appendInlines`、回写 `SpanExtractor.extractInlines`+`MarkdownEmitter.emitInlines`）渲染行内 markdown 的格式效果，编辑即预览；`BlockRichTextTest`（Robolectric）保证往返稳定；文本块用 `BlockEditText` 自定义选中菜单（系统剪切/复制/粘贴/全选旁并排 加粗/斜体/下划线/删除线，不再遮挡格式条，选中菜单开合时自动隐藏/恢复浮动条）
+- **所见即所得**：文本块经 `BlockRichText`（渲染 `MarkdownParser.parseInlines`+`ModelToSpanned.appendInlines`、回写 `SpanExtractor.extractInlines`+`MarkdownEmitter.emitInlines`）渲染行内 markdown 的格式效果，编辑即预览；`BlockRichTextTest`（Robolectric）保证往返稳定；文本块用**系统默认选中菜单**（剪切/复制/粘贴/全选），格式操作统一走底部工具栏
 - 图片块位图缓存（`LruCache`，mediaUrl→Bitmap），滑动复用时不反复异步加载，避免画画等图片块闪烁；异步回填校验 holder 未被复用
-- 工具栏单行常显：块类型（文本/标题，切换当前焦点块类型，无焦点块时在末尾插入新块；标题不再区分 H1/H2/H3）+ 竖线分隔 + 媒体（图片/录音/画画），与 Web 一致；浮动格式条（焦点块上方偏左显示，B/I/U/S = 加粗/斜体/下划线/删除线，就地切换选中文字 span）
+- 工具栏常显两行：第一行块类型（文本/标题，切换当前焦点块类型，无焦点块时在末尾插入新块；标题不再区分 H1/H2/H3）+ 竖线分隔 + 媒体（图片/录音/画画），与 Web 一致；第二行格式栏 B/I/U/S = 加粗/斜体/下划线/删除线（选中文字后点击应用、再点取消；`focusable=false` 不抢焦点保住选中；未选中时提示先选中文字；**取消时按选中范围做 span 切分，只去选中部分、范围外保留，与 Web execCommand 行为对齐**）。格式按钮固定于工具栏第二行，不采用悬浮格式条（会遮挡正文与块顶「＋」、且与系统选中弹窗冲突）
 - 空行是块间分隔，不生成可见空块（`NoteBlocks.fromDoc` 跳过空行、`toDoc` 在块间注入 `\n\n`，与 Web blocksToMarkdown 一致）
-- 块卡片撑满整行宽、块间 8dp 间距（ItemDecoration）；每块顶部居中「＋」（白底圆）可**在上方插入**（文本/标题/图片/录音，与 Web 的插入横线一致，媒体经 pendingInsertIdx 落到指定位置）；新增块后界面自动滚动过去
+- 块卡片撑满整行宽、块间 8dp 间距（ItemDecoration）；每块顶部一条**全宽插入条**（居中「＋」，整条可点，与 Web 的插入横线一致）可**在上方插入**（文本/标题/图片/录音，媒体经 pendingInsertIdx 落到指定位置）；插入条位于卡内顶部、不凸出，避免被相邻卡片遮挡或 RecyclerView 裁剪；新增块后界面自动滚动过去
 - 音频块：宽度**拉满整块**，右侧留出 32dp 给右上角删除 ×（不被遮挡）；播放/暂停用 TextView 而非系统 Button（避免默认样式导致按钮显示不全）；进入时按钮正确显示 ▶（仅准备完成未播放）
 - 录音时长：录音时用**墙钟时长**（stop-start）写入 URL `&duration=`（避免 MediaPlayer/Retriever 误读，如 1s 读成 2s），播放组件优先用该已知时长显示
 - 插入媒体（图片/录音/画画）后**不再自动补空文本块**——文本由用户手动插入（Web 与 Android 一致）

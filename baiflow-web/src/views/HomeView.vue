@@ -131,6 +131,7 @@
             {{ d.online ? '在线' : '离线' }}
           </el-tag>
           <el-button v-if="d.online && !d.current" link type="danger" size="small" @click="handleRevokeDevice(d)">强制下线</el-button>
+          <el-button v-if="!d.online" link type="danger" size="small" @click="handleDeleteDevice(d)">删除</el-button>
         </div>
       </div>
 
@@ -163,11 +164,11 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { FolderOpened, Share, User, Fold, Expand, Document, ArrowDown, Memo } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
-import { updateProfile, uploadAvatar, changePassword, listDevices, revokeSession } from '../api/auth'
+import { updateProfile, uploadAvatar, changePassword, listDevices, revokeSession, deleteDevice } from '../api/auth'
 import { formatDateTime } from '../utils/format'
 import FilesView from './FilesView.vue'
 import NotesView from './NotesView.vue'
@@ -254,6 +255,26 @@ async function handleRevokeDevice(d) {
   try {
     await revokeSession(d.activeSessionId)
     ElMessage.success('已强制下线')
+    loadDevices()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '操作失败')
+  }
+}
+
+/** 删除某登录设备（撤销其全部会话 + 删除登录历史记录，需确认） */
+async function handleDeleteDevice(d) {
+  try {
+    await ElMessageBox.confirm(
+      `删除设备「${d.deviceName}」的登录记录？删除后该设备将从列表移除（在线设备需先强制下线）。`,
+      '删除登录设备',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch (e) {
+    return   // 取消
+  }
+  try {
+    await deleteDevice(d.deviceName)
+    ElMessage.success('已删除登录设备')
     loadDevices()
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '操作失败')

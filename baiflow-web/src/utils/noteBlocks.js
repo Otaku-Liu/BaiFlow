@@ -153,6 +153,9 @@ export function inlineToHtml(text) {
     .replace(/</g, '&lt;')
   let html = INLINE_CONVERTER.makeHtml(guarded)
   html = html.replace(new RegExp(U_OPEN, 'g'), '<u>').replace(new RegExp(U_CLOSE, 'g'), '</u>')
+  // 删除线统一渲染成 <strike>：execCommand('strikeThrough') 对 <strike>/<s> 的选中状态识别可靠，
+  // showdown 默认输出 <del>，会导致「选中删除线文字再点 S 取消」失效
+  html = html.replace(/<del>/g, '<strike>').replace(/<\/del>/g, '</strike>')
   // makeHtml 会把单行包成 <p>…</p>，剥掉外皮只留行内内容
   return html.replace(/^<p>/, '').replace(/<\/p>$/, '')
 }

@@ -180,12 +180,13 @@ public class AuthServiceImpl implements AuthService {
         AuthSession current = sessionTokenService.findByToken(currentToken);
         String currentDevice = current != null ? current.getDeviceName() : null;
 
-        // 登录历史：登出不删，保留曾登录过的设备
+        // 登录设备列表：历史设备全展示（含在线/离线状态）。
+        // 在线 = 当前存在未过期会话；强制下线（撤销该设备全部会话）后即变为离线，
+        // 离线设备可被「删除」（移除登录历史记录）。
         List<UserDevice> devices = userDeviceService.list(new LambdaQueryWrapper<UserDevice>()
                 .eq(UserDevice::getUserId, userId)
                 .orderByDesc(UserDevice::getLastLoginAt));
 
-        // 在线 = 当前存在未过期会话（登出/被踢即删会话 → 离线）
         LocalDateTime now = LocalDateTime.now();
         List<AuthSession> active = sessionMapper.selectList(new LambdaQueryWrapper<AuthSession>()
                 .eq(AuthSession::getUserId, userId)
@@ -206,7 +207,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void revokeSession(String userId, boolean isAdmin, String sessionId) {
+    public void revokeSession(String userId, boolean isAdmin, String sessionId, String currentToken) {
         AuthSession target = sessionMapper.selectById(sessionId);
         if (target == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "会话不存在");
@@ -214,11 +215,52 @@ public class AuthServiceImpl implements AuthService {
         if (!isAdmin && !userId.equals(target.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权下线此设备");
         }
-        sessionMapper.deleteById(sessionId);
+        // 强制下线 = 撤销该设备（deviceName）的全部会话（同一设备可能有多次登录的多条活跃会话），
+        // 排除当前会话防止误下线自己
+        AuthSession current = currentToken != null && !currentToken.isBlank()
+                ? sessionTokenService.findByToken(currentToken) : null;
+        int deleted = deleteSessionsForDevice(target.getUserId(), target.getDeviceName(), current);
         auditService.log(userId, "FORCE_LOGOUT", "SESSION", sessionId,
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
-                "强制下线设备：" + target.getDeviceName() + "（目标用户 " + target.getUserId() + "）");
-        log.info("会话已强制下线: targetUser={}, sessionId={}, by={}", target.getUserId(), sessionId, userId);
+                "强制下线设备：" + target.getDeviceName() + "（目标用户 " + target.getUserId() + "）共撤销 " + deleted + " 条会话");
+        log.info("会话已强制下线: targetUser={}, deviceName={}, sessions={}, by={}", target.getUserId(),
+                target.getDeviceName(), deleted, userId);
+    }
+
+    @Override
+    public void deleteDevice(String userId, String deviceName) {
+        if (deviceName == null || deviceName.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "设备名不能为空");
+        }
+        // 仅允许删除离线设备：存在未过期会话 → 需先强制下线（在线设备只能强制下线）
+        LocalDateTime now = LocalDateTime.now();
+        List<AuthSession> active = sessionMapper.selectList(new LambdaQueryWrapper<AuthSession>()
+                .eq(AuthSession::getUserId, userId)
+                .eq(AuthSession::getDeviceName, deviceName)
+                .gt(AuthSession::getExpiresAt, now));
+        if (!active.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "设备仍在线，请先强制下线再删除");
+        }
+        // 清理该设备全部（已过期）会话记录 + 删除登录历史记录
+        deleteSessionsForDevice(userId, deviceName, null);
+        userDeviceService.remove(new LambdaQueryWrapper<UserDevice>()
+                .eq(UserDevice::getUserId, userId)
+                .eq(UserDevice::getDeviceName, deviceName));
+        auditService.log(userId, "DELETE_DEVICE", "DEVICE", deviceName,
+                RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
+                "删除登录设备：" + deviceName);
+        log.info("登录设备已删除: user={}, deviceName={}", userId, deviceName);
+    }
+
+    /** 删除某用户指定设备名下的全部会话；excludeCurrent 非空时保留该会话（防误下线自己） */
+    private int deleteSessionsForDevice(String userId, String deviceName, AuthSession excludeCurrent) {
+        LambdaQueryWrapper<AuthSession> w = new LambdaQueryWrapper<AuthSession>()
+                .eq(AuthSession::getUserId, userId)
+                .eq(AuthSession::getDeviceName, deviceName);
+        if (excludeCurrent != null) {
+            w.ne(AuthSession::getId, excludeCurrent.getId());
+        }
+        return sessionMapper.delete(w);
     }
 
     /**

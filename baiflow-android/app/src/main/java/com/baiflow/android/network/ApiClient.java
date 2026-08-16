@@ -115,10 +115,10 @@ public class ApiClient {
             Log.i(TAG, "<-- " + response.code() + " " + original.method() + " " + original.url()
                     + " (" + duration + "ms)");
 
-            // 401 时清除会话（长会话被强制下线/过期即回登录）
+            // 401：会话被吊销（被强制下线/过期）→ 清会话并跳转登录页，把用户踢出到登录界面
             if (response.code() == 401) {
-                Log.w(TAG, "收到 401，清除会话");
-                session.clearSession();
+                Log.w(TAG, "收到 401，清除会话并跳转登录");
+                session.kickToLogin();
             }
             return response;
         }

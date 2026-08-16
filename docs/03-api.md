@@ -59,8 +59,9 @@
 - `POST /api/auth/avatar`（multipart, ≤1MB, jpg/png/gif/webp）
 - `POST /api/auth/change-password` — 改密后吊销该用户全部会话（所有设备下线）
 - `GET /api/auth/sessions` — 当前用户的登录会话列表 `{ id, deviceName, deviceType, ip, lastUsedAt, createdAt, current }`
-- `GET /api/auth/devices` — 当前用户的登录设备列表（**含历史与在线状态**）`{ deviceName, deviceType, firstLoginAt, lastLoginAt, lastActiveAt, online, current, activeSessionId }`
-- `DELETE /api/auth/sessions/{id}` — 强制下线某登录会话（本人任意会话；管理员可任意用户）
+- `GET /api/auth/devices` — 当前用户的登录设备列表（**含历史与在线状态**；强制下线（撤销全部会话）后变为离线）`{ deviceName, deviceType, firstLoginAt, lastLoginAt, lastActiveAt, online, current, activeSessionId }`
+- `DELETE /api/auth/sessions/{id}` — 强制下线某登录设备（**撤销该设备名下的全部会话**，排除当前会话；本人任意会话；管理员可任意用户）
+- `DELETE /api/auth/devices?deviceName=` — 删除某登录设备（仅可删除**离线**设备：在线设备需先强制下线；撤销其历史会话 + 删除登录历史记录；写审计日志 `DELETE_DEVICE`）
 
 ### 用户（管理员）
 - `GET/POST /api/users` · `PATCH /api/users/{id}` · `POST /api/users/{id}/reset-password`
