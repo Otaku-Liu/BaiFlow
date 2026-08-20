@@ -15,7 +15,7 @@
   1. **Android adaptive icon**（`mipmap-anydpi-v26` + 透明前景）；
   2. **透明 mark**（`logo-mark.png`，顶栏用）；
   3. **Manifest / HTML 接线**。
-- 权威 mark 源 = **去背景后的透明 PNG**，派生 adaptive 前景与 `logo-mark.png`。
+- 权威 mark 源 = **去背景后的透明 PNG**（备份在 `docs/assets/brand/mark-source.png`），派生 adaptive 前景与 `logo-mark.png`。
 - 不接入 iOS/macOS/tvOS/watchOS 资产（本项目只有 Android + Web）。
 
 ## 3. 调色板
@@ -65,4 +65,4 @@
 
 ## 7. 待办
 
-- Play Store 512px 图标未入库（来源目录），上架时取用。
+- Play Store 512px 图标在 `docs/assets/brand/play_store_512.png`，上架时取用。
