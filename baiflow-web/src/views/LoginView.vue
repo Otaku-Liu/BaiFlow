@@ -2,6 +2,7 @@
   <div class="login-wrapper">
     <el-card class="login-card" shadow="hover">
       <template #header>
+        <img src="/brand/logo-icon.png" class="login-logo" alt="BaiFlow" />
         <h2 style="margin:0;text-align:center;font-size:24px;font-weight:600;letter-spacing:-0.02em">BaiFlow</h2>
         <p style="margin:6px 0 0;text-align:center;font-size:13px;color:var(--el-text-color-secondary)">登录到你的账户</p>
       </template>
@@ -148,6 +149,15 @@ async function handleReconnect() {
 
 .login-card :deep(.el-card__body) {
   padding: 24px;
+}
+
+.login-logo {
+  display: block;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 16px;
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .login-card h2 {

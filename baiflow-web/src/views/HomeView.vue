@@ -7,6 +7,7 @@
           <button class="sidebar-toggle" @click="toggleSidebar" :aria-label="sidebarOpen ? '收起侧边栏' : '展开侧边栏'">
             <el-icon :size="20"><Fold v-if="sidebarOpen" /><Expand v-else /></el-icon>
           </button>
+          <img src="/brand/logo-mark.png" class="header-logo" alt="BaiFlow" />
           <h3>BaiFlow</h3>
         </div>
         <div class="header-right">
@@ -375,6 +376,12 @@ async function handleChangePassword() {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.header-logo {
+  height: 22px;
+  width: auto;
+  display: block;
 }
 
 .header-left h3 {
