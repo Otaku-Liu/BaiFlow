@@ -2,6 +2,11 @@
 
 数据库：MySQL 8。文件本体保存在磁盘，数据库只存元数据。
 
+## 字符集与排序规则
+
+- 库与表统一使用 `utf8mb4` + `utf8mb4_0900_ai_ci`（MySQL 8 默认排序规则，支持中文等 BMP + 辅助平面字符，比较不区分大小写、重音）
+- 建库语句见 `README.md`：`CREATE DATABASE ... CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`
+
 ## 命名规范
 
 - 表名/字段名：小写下划线

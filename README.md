@@ -25,7 +25,7 @@ BaiFlow（小白流转）是一个个人服务器上的下载与文件协同中�
 ### 1. 数据库
 确保 MySQL 8 已运行，创建数据库：
 ```sql
-CREATE DATABASE IF NOT EXISTS baiflow_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS baiflow_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 ```
 
 ### 2. 后端

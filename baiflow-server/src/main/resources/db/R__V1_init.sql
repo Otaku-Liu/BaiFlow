@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `bf_user` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_username` (`username`),
     KEY `idx_user_role_status` (`role`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统用户表';
 
 -- 默认管理员账号（用户名 admin，密码 admin）
 INSERT INTO `bf_user` (`id`, `username`, `password_hash`, `display_name`, `role`, `status`, `avatar_url`, `created_at`, `updated_at`)
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `bf_storage_root` (
     `updated_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_storage_root_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='存储根目录表（定义文件操作的安全边界）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='存储根目录表（定义文件操作的安全边界）';
 
 -- -----------------------------------------------------------
 -- 文件项表（文件和目录元数据）
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `bf_file_item` (
     KEY `idx_file_item_storage_parent` (`storage_root_id`, `parent_id`),
     KEY `idx_file_item_storage_path` (`storage_root_id`, `relative_path`(255)),
     KEY `idx_file_item_owner` (`owner_user_id`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件项表（存储文件和目录的元数据，文件本体落磁盘）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件项表（存储文件和目录的元数据，文件本体落磁盘）';
 
 -- -----------------------------------------------------------
 -- 用户存储权限表
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS `bf_user_storage_permission` (
     `updated_at`      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_usp_user_root` (`user_id`, `storage_root_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户存储权限表（定义用户对存储根目录或文件/文件夹的访问级别）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户存储权限表（定义用户对存储根目录或文件/文件夹的访问级别）';
 
 -- -----------------------------------------------------------
 -- 隐私文件夹访问会话表
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS `bf_private_folder_access` (
     PRIMARY KEY (`id`),
     KEY `idx_pfa_user_folder` (`user_id`, `file_item_id`),
     KEY `idx_pfa_expires` (`expires_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='隐私文件夹访问会话表（密码验证通过后的短期会话）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='隐私文件夹访问会话表（密码验证通过后的短期会话）';
 
 -- -----------------------------------------------------------
 -- 传输任务表
@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS `bf_transfer_task` (
     PRIMARY KEY (`id`),
     KEY `idx_tt_user_status` (`created_by`, `status`, `created_at`),
     KEY `idx_tt_type_status` (`task_type`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='传输任务表（上传、下载、设备流转）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='传输任务表（上传、下载、设备流转）';
 
 -- -----------------------------------------------------------
 -- 用户通知表
@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS `bf_notification` (
     `read_at`     TIMESTAMP     NULL COMMENT '标记已读的时间',
     PRIMARY KEY (`id`),
     KEY `idx_notif_user_read` (`user_id`, `read_status`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户通知表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户通知表';
 
 -- -----------------------------------------------------------
 -- 分享链接表
@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS `bf_share_link` (
     PRIMARY KEY (`id`),
     KEY `idx_sl_token_hash` (`token_hash`(64)),
     KEY `idx_sl_created_by` (`created_by`, `status`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分享链接表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='分享链接表';
 
 -- -----------------------------------------------------------
 -- 分享访问日志表
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS `bf_share_access_log` (
     `created_at`     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_sal_share_link` (`share_link_id`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分享访问日志表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='分享访问日志表';
 
 -- -----------------------------------------------------------
 -- 操作审计日志表
@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS `bf_audit_log` (
     KEY `idx_al_actor` (`actor_user_id`, `created_at`),
     KEY `idx_al_action` (`action`, `created_at`),
     KEY `idx_al_target` (`target_type`, `target_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作审计日志表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='操作审计日志表';
 
 -- -----------------------------------------------------------
 -- 播放/阅读进度表（视频/音频/PDF/文本，跨设备断点续看）
@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS `bf_playback_progress` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_file` (`user_id`, `file_item_id`),
     KEY `idx_user` (`user_id`, `updated_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='播放/阅读进度表（每个用户对每个文件一条记录，支持跨设备断点续看）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='播放/阅读进度表（每个用户对每个文件一条记录，支持跨设备断点续看）';
 
 -- -----------------------------------------------------------
 -- 随手记笔记表（便签/笔记，正文存 Markdown）
@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS `bf_note` (
     `deleted_at` TIMESTAMP    NULL COMMENT '软删除时间（NULL 表示未删除）',
     PRIMARY KEY (`id`),
     KEY `idx_user_updated` (`user_id`, `updated_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='随手记笔记表（标题 + Markdown 正文，独立于文件系统存储）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='随手记笔记表（标题 + Markdown 正文，独立于文件系统存储）';
 
 -- -----------------------------------------------------------
 -- 笔记阅读进度表（跨设备续读长笔记）
@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS `bf_note_progress` (
     `updated_at`     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_note` (`user_id`, `note_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='笔记阅读进度表（每个用户对每篇笔记一条记录，支持跨设备续读）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='笔记阅读进度表（每个用户对每篇笔记一条记录，支持跨设备续读）';
 
 -- -----------------------------------------------------------
 -- 随手记笔记媒体表（图片/录音/画画，独立于文件中心存储）
@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS `bf_note_media` (
     `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_user` (`user_id`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='随手记笔记媒体表（图片/录音/画画，独立于文件中心存储）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='随手记笔记媒体表（图片/录音/画画，独立于文件中心存储）';
 
 -- -----------------------------------------------------------
 -- 登录会话表（长会话 token + 设备信息，吊销驱动 + 不活跃兜底）
@@ -279,7 +279,7 @@ CREATE TABLE IF NOT EXISTS `bf_auth_session` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_token_hash` (`token_hash`),
     KEY `idx_user` (`user_id`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录会话表（长会话 token + 设备信息，吊销驱动 + 不活跃兜底）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='登录会话表（长会话 token + 设备信息，吊销驱动 + 不活跃兜底）';
 
 -- -----------------------------------------------------------
 -- 文件下载记录表（文件中心直接下载 + 分享下载，供下载次数统计与 ADMIN 审计）
@@ -298,7 +298,7 @@ CREATE TABLE IF NOT EXISTS `bf_download_record` (
     KEY `idx_dr_file` (`file_id`, `created_at`),
     KEY `idx_dr_user` (`downloader_user_id`, `created_at`),
     KEY `idx_dr_share` (`share_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件下载记录表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件下载记录表';
 
 -- -----------------------------------------------------------
 -- 用户登录设备表（登录历史 + 在线状态；登出不删，保留曾登录过的设备）
@@ -314,4 +314,4 @@ CREATE TABLE IF NOT EXISTS `bf_user_device` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_device` (`user_id`, `device_name`),
     KEY `idx_ud_user` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户登录设备表（按 user+device_name 登记，在线状态由活跃会话判定）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户登录设备表（按 user+device_name 登记，在线状态由活跃会话判定）';
