@@ -37,6 +37,8 @@
 
 `mime_type` 字段前端不展示（文件名自带扩展名），后端用于预览 MIME 路由和 Content-Type 返回。
 
+**隐私空间（新模型）**：每个用户主目录下固定一个名为「隐私空间」的子目录（`privacy_mode=PRIVATE`，密码未设置时 `privacy_password_hash` 为空）。首访设密码、之后输密码换取 `private_folder_access` 令牌进入；管理员免验证。任意文件夹不再单独设为隐私。
+
 ### private_folder_access — 隐私访问会话
 `id, user_id, file_item_id, access_token_hash, expires_at, created_at`
 

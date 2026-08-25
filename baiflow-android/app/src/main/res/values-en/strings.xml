@@ -92,12 +92,17 @@
     <string name="files_my_files">My Files</string>
     <string name="files_user_display">%1$s (%2$s)</string>
     <string name="files_all_users">All (all users)</string>
-    <string name="files_privacy_verify_title">Private Folder Access</string>
-    <string name="files_privacy_verify_message">This folder is protected. Enter the private password to access it.</string>
-    <string name="files_privacy_password_hint">Enter private password</string>
+    <string name="files_privacy_verify_title">Privacy Space Access</string>
+    <string name="files_privacy_verify_message">This folder is protected. Enter the privacy password to access it (admins are exempt).</string>
+    <string name="files_privacy_password_hint">Enter privacy password</string>
     <string name="files_privacy_verify">Verify</string>
     <string name="files_privacy_verify_success">Verified</string>
     <string name="files_privacy_wrong_password">Wrong password</string>
+    <string name="files_privacy_setup_title">Set Privacy Space Password</string>
+    <string name="files_privacy_setup_message">The privacy space has no password yet. Set one now (admins are exempt).</string>
+    <string name="files_privacy_setup_hint">Set a password (min 4 chars)</string>
+    <string name="files_privacy_setup">Set</string>
+    <string name="files_privacy_setup_failed">Failed to set privacy password</string>
     <string name="files_back_up">Go Back</string>
 
     <!-- ==================== Notes list ==================== -->
@@ -167,6 +172,13 @@
     <string name="mine_not_logged_in">Not logged in</string>
     <string name="mine_display_name_hint">Display name</string>
     <string name="mine_profile_updated">Profile updated</string>
+    <string name="mine_change_avatar">Change Avatar</string>
+    <string name="mine_delete_avatar">Delete Avatar</string>
+    <string name="mine_avatar_updated">Avatar updated</string>
+    <string name="mine_avatar_upload_failed">Avatar upload failed</string>
+    <string name="mine_avatar_deleted">Avatar deleted</string>
+    <string name="mine_avatar_delete_confirm">Delete your avatar? It will show the default initial placeholder.</string>
+    <string name="mine_avatar_delete_failed">Failed to delete avatar</string>
     <string name="mine_old_password_hint">Old password</string>
     <string name="mine_new_password_hint">New password</string>
     <string name="mine_confirm_password_hint">Confirm new password</string>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 头像图片框：透明底 + 浅灰圆环边框（颜色与软件灰色背景一致，透明 PNG 抠图直接露底色） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@android:color/transparent" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/background" />
+</shape>

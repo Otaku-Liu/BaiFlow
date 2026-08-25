@@ -1,7 +1,7 @@
 <template>
   <div class="shares-view">
     <div class="toolbar">
-      <el-button type="primary" @click="showCreateDialog = true">
+      <el-button type="primary" @click="openCreateDialog">
         <el-icon><Share /></el-icon> {{ t('shares.createLink') }}
       </el-button>
       <el-select v-model="filterStatus" clearable @change="loadShares" :placeholder="t('shares.statusFilter')" style="width:140px">
@@ -57,13 +57,13 @@
     <el-dialog v-model="showCreateDialog" :title="t('shares.createDialogTitle')" width="500px">
       <el-form :model="createForm" ref="createFormRef" label-position="top">
         <el-form-item :label="t('shares.targetFileId')" prop="targetFileItemId" required>
-          <el-input v-model="createForm.targetFileItemId" :placeholder="t('shares.targetFileIdPlaceholder')" />
-        </el-form-item>
-        <el-form-item :label="t('shares.shareType')" required>
-          <el-radio-group v-model="createForm.shareType">
-            <el-radio value="FILE">{{ t('common.file') }}</el-radio>
-            <el-radio value="FOLDER">{{ t('common.folder') }}</el-radio>
-          </el-radio-group>
+          <div class="target-picker">
+            <el-button @click="openTargetPicker">{{ selectedTarget ? t('shares.changeTarget') : t('shares.selectTarget') }}</el-button>
+            <span v-if="selectedTarget" class="target-selected">
+              <el-tag size="small" :type="selectedTarget.type === 'FOLDER' ? 'primary' : ''">{{ selectedTarget.type === 'FOLDER' ? t('common.folder') : t('common.file') }}</el-tag>
+              <span style="margin-left:6px">{{ selectedTarget.name }}</span>
+            </span>
+          </div>
         </el-form-item>
         <el-form-item :label="t('shares.accessMode')" required>
           <el-radio-group v-model="createForm.accessMode">
@@ -97,6 +97,39 @@
       </template>
     </el-dialog>
 
+    <!-- 分享目标选择器（文件夹/文件导航） -->
+    <el-dialog v-model="showTargetPicker" :title="t('shares.selectTargetTitle')" width="540px">
+      <div class="picker-header">
+        <el-breadcrumb separator="/">
+          <el-breadcrumb-item>
+            <el-link type="primary" @click="pickNavigateTo(null)">{{ pickRootName }}</el-link>
+          </el-breadcrumb-item>
+          <el-breadcrumb-item v-for="(c, i) in pickBreadcrumb" :key="c.id">
+            <el-link type="primary" @click="pickNavigateTo(c)">{{ c.name }}</el-link>
+          </el-breadcrumb-item>
+        </el-breadcrumb>
+      </div>
+      <el-table :data="pickItems" v-loading="pickLoading" height="360" style="margin-top:12px" @row-click="pickRowClick">
+        <el-table-column :label="t('common.name')">
+          <template #default="{ row }">
+            <el-icon v-if="row.itemType === 'DIRECTORY'"><Folder /></el-icon>
+            <el-icon v-else><Document /></el-icon>
+            <span style="margin-left:6px">{{ row.name }}</span>
+            <el-tag v-if="row.privacyMode === 'PRIVATE'" size="small" type="warning" style="margin-left:6px">{{ t('files.privacy') }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="''" width="110" align="right">
+          <template #default="{ row }">
+            <el-button v-if="row.privacyMode !== 'PRIVATE'" size="small" type="primary" link @click.stop="pickSelect(row)">{{ t('shares.pick') }}</el-button>
+            <span v-else class="picker-disabled">{{ t('shares.notShareable') }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="showTargetPicker = false">{{ t('common.cancel') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 通用确认弹窗 -->
     <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
 
@@ -124,8 +157,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Share } from '@element-plus/icons-vue'
+import { Share, Folder, Document } from '@element-plus/icons-vue'
 import { createShare, listShares, updateShare, revokeShare, buildShareUrl, getShareAnalytics } from '../api/shares'
+import { listFiles, listStorageRoots } from '../api/files'
 import { useAuthStore } from '../stores/auth'
 import { formatDateTime } from '../utils/format'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
@@ -140,11 +174,107 @@ const filterStatus = ref(''); const showCreateDialog = ref(false)
 const shareResult = ref('')
 
 const createForm = reactive({
-  targetFileItemId: '', shareType: 'FILE', accessMode: 'VIEW',
+  targetFileItemId: '', accessMode: 'VIEW',
   extractionCode: '', expiresAt: null, maxViews: 0, maxDownloads: 0
 })
+const selectedTarget = ref(null)
+const showTargetPicker = ref(false)
+const pickBreadcrumb = ref([])
+const pickItems = ref([])
+const pickLoading = ref(false)
+const pickRootId = ref('')
+const pickRootName = ref('')
 
 onMounted(() => loadShares())
+
+/** 打开创建分享：重置表单（分享类型由所选目标自动判断） */
+function openCreateDialog() {
+  Object.assign(createForm, {
+    targetFileItemId: '', accessMode: 'VIEW',
+    extractionCode: '', expiresAt: null, maxViews: 0, maxDownloads: 0
+  })
+  selectedTarget.value = null
+  shareResult.value = ''
+  showCreateDialog.value = true
+}
+
+// ---- 分享目标选择器（文件夹/文件导航） ----
+
+async function openTargetPicker() {
+  showTargetPicker.value = true
+  pickBreadcrumb.value = []
+  if (!pickRootId.value) {
+    try {
+      const { data } = await listStorageRoots()
+      if (data.code === 0 && data.data?.length > 0) {
+        pickRootId.value = data.data[0].id
+        pickRootName.value = data.data[0].name || ''
+      } else {
+        ElMessage.error(t('shares.loadFolderFailed'))
+        showTargetPicker.value = false
+        return
+      }
+    } catch (e) {
+      ElMessage.error(t('shares.loadFolderFailed'))
+      showTargetPicker.value = false
+      return
+    }
+  }
+  loadPickItems()
+}
+
+function pickNavigateTo(item) {
+  if (item == null) {
+    pickBreadcrumb.value = []
+  } else {
+    const idx = pickBreadcrumb.value.findIndex(b => b.id === item.id)
+    if (idx >= 0) {
+      pickBreadcrumb.value = pickBreadcrumb.value.slice(0, idx + 1)
+    } else {
+      pickBreadcrumb.value.push(item)
+    }
+  }
+  loadPickItems()
+}
+
+async function loadPickItems() {
+  if (!pickRootId.value) return
+  pickLoading.value = true
+  try {
+    const parentId = pickBreadcrumb.value.length > 0
+      ? pickBreadcrumb.value[pickBreadcrumb.value.length - 1].id : null
+    const { data } = await listFiles({
+      storageRootId: pickRootId.value,
+      parentId: parentId || undefined,
+      page: 1,
+      size: 100
+    })
+    pickItems.value = (data.code === 0) ? (data.data?.records || []) : []
+    if (data.code !== 0) ElMessage.error(data.message || t('shares.loadFolderFailed'))
+  } catch (e) {
+    pickItems.value = []
+    ElMessage.error(t('shares.loadFolderFailed'))
+  } finally {
+    pickLoading.value = false
+  }
+}
+
+function pickRowClick(row) {
+  // 文件夹进入下一层；隐私文件夹不可进入/选择
+  if (row.itemType === 'DIRECTORY' && row.privacyMode !== 'PRIVATE') {
+    pickNavigateTo(row)
+  }
+}
+
+function pickSelect(row) {
+  createForm.targetFileItemId = row.id
+  selectedTarget.value = {
+    id: row.id,
+    name: row.name,
+    type: row.itemType === 'DIRECTORY' ? 'FOLDER' : 'FILE'
+  }
+  showTargetPicker.value = false
+}
 
 async function loadShares() {
   loading.value = true
@@ -160,7 +290,7 @@ async function doCreateShare() {
   try {
     const expiresIso = createForm.expiresAt ? new Date(createForm.expiresAt).toISOString() : null
     const { data } = await createShare({
-      targetFileItemId: createForm.targetFileItemId, shareType: createForm.shareType,
+      targetFileItemId: createForm.targetFileItemId,
       accessMode: createForm.accessMode, expiresAt: expiresIso,
       maxViews: createForm.maxViews, maxDownloads: createForm.maxDownloads,
       extractionCode: createForm.extractionCode || null
@@ -232,6 +362,30 @@ async function doToggleStatus(row, status) {
 
 <style scoped>
 .shares-view { width: 100%; }
+
+.target-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.target-selected {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+}
+
+.picker-header {
+  padding-bottom: 4px;
+}
+
+/* 隐私文件夹不可分享提示 */
+.picker-disabled {
+  color: var(--el-text-color-disabled);
+  font-size: 13px;
+}
 
 .toolbar {
   display: flex;

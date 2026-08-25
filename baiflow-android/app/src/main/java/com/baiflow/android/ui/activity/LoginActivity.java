@@ -116,7 +116,7 @@ public class LoginActivity extends AppCompatActivity {
             public void onResponse(Call<ApiResponse<UserInfo>> call, Response<ApiResponse<UserInfo>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     UserInfo user = response.body().getData();
-                    session.saveUser(user.getId(), user.getUsername(), user.getDisplayName(), user.getRole());
+                    session.saveUser(user.getId(), user.getUsername(), user.getDisplayName(), user.getAvatarUrl(), user.getRole());
                     // 登录成功：复位离线标记（重连后回到在线模式）
                     session.saveOffline(false);
                     Toast.makeText(LoginActivity.this, getString(R.string.login_success), Toast.LENGTH_SHORT).show();

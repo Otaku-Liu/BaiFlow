@@ -69,7 +69,7 @@
 <el-table-column :label="t('files.uploadTime')">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column :label="t('files.downloadCount')" width="90" align="right">
+      <el-table-column :label="t('files.downloadCount')" width="110" align="right">
         <template #default="{ row }">
           <el-button v-if="row.itemType === 'FILE'" link type="primary" size="small" @click="showDownloadDetails(row)">
             {{ row.downloadCount ?? 0 }}
@@ -89,12 +89,9 @@
             <el-button v-if="row.itemType === 'FILE'" type="primary" link size="small" @click="doDownload(row)">
               {{ t('common.download') }}
             </el-button>
-            <el-button type="warning" link size="small" @click="showRename(row)">{{ t('common.rename') }}</el-button>
-            <el-button v-if="row.itemType === 'DIRECTORY' && row.privacyMode !== 'PRIVATE'"
-              type="info" link size="small" @click="showSetPrivacy(row)">{{ t('files.setPrivacy') }}</el-button>
-            <el-button v-if="row.privacyMode === 'PRIVATE'"
-              type="info" link size="small" @click="doRemovePrivacy(row)">{{ t('files.removePrivacy') }}</el-button>
-            <el-button type="danger" link size="small" @click="doDelete(row)">{{ t('common.delete') }}</el-button>
+            <!-- 根级主目录与隐私空间不可重命名/删除 -->
+            <el-button v-if="row.parentId !== null && row.privacyMode !== 'PRIVATE'" type="warning" link size="small" @click="showRename(row)">{{ t('common.rename') }}</el-button>
+            <el-button v-if="row.parentId !== null && row.privacyMode !== 'PRIVATE'" type="danger" link size="small" @click="doDelete(row)">{{ t('common.delete') }}</el-button>
           </div>
         </template>
       </el-table-column>
@@ -172,16 +169,21 @@
     <!-- 通用确认弹窗（替换 ElMessageBox） -->
     <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
 
-    <!-- 设置隐私密码对话框 -->
-    <el-dialog v-model="showSetPrivacyDialog" :title="t('files.setPrivacyTitle')" width="380px">
-      <el-alert type="info" :closable="false" show-icon style="margin-bottom:16px">
-        {{ t('files.setPrivacyMsg') }}
+    <!-- 隐私空间首次设置密码弹窗 -->
+    <el-dialog v-model="showPrivacySetup" :title="t('files.privacySetupTitle')" width="380px" :close-on-click-modal="false" :close-on-press-escape="false">
+      <el-alert type="warning" :closable="false" show-icon style="margin-bottom:16px">
+        {{ t('files.privacySetupMsg') }}
       </el-alert>
-      <el-input v-model="privacyPassword" type="password" :placeholder="t('files.setPrivacyPlaceholder')" show-password />
-      <template #footer>
-        <el-button @click="showSetPrivacyDialog = false">{{ t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="doSetPrivacy" :loading="settingPrivacy">{{ t('files.confirmSetPrivacy') }}</el-button>
-      </template>
+      <el-form @submit.prevent="doSetupPrivacy">
+        <el-form-item :label="t('files.privacyPassword')">
+          <el-input v-model="privacySetupPassword" type="password" :placeholder="t('files.privacySetupPlaceholder')" show-password />
+        </el-form-item>
+        <div class="dialog-footer">
+          <el-button @click="cancelPrivacySetup">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" native-type="submit" :loading="settingPrivacy">{{ t('files.confirmSetPrivacy') }}</el-button>
+        </div>
+      </el-form>
+      <p v-if="privacySetupError" class="error-msg">{{ privacySetupError }}</p>
     </el-dialog>
 
     <!-- 预览抽屉 -->
@@ -202,7 +204,7 @@ import { useAuthStore } from '../stores/auth'
 import { useFileStore } from '../stores/file'
 import {
   listFiles, uploadFile, downloadFile, createFolder, renameFile, deleteFile,
-  setPrivacy, removePrivacy, verifyPrivacy, listStorageRoots, getFileDownloads
+  setPrivacy, verifyPrivacy, listStorageRoots, getFileDownloads
 } from '../api/files'
 import { listUsers } from '../api/users'
 import { formatDateTime, formatSize } from '../utils/format'
@@ -258,8 +260,8 @@ const loading = ref(false)
 const showUploadDialog = ref(false)
 const showNewFolderDialog = ref(false)
 const showRenameDialog = ref(false)
-const showSetPrivacyDialog = ref(false)
 const showPrivacyVerify = ref(false)
+const showPrivacySetup = ref(false)
 const uploadFiles = ref([])
 const uploading = ref(false)
 const creating = ref(false)
@@ -269,8 +271,8 @@ const privacyVerifying = ref(false)
 const newFolderName = ref('')
 const renameName = ref('')
 const renameTarget = ref(null)
-const privacyTarget = ref(null)
-const privacyPassword = ref('')
+const privacySetupPassword = ref('')
+const privacySetupError = ref('')
 const privacyPendingPassword = ref('')
 const privacyPendingFolderId = ref(null)
 const privacyPendingCallback = ref(null)
@@ -287,6 +289,10 @@ function showPreview(row) {
 
 function onRowDblClick(row) {
   if (row.itemType === 'DIRECTORY') {
+    // 每次进入隐私空间都要验证密码：清掉缓存令牌，让后端返回 40105/40107 触发弹窗
+    if (row.privacyMode === 'PRIVATE') {
+      fileStore.clearPrivacyToken(row.id)
+    }
     navigateTo(row)
   } else if (canPreview(row.mimeType)) {
     showPreview(row)
@@ -357,7 +363,7 @@ async function loadFiles() {
   loading.value = true
   try {
     const folderId = fileStore.currentFolderId
-    const token = fileStore.getPrivacyToken(folderId)
+    const token = fileStore.currentPrivacyToken
     const params = {
       storageRootId: rootId.value,
       parentId: folderId || undefined,
@@ -558,46 +564,42 @@ async function doDelete(row) {
   }
 }
 
-/** 设置隐私密码 */
-function showSetPrivacy(row) {
-  privacyTarget.value = row
-  privacyPassword.value = ''
-  showSetPrivacyDialog.value = true
+/** 隐私空间首次访问：设置密码（40107 触发）；设密后立即用同一密码换取令牌进入 */
+function cancelPrivacySetup() {
+  showPrivacySetup.value = false
+  privacyPendingCallback.value = null
 }
 
-async function doSetPrivacy() {
-  if (!privacyPassword.value || privacyPassword.value.length < 4) {
+async function doSetupPrivacy() {
+  if (!privacySetupPassword.value || privacySetupPassword.value.length < 4) {
     ElMessage.warning(t('files.privacyPwdMinLength')); return
   }
   settingPrivacy.value = true
+  privacySetupError.value = ''
   try {
-    await setPrivacy(privacyTarget.value.id, privacyPassword.value)
-    ElMessage.success(t('files.privacySet'))
-    showSetPrivacyDialog.value = false
-    loadFiles()
+    const folderId = privacyPendingFolderId.value
+    const setResp = await setPrivacy(folderId, privacySetupPassword.value)
+    if (setResp.data?.code !== 0) {
+      privacySetupError.value = setResp.data?.message || t('files.privacySetFailed')
+      return
+    }
+    // 设密后立即验证换取访问令牌，直接进入隐私空间
+    const { data } = await verifyPrivacy(folderId, privacySetupPassword.value)
+    if (data.code === 0) {
+      fileStore.savePrivacyToken(folderId, data.data.accessToken)
+      ElMessage.success(t('files.privacySet'))
+      showPrivacySetup.value = false
+      if (privacyPendingCallback.value) {
+        privacyPendingCallback.value()
+        privacyPendingCallback.value = null
+      }
+    } else {
+      privacySetupError.value = data.message || t('files.privacySetFailed')
+    }
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || t('files.privacySetFailed'))
+    privacySetupError.value = e.response?.data?.message || t('files.privacySetFailed')
   } finally {
     settingPrivacy.value = false
-  }
-}
-
-/** 取消隐私保护 */
-async function doRemovePrivacy(row) {
-  try {
-    await confirm({
-      title: t('files.removePrivacyTitle'),
-      message: t('files.removePrivacyMsg', { name: row.name }),
-      confirmText: t('common.confirm'),
-      type: 'warning'
-    })
-    await removePrivacy(row.id)
-    // 清除本地存储的访问令牌
-    fileStore.clearPrivacyToken(row.id)
-    ElMessage.success(t('files.privacyRemoved'))
-    loadFiles()
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('files.operationFailed'))
   }
 }
 
@@ -611,14 +613,12 @@ async function doRemovePrivacy(row) {
  * @param {Function} callback - 验证通过后执行的回调，传入有效令牌
  */
 async function checkParentPrivacy(fileItemId, currentToken, callback) {
-  // 简化处理：使用当前目录令牌尝试访问
-  // 如果后端返回 40105（PRIVATE_PASSWORD_REQUIRED），则弹出验证
   try {
     await callback(currentToken)
   } catch (e) {
     const code = e.response?.data?.code
-    if (code === 40105 || code === 40106) {
-      // 需要验证隐私密码——弹出验证对话框
+    if (isPrivacyCode(code)) {
+      // 需要隐私密码——弹出验证/首次设置对话框
       privacyPendingFolderId.value = fileItemId
       privacyPendingCallback.value = () => {
         const newToken = fileStore.getPrivacyToken(privacyPendingFolderId.value)
@@ -626,9 +626,7 @@ async function checkParentPrivacy(fileItemId, currentToken, callback) {
           ElMessage.error(err.response?.data?.message || t('files.operationFailed'))
         })
       }
-      privacyPendingPassword.value = ''
-      privacyError.value = ''
-      showPrivacyVerify.value = true
+      showPrivacyDialog(code, e.response?.data?.message || '')
     } else {
       ElMessage.error(e.response?.data?.message || '操作失败')
     }
@@ -668,12 +666,34 @@ function cancelPrivacyVerify() {
 }
 
 // ---- 错误处理 ----
-function handleApiError(data) {
-  if (data.code === 40105 || data.code === 40106) {
-    showPrivacyVerify.value = true
+const isPrivacyCode = (code) => code === 40105 || code === 40106 || code === 40107
+
+/** 打开隐私弹窗：40107 首次设置密码，其余输入密码验证 */
+function showPrivacyDialog(code, message) {
+  if (code === 40107) {
+    privacySetupPassword.value = ''
+    privacySetupError.value = message || ''
+    showPrivacySetup.value = true
+  } else {
     privacyPendingPassword.value = ''
-    privacyError.value = data.message || ''
-    privacyPendingCallback.value = () => loadFiles()
+    privacyError.value = message || ''
+    showPrivacyVerify.value = true
+  }
+}
+
+/**
+ * 打开隐私密码弹窗并绑定当前目录的重试：必须带上当前目录 ID
+ * （此前缺失导致 verifyPrivacy(null) 报「文件项不存在」）。
+ */
+function openPrivacyDialog(code, message) {
+  privacyPendingFolderId.value = fileStore.currentFolderId
+  privacyPendingCallback.value = () => loadFiles()
+  showPrivacyDialog(code, message)
+}
+
+function handleApiError(data) {
+  if (isPrivacyCode(data.code)) {
+    openPrivacyDialog(data.code, data.message || '')
   } else {
     ElMessage.error(data.message || t('files.operationFailed'))
   }
@@ -681,11 +701,8 @@ function handleApiError(data) {
 
 function handleHttpError(e) {
   const code = e.response?.data?.code
-  if (code === 40105 || code === 40106) {
-    showPrivacyVerify.value = true
-    privacyPendingPassword.value = ''
-    privacyError.value = e.response?.data?.message || ''
-    privacyPendingCallback.value = () => loadFiles()
+  if (isPrivacyCode(code)) {
+    openPrivacyDialog(code, e.response?.data?.message || '')
   } else {
     ElMessage.error(e.response?.data?.message || t('files.requestFailed'))
   }

@@ -44,4 +44,6 @@ cd deploy && docker compose up -d
 | [10-web-connection-timeout.md](10-web-connection-timeout.md) | Web 连接超时检测与恢复 |
 | [11-android-network-error.md](11-android-network-error.md) | Android 网络错误处理 |
 | [12-android-offline-mode.md](12-android-offline-mode.md) | Android 离线模式与随手记同步 |
+| [13-download-records.md](13-download-records.md) | ADR：文件下载记录与下载安全 |
+| [14-brand-assets.md](14-brand-assets.md) | 品牌资源与图标规范 |
 | [glossary.md](glossary.md) | 术语表 |

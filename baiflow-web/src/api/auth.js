@@ -25,6 +25,11 @@ export function uploadAvatar(file) {
   })
 }
 
+/** 删除当前用户头像 */
+export function deleteAvatar() {
+  return http.delete('/auth/avatar')
+}
+
 /** 修改密码（需提供旧密码验证） */
 export function changePassword(oldPassword, newPassword) {
   return http.post('/auth/change-password', { oldPassword, newPassword })

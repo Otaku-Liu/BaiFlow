@@ -180,6 +180,13 @@ public class ApiClient {
         @PATCH("auth/profile")
         Call<ApiResponse<UserInfo>> updateProfile(@Body Map<String, String> body);
 
+        @Multipart
+        @POST("auth/avatar")
+        Call<ApiResponse<UserInfo>> uploadAvatar(@Part MultipartBody.Part file);
+
+        @DELETE("auth/avatar")
+        Call<ApiResponse<UserInfo>> deleteAvatar();
+
         @POST("auth/change-password")
         Call<ApiResponse<Map<String, Object>>> changePassword(@Body Map<String, String> body);
 
@@ -244,6 +251,12 @@ public class ApiClient {
 
         @POST("files/{id}/privacy/verify")
         Call<ApiResponse<Map<String, Object>>> verifyPrivacy(
+                @Path("id") String id,
+                @Body Map<String, String> body
+        );
+
+        @POST("files/{id}/privacy")
+        Call<ApiResponse<FileItem>> setPrivacy(
                 @Path("id") String id,
                 @Body Map<String, String> body
         );
@@ -318,6 +331,16 @@ public class ApiClient {
         return getService().updateProfile(body);
     }
 
+    /** 上传头像（multipart，服务端校验 ≤1MB / 白名单扩展名），成功返回含新 avatarUrl 的用户信息 */
+    public Call<ApiResponse<UserInfo>> uploadAvatar(byte[] bytes, String fileName, String mime) {
+        return getService().uploadAvatar(buildFilePart(bytes, fileName, mime != null ? mime : "image/jpeg"));
+    }
+
+    /** 删除当前用户头像，成功返回 avatarUrl 为空的用户信息 */
+    public Call<ApiResponse<UserInfo>> deleteAvatar() {
+        return getService().deleteAvatar();
+    }
+
     public Call<ApiResponse<Map<String, Object>>> changePassword(String oldPassword, String newPassword) {
         Map<String, String> body = new java.util.HashMap<>();
         body.put("oldPassword", oldPassword != null ? oldPassword : "");
@@ -381,9 +404,7 @@ public class ApiClient {
                                                     String privacyToken) {
         RequestBody rootPart = RequestBody.create(storageRootId, MediaType.parse("text/plain"));
         RequestBody parentPart = RequestBody.create(parentId != null ? parentId : "", MediaType.parse("text/plain"));
-        RequestBody fileBody = RequestBody.create(fileBytes, MediaType.parse("application/octet-stream"));
-        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", fileName, fileBody);
-        return getService().uploadFile(rootPart, parentPart, filePart, viewUserId, privacyToken);
+        return getService().uploadFile(rootPart, parentPart, buildFilePart(fileBytes, fileName, "application/octet-stream"), viewUserId, privacyToken);
     }
 
     public Call<ResponseBody> downloadFile(String fileId, String privacyToken) {
@@ -409,6 +430,13 @@ public class ApiClient {
         Map<String, String> body = new java.util.HashMap<>();
         body.put("password", password);
         return getService().verifyPrivacy(folderId, body);
+    }
+
+    /** 隐私空间首次访问：设置隐私密码（仅空密码时可用；已设置则拒绝） */
+    public Call<ApiResponse<FileItem>> setPrivacy(String folderId, String password) {
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("password", password);
+        return getService().setPrivacy(folderId, body);
     }
 
     public Call<ApiResponse<List<StorageRoot>>> listStorageRoots() {
@@ -465,9 +493,14 @@ public class ApiClient {
     public Call<ApiResponse<NoteMedia>> uploadNoteMedia(String mediaType, byte[] bytes,
                                                         String fileName, String mime) {
         RequestBody typePart = RequestBody.create(mediaType, MediaType.parse("text/plain"));
-        RequestBody fileBody = RequestBody.create(bytes, MediaType.parse(mime != null ? mime : "application/octet-stream"));
-        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", fileName, fileBody);
-        return getService().uploadNoteMedia(typePart, filePart);
+        return getService().uploadNoteMedia(typePart,
+                buildFilePart(bytes, fileName, mime != null ? mime : "application/octet-stream"));
+    }
+
+    /** 构造 multipart 文件 Part（"file" 字段），供头像/文件/笔记媒体上传共用 */
+    private static MultipartBody.Part buildFilePart(byte[] bytes, String fileName, String mime) {
+        RequestBody fileBody = RequestBody.create(bytes, MediaType.parse(mime));
+        return MultipartBody.Part.createFormData("file", fileName, fileBody);
     }
 
     /** 获取笔记媒体字节流（带鉴权，供编辑器回读图片/录音） */

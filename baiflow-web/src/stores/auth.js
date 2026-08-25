@@ -31,6 +31,14 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    /** 更新当前用户字段并同步 localStorage（头像/展示名等；修复刷新后还原） */
+    updateUser(patch) {
+      if (this.user && patch) {
+        this.user = { ...this.user, ...patch }
+        localStorage.setItem('baiflow_user', JSON.stringify(this.user))
+      }
+    },
+
     restoreSession() {
       const savedToken = localStorage.getItem('baiflow_token')
       if (savedToken) {

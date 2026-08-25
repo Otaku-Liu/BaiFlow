@@ -48,6 +48,9 @@ public final class ErrorCode {
     /** 隐私文件夹密码错误 */
     public static final int PRIVATE_PASSWORD_INVALID = 40106;
 
+    /** 隐私空间尚未设置密码，需先设置 */
+    public static final int PRIVATE_SETUP_REQUIRED = 40107;
+
     /** 无权限 */
     public static final int FORBIDDEN = 40301;
 

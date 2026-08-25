@@ -94,12 +94,17 @@
     <string name="files_my_files">我的文件</string>
     <string name="files_user_display">%1$s（%2$s）</string>
     <string name="files_all_users">全部（所有用户）</string>
-    <string name="files_privacy_verify_title">隐私文件夹访问验证</string>
-    <string name="files_privacy_verify_message">此文件夹受隐私保护，需要输入隐私密码才能访问。</string>
+    <string name="files_privacy_verify_title">隐私空间访问验证</string>
+    <string name="files_privacy_verify_message">此文件夹受隐私保护，需要输入隐私密码才能访问（管理员无需密码）。</string>
     <string name="files_privacy_password_hint">请输入隐私密码</string>
     <string name="files_privacy_verify">验证</string>
     <string name="files_privacy_verify_success">验证成功</string>
     <string name="files_privacy_wrong_password">密码错误</string>
+    <string name="files_privacy_setup_title">设置隐私空间密码</string>
+    <string name="files_privacy_setup_message">隐私空间尚未设置密码，请设置隐私密码（管理员无需密码）。</string>
+    <string name="files_privacy_setup_hint">设置隐私密码（至少4位）</string>
+    <string name="files_privacy_setup">设置</string>
+    <string name="files_privacy_setup_failed">隐私密码设置失败</string>
     <string name="files_back_up">返回上级</string>
 
     <!-- ==================== 随手记列表 ==================== -->
@@ -170,6 +175,13 @@
     <string name="mine_not_logged_in">未登录</string>
     <string name="mine_display_name_hint">展示名称</string>
     <string name="mine_profile_updated">资料已更新</string>
+    <string name="mine_change_avatar">更换头像</string>
+    <string name="mine_delete_avatar">删除头像</string>
+    <string name="mine_avatar_updated">头像已更新</string>
+    <string name="mine_avatar_upload_failed">头像上传失败</string>
+    <string name="mine_avatar_deleted">头像已删除</string>
+    <string name="mine_avatar_delete_confirm">确定删除头像吗？删除后将显示默认首字头像。</string>
+    <string name="mine_avatar_delete_failed">头像删除失败</string>
     <string name="mine_old_password_hint">旧密码</string>
     <string name="mine_new_password_hint">新密码</string>
     <string name="mine_confirm_password_hint">确认新密码</string>

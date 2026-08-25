@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
  * 创建分享链接请求
  *
  * @param targetFileItemId       被分享的文件/文件夹 ID
- * @param shareType              FILE 或 FOLDER
+ * @param shareType              分享类型（可选；不再要求前端传，服务端按目标 itemType 自动推导 FILE/FOLDER）
  * @param accessMode             VIEW 或 DOWNLOAD
  * @param expiresAt              ISO 时间字符串（可选，为空则永不过期）
  * @param maxViews               最大访问次数（0 不限制）
@@ -15,7 +15,7 @@ import jakarta.validation.constraints.NotBlank;
  */
 public record CreateShareRequest(
         @NotBlank String targetFileItemId,
-        @NotBlank String shareType,
+        String shareType,
         @NotBlank String accessMode,
         String expiresAt,
         int maxViews,

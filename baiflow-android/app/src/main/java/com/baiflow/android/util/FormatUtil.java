@@ -14,4 +14,10 @@ public final class FormatUtil {
         if (bytes < 1024 * 1024 * 1024) { return String.format("%.1f MB", bytes / (1024.0 * 1024)); }
         return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
     }
+
+    /** 展示名首字占位（空则 "?"），按码点截取避免拆散代理对/emoji */
+    public static String firstCharOrQuestion(String s) {
+        if (s == null || s.isEmpty()) { return "?"; }
+        return s.substring(0, s.offsetByCodePoints(0, 1));
+    }
 }

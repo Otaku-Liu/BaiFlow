@@ -21,14 +21,29 @@
             android:padding="20dp"
             android:layout_marginBottom="16dp">
 
-            <TextView
-                android:id="@+id/tvAvatar"
+            <FrameLayout
                 android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:gravity="center"
-                android:textSize="24sp"
-                android:textColor="@color/white"
-                android:background="@drawable/bg_avatar" />
+                android:layout_height="56dp">
+
+                <TextView
+                    android:id="@+id/tvAvatar"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:textSize="24sp"
+                    android:textColor="@color/white"
+                    android:background="@drawable/bg_avatar" />
+
+                <ImageView
+                    android:id="@+id/ivAvatar"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"
+                    android:background="@drawable/bg_avatar_border"
+                    android:visibility="gone"
+                    android:contentDescription="@string/mine_change_avatar" />
+            </FrameLayout>
 
             <LinearLayout
                 android:orientation="vertical"

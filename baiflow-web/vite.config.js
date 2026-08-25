@@ -11,6 +11,11 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true
+      },
+      // 头像静态资源：开发环境由后端 AvatarWebConfig 映射服务
+      '/avatars': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
       }
     }
   }

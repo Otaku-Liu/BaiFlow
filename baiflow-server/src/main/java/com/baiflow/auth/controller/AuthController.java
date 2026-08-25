@@ -125,6 +125,14 @@ public class AuthController {
     }
 
     /**
+     * 删除当前用户的头像（清除 URL + 删除文件），回到首字占位。
+     */
+    @DeleteMapping("/avatar")
+    public ApiResponse<UserInfo> deleteAvatar(Authentication authentication) {
+        return ApiResponse.success(authService.deleteAvatar(authentication.getPrincipal().toString()));
+    }
+
+    /**
      * 修改当前用户的密码，需提供旧密码验证身份。
      */
     @PostMapping("/change-password")

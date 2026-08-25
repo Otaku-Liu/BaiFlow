@@ -399,7 +399,7 @@ public class FilesFragment extends Fragment {
         // 程序化加载只显示顶部进度条；SwipeRefresh 转圈仅由用户下拉触发，避免加载时出现遮罩
         // （下拉刷新时 SwipeRefreshLayout 已自行置 refreshing，响应回调里 setRefreshing(false) 会停掉）
 
-        String token = privacyTokens.get(currentParentId);
+        String token = effectivePrivacyToken();
 
         client.listFiles(currentRootId, currentParentId, 1, 100, currentViewUserId, token)
                 .enqueue(new UiCallback<ApiResponse<PagedResult<FileItem>>>(requireContext()) {
@@ -455,26 +455,66 @@ public class FilesFragment extends Fragment {
         int code = resp.getCode();
         if (code == 40105 || code == 40106) {
             showPrivacyPasswordDialog();
+        } else if (code == 40107) {
+            // 隐私空间尚未设置密码：首次访问设置密码
+            showPrivacySetupDialog();
         } else {
             Toast.makeText(requireContext(), resp.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
-    // ---- 隐私密码对话框 ----
+    // ---- 隐私空间首次设置密码对话框 ----
+    private void showPrivacySetupDialog() {
+        showPrivacyInputDialog(R.string.files_privacy_setup_title, R.string.files_privacy_setup_message,
+                R.string.files_privacy_setup_hint, R.string.files_privacy_setup, 4, this::setupPrivacyAndRetry);
+    }
+
+    private void setupPrivacyAndRetry(String password) {
+        String folderId = currentParentId;
+        if (folderId == null) { return; }
+
+        client.setPrivacy(folderId, password).enqueue(new UiCallback<ApiResponse<FileItem>>(requireContext()) {
+            @Override
+            protected void onUiResponse(Call<ApiResponse<FileItem>> call, Response<ApiResponse<FileItem>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
+                    // 设密后立即用同一密码验证换取令牌，直接进入
+                    verifyPrivacyAndRetry(password);
+                } else if (response.code() < 500) {
+                    String msg = response.body() != null ? response.body().getMessage()
+                            : getString(R.string.files_privacy_setup_failed);
+                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            protected void onUiFailure(Call<ApiResponse<FileItem>> call, Throwable t) {
+                // 网络失败已由 UiCallback 统一提示
+            }
+        });
+    }
+
+    // ---- 隐私密码对话框（验证/首次设置共用） ----
     private void showPrivacyPasswordDialog() {
+        showPrivacyInputDialog(R.string.files_privacy_verify_title, R.string.files_privacy_verify_message,
+                R.string.files_privacy_password_hint, R.string.files_privacy_verify, 1, this::verifyPrivacyAndRetry);
+    }
+
+    /** 隐私密码输入弹窗骨架：设置/验证共用，仅文案与回调不同 */
+    private void showPrivacyInputDialog(int titleRes, int msgRes, int hintRes, int buttonRes,
+                                        int minLen, java.util.function.Consumer<String> onPassword) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle(getString(R.string.files_privacy_verify_title));
-        builder.setMessage(getString(R.string.files_privacy_verify_message));
+        builder.setTitle(getString(titleRes));
+        builder.setMessage(getString(msgRes));
 
         final EditText input = new EditText(requireContext());
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        input.setHint(getString(R.string.files_privacy_password_hint));
+        input.setHint(getString(hintRes));
         builder.setView(input);
 
-        builder.setPositiveButton(getString(R.string.files_privacy_verify), (dialog, which) -> {
+        builder.setPositiveButton(getString(buttonRes), (dialog, which) -> {
             String password = input.getText().toString().trim();
-            if (!password.isEmpty()) { verifyPrivacyAndRetry(password); }
+            if (password.length() >= minLen) { onPassword.accept(password); }
         });
         builder.setNegativeButton(getString(R.string.files_back_up), (dialog, which) -> navigateUp());
         builder.setCancelable(false);
@@ -508,6 +548,19 @@ public class FilesFragment extends Fragment {
                 // 网络失败已由 UiCallback 统一提示
             }
         });
+    }
+
+    /** 沿 folderStack 从当前目录向上取最近隐私文件夹的有效令牌（支持隐私空间内子目录操作） */
+    private String effectivePrivacyToken() {
+        java.util.Iterator<FileItem> it = folderStack.descendingIterator();
+        while (it.hasNext()) {
+            FileItem f = it.next();
+            if (f.isPrivate()) {
+                String t = privacyTokens.get(f.getId());
+                if (t != null) { return t; }
+            }
+        }
+        return null;
     }
 
     // ---- 导航 ----
@@ -585,11 +638,15 @@ public class FilesFragment extends Fragment {
 
             holder.itemView.setOnClickListener(v -> {
                 if (item.isDirectory()) {
+                    // 每次进入隐私空间都要验证密码：清掉缓存令牌，让后端返回 40105/40107 触发弹窗
+                    if (item.isPrivate()) {
+                        privacyTokens.remove(item.getId());
+                    }
                     navigateTo(item);
                 } else if (PreviewActivity.canPreview(item.getMimeType())) {
                     // 可预览类型：打开预览页
                     startActivity(PreviewActivity.newIntent(requireContext(), item.getId(), item.getName(),
-                            item.getMimeType(), privacyTokens.get(currentParentId),
+                            item.getMimeType(), effectivePrivacyToken(),
                             item.getSizeBytes() != null ? item.getSizeBytes() : 0L));
                 } else {
                     // 不支持预览：提示 + 手动确认下载，不自动下载
@@ -725,7 +782,7 @@ public class FilesFragment extends Fragment {
     }
 
     private void rename(FileItem item, String newName) {
-        String token = privacyTokens.get(currentParentId);
+        String token = effectivePrivacyToken();
         client.renameFile(item.getId(), newName, token)
                 .enqueue(new UiCallback<ApiResponse<FileItem>>(requireContext()) {
                     @Override
@@ -753,7 +810,7 @@ public class FilesFragment extends Fragment {
                 .setTitle(getString(R.string.common_confirm_delete))
                 .setMessage(getString(R.string.common_delete_message, item.getName()))
                 .setPositiveButton(getString(R.string.common_delete), (dialog, which) -> {
-                    String token = privacyTokens.get(currentParentId);
+                    String token = effectivePrivacyToken();
                     client.deleteFile(item.getId(), token).enqueue(new UiCallback<ApiResponse<Map<String, Object>>>(requireContext()) {
                         @Override
                         protected void onUiResponse(Call<ApiResponse<Map<String, Object>>> call,

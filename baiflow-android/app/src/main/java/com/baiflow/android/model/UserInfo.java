@@ -12,11 +12,14 @@ public class UserInfo {
     private String username;
     @SerializedName("displayName")
     private String displayName;
+    @SerializedName("avatarUrl")
+    private String avatarUrl;
     @SerializedName("role")
     private String role;
 
     public String getId() { return id; }
     public String getUsername() { return username; }
     public String getDisplayName() { return displayName; }
+    public String getAvatarUrl() { return avatarUrl; }
     public String getRole() { return role; }
 }

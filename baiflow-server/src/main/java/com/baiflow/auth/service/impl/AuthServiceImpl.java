@@ -294,7 +294,11 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
-        user.setDisplayName(displayName != null ? displayName : "");
+        // 展示名不允许为空
+        if (displayName == null || displayName.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "展示名不能为空");
+        }
+        user.setDisplayName(displayName.trim());
         userMapper.updateById(user);
         return UserInfo.from(user);
     }
@@ -326,13 +330,12 @@ public class AuthServiceImpl implements AuthService {
                     i18nUtil.translate("不支持的文件格式，仅允许：") + String.join(", ", ALLOWED_AVATAR_EXTENSIONS));
         }
 
-        // 保存文件到 avatar 目录
+        // 保存文件到 avatar 目录（文件名带时间戳版本，URL 每次上传唯一，避免浏览器缓存旧头像）
         String avatarDir = baiflowProperties.getStorage().getAvatarPath();
-        String avatarFileName = userId + "." + ext;
-        Path avatarPath = Path.of(avatarDir, avatarFileName).normalize();
-
-        // 防止路径穿越
-        if (!avatarPath.startsWith(Path.of(avatarDir).normalize())) {
+        String oldAvatarUrl = user.getAvatarUrl();
+        String avatarFileName = userId + "." + System.currentTimeMillis() + "." + ext;
+        Path avatarPath = resolveAvatarWithin(avatarDir, avatarFileName);
+        if (avatarPath == null) {
             throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "非法的头像路径");
         }
 
@@ -350,7 +353,78 @@ public class AuthServiceImpl implements AuthService {
         userMapper.updateById(user);
 
         log.info("头像已更新: userId={}, url={}", userId, avatarUrl);
+
+        // 清理旧头像文件（文件名带版本，不覆盖，需删除旧文件避免磁盘残留）
+        deleteOldAvatar(oldAvatarUrl, avatarDir, avatarFileName);
+
         return UserInfo.from(user);
+    }
+
+    @Override
+    public UserInfo deleteAvatar(String userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+        String avatarDir = baiflowProperties.getStorage().getAvatarPath();
+        Path avatarPath = resolveAvatarPath(user.getAvatarUrl(), avatarDir);
+        if (avatarPath != null) {
+            try {
+                Files.deleteIfExists(avatarPath);
+                log.info("头像已删除: path={}", avatarPath);
+            } catch (IOException e) {
+                log.warn("头像删除失败: path={}", avatarPath, e);
+            }
+        }
+        // avatar_url 列 NOT NULL（DEFAULT ''），"无头像"约定为空字符串
+        user.setAvatarUrl("");
+        // updateById 默认跳过空值字段，需用 LambdaUpdateWrapper 显式写回空字符串
+        userMapper.update(null, new LambdaUpdateWrapper<User>()
+                .eq(User::getId, userId)
+                .set(User::getAvatarUrl, ""));
+        log.info("头像已清除: userId={}", userId);
+        return UserInfo.from(user);
+    }
+
+    /** 删除指定 URL 对应的旧头像文件；无旧头像/URL 非法/与新文件同名时跳过。 */
+    private void deleteOldAvatar(String oldAvatarUrl, String avatarDir, String newFileName) {
+        Path oldPath = resolveAvatarPath(oldAvatarUrl, avatarDir);
+        if (oldPath == null || oldPath.getFileName().toString().equals(newFileName)) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(oldPath);
+            log.info("旧头像已删除: path={}", oldPath);
+        } catch (IOException e) {
+            log.warn("旧头像删除失败: path={}", oldPath, e);
+        }
+    }
+
+    /** 解析头像 URL 对应的文件路径（归一化 + 目录穿越校验）；非 /avatars/ 前缀或非法返回 null */
+    private Path resolveAvatarPath(String avatarUrl, String avatarDir) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            return null;
+        }
+        String prefix = "/avatars/";
+        if (!avatarUrl.startsWith(prefix)) {
+            return null;
+        }
+        String fileName = avatarUrl.substring(prefix.length());
+        int queryIdx = fileName.indexOf('?');
+        if (queryIdx >= 0) {
+            fileName = fileName.substring(0, queryIdx);
+        }
+        if (fileName.isEmpty()) {
+            return null;
+        }
+        return resolveAvatarWithin(avatarDir, fileName);
+    }
+
+    /** 归一化并校验文件名位于 avatar 目录内，返回安全路径；穿越则返回 null（uploadAvatar 与 deleteAvatar 共用） */
+    private Path resolveAvatarWithin(String avatarDir, String fileName) {
+        Path dir = Path.of(avatarDir).normalize();
+        Path path = Path.of(avatarDir, fileName).normalize();
+        return path.startsWith(dir) ? path : null;
     }
 
     @Override

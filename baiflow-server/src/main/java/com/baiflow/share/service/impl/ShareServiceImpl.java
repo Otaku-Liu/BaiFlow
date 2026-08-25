@@ -6,6 +6,8 @@ import com.baiflow.downloadrecord.enums.DownloadSource;
 import com.baiflow.downloadrecord.service.DownloadRecordService;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.file.entity.FileItem;
+import com.baiflow.file.enums.ItemType;
+import com.baiflow.file.enums.PrivacyMode;
 import com.baiflow.file.service.FileService;
 import com.baiflow.share.dto.request.CreateShareRequest;
 import com.baiflow.share.dto.request.UpdateShareRequest;
@@ -85,6 +87,16 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         FileItem target = fileService.getById(req.targetFileItemId());
         if (target == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "文件/文件夹不存在"); }
 
+        // 隐私文件夹（或其内部内容）不可分享：沿父链检查（前端选择器已禁用，这里服务端兜底拦截）
+        FileItem cur = target;
+        while (cur != null) {
+            if (cur.getPrivacyMode() == PrivacyMode.PRIVATE) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "隐私文件夹不可分享");
+            }
+            String pid = cur.getParentId();
+            cur = (pid == null || pid.isBlank()) ? null : fileService.getById(pid);
+        }
+
         // 生成不可预测 token，只存 hash
         byte[] tokenBytes = new byte[32]; new SecureRandom().nextBytes(tokenBytes);
         String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
@@ -95,7 +107,8 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         sl.setOwnerUsername(user.getUsername());
         sl.setOwnerDisplayName(user.getDisplayName());
         sl.setTokenHash(passwordEncoder.encode(rawToken));
-        sl.setShareType(ShareType.valueOf(req.shareType()));
+        // 分享类型按目标自动推导（文件夹→FOLDER，文件→FILE），无需前端指定
+        sl.setShareType(target.getItemType() == ItemType.DIRECTORY ? ShareType.FOLDER : ShareType.FILE);
         sl.setAccessMode(AccessMode.valueOf(req.accessMode()));
         sl.setExpiresAt(req.expiresAt() != null && !req.expiresAt().isBlank()
                 ? LocalDateTime.parse(req.expiresAt()) : null);

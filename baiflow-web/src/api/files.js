@@ -77,14 +77,9 @@ export function deleteFile(id, privacyToken) {
   return http.delete(`/files/${id}`, { headers })
 }
 
-/** 设置隐私密码 */
+/** 设置隐私密码（隐私空间首访设密；已设置则拒绝） */
 export function setPrivacy(id, password) {
   return http.post(`/files/${id}/privacy`, { password })
-}
-
-/** 取消隐私保护 */
-export function removePrivacy(id) {
-  return http.delete(`/files/${id}/privacy`)
 }
 
 /** 验证隐私密码，返回 accessToken */

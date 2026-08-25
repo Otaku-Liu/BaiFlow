@@ -32,9 +32,15 @@ export const useFileStore = defineStore('file', {
         : null
     },
 
-    /** 当前路径所需的隐私访问令牌 */
+    /** 当前路径所需的隐私访问令牌：沿面包屑从后往前取最近隐私文件夹的令牌（支持隐私空间内子目录） */
     currentPrivacyToken(state) {
-      return state.currentFolderId ? state.privacyTokens[state.currentFolderId] : null
+      for (let i = state.breadcrumb.length - 1; i >= 0; i--) {
+        const crumb = state.breadcrumb[i]
+        if (crumb.privacyMode === 'PRIVATE' && state.privacyTokens[crumb.id]) {
+          return state.privacyTokens[crumb.id]
+        }
+      }
+      return null
     }
   },
 

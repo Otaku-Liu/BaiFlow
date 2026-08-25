@@ -28,6 +28,7 @@ import com.baiflow.storage.enums.StorageRootStatus;
 import com.baiflow.storage.service.StorageService;
 import com.baiflow.storage.service.UserStoragePermissionService;
 import com.baiflow.user.entity.User;
+import com.baiflow.user.enums.UserRole;
 import com.baiflow.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -52,6 +53,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -287,6 +289,7 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
                                String privacyAccessToken) {
         FileItem f = checkActive(id);
         checkOwnership(f, userId, isAdmin);
+        assertMutable(f, "重命名");
         // NAS 离线时禁止写入
         requireStorageAvailable(storageService.getByIdOrThrow(f.getStorageRootId()));
 
@@ -354,6 +357,7 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
     public void delete(String id, String userId, boolean isAdmin, String privacyAccessToken) {
         FileItem f = checkActive(id);
         checkOwnership(f, userId, isAdmin);
+        assertMutable(f, "删除");
         // NAS 离线时禁止写入
         requireStorageAvailable(storageService.getByIdOrThrow(f.getStorageRootId()));
 
@@ -402,13 +406,20 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
     @Transactional
     public FileItemInfo setPrivacy(String id, SetPrivacyRequest req, String userId) {
         FileItem f = checkActive(id);
-        // 仅目录可设置为隐私模式
-        if (f.getItemType() != ItemType.DIRECTORY) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "仅文件夹可设置为隐私模式");
+        assertMutable(f, "设置隐私");
+        // 新模型：仅隐私空间可设置密码（首访设密），任意文件夹不可再设为隐私
+        if (f.getPrivacyMode() != PrivacyMode.PRIVATE) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "仅隐私空间可设置密码");
+        }
+        // 已设置过密码则禁止重置（暂不提供重置功能）
+        if (f.getPrivacyPasswordHash() != null && !f.getPrivacyPasswordHash().isEmpty()) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "隐私空间已设置密码，暂不支持重置");
+        }
+        if (req.password() == null || req.password().isBlank()) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "隐私密码不能为空");
         }
 
-        // BCrypt 哈希后存储密码
-        f.setPrivacyMode(PrivacyMode.PRIVATE);
+        // BCrypt 哈希后存储密码（隐私空间保持 PRIVATE）
         f.setPrivacyPasswordHash(passwordEncoder.encode(req.password()));
         updateById(f);
 
@@ -551,6 +562,17 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
                 break;
             }
             if (cursor.getPrivacyMode() == PrivacyMode.PRIVATE) {
+                // 管理员访问隐私空间/隐私文件夹免密码
+                User caller = userMapper.selectById(userId);
+                if (caller != null && caller.getRole() == UserRole.ADMIN) {
+                    return;
+                }
+                // 隐私空间尚未设置密码：要求先设置（首访流程）
+                String hash = cursor.getPrivacyPasswordHash();
+                if (hash == null || hash.isEmpty()) {
+                    throw new BusinessException(ErrorCode.PRIVATE_SETUP_REQUIRED,
+                            "隐私空间尚未设置密码，请先设置隐私密码");
+                }
                 // 发现隐私文件夹——要求提供有效访问令牌
                 requireValidAccessToken(cursor.getId(), userId, accessToken);
                 return; // 找到第一个隐私文件夹即返回（不需要继续向上）
@@ -712,38 +734,102 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
      * @param username 用户名（用作主目录名称）
      * @return 主目录的 FileItem ID
      */
+    /** 隐私空间固定文件夹名（主目录直接子目录，用户不可在其路径下新建同名文件夹） */
+    private static final String PRIVACY_SPACE_NAME = "隐私空间";
+
     private String getOrCreateHomeFolder(String rootId, String userId, String username) {
         String relativePath = username;
-        FileItem existing = findByPath(rootId, relativePath);
-        if (existing != null && existing.getStatus() == FileItemStatus.ACTIVE) {
-            return existing.getId();
+        FileItem home = findByPath(rootId, relativePath);
+        if (home == null || home.getStatus() != FileItemStatus.ACTIVE) {
+            StorageRoot root = storageService.getByIdOrThrow(rootId);
+            Path homePath = storageService.resolveRootPath(root).resolve(relativePath).normalize();
+            storageService.verifyPathInRoot(root, homePath);
+
+            try {
+                Files.createDirectories(homePath);
+            } catch (IOException e) {
+                throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
+                        i18nUtil.translate("无法创建用户主目录：") + e.getMessage());
+            }
+
+            home = new FileItem();
+            home.setStorageRootId(rootId);
+            home.setParentId(null);
+            home.setOwnerUserId(userId);
+            home.setName(username);
+            home.setRelativePath(relativePath);
+            home.setItemType(ItemType.DIRECTORY);
+            home.setSizeBytes(0L);
+            home.setPrivacyMode(PrivacyMode.NORMAL);
+            home.setStatus(FileItemStatus.ACTIVE);
+            save(home);
+
+            log.info("已为用户 {} 创建主目录: {} (root={})", username, relativePath, rootId);
+        }
+
+        // 同时确保该用户存在「隐私空间」（PRIVATE、密码未设置，首访时设置）
+        ensurePrivacySpace(rootId, home, userId);
+        return home.getId();
+    }
+
+    /** 确保用户主目录下有「隐私空间」子目录；已存在则跳过 */
+    private void ensurePrivacySpace(String rootId, FileItem home, String userId) {
+        String homeId = home.getId();
+        FileItem space = getOne(new LambdaQueryWrapper<FileItem>()
+                .eq(FileItem::getStorageRootId, rootId)
+                .eq(FileItem::getParentId, homeId)
+                .eq(FileItem::getName, PRIVACY_SPACE_NAME)
+                .eq(FileItem::getStatus, FileItemStatus.ACTIVE)
+                .last("LIMIT 1"));
+        if (space != null) {
+            return;
         }
 
         StorageRoot root = storageService.getByIdOrThrow(rootId);
-        Path homePath = storageService.resolveRootPath(root).resolve(relativePath).normalize();
-        storageService.verifyPathInRoot(root, homePath);
-
+        String rel = home.getRelativePath() + "/" + PRIVACY_SPACE_NAME;
+        Path spacePath = storageService.resolveRootPath(root).resolve(rel).normalize();
+        storageService.verifyPathInRoot(root, spacePath);
         try {
-            Files.createDirectories(homePath);
+            Files.createDirectories(spacePath);
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
-                    i18nUtil.translate("无法创建用户主目录：") + e.getMessage());
+                    i18nUtil.translate("无法创建隐私空间：") + e.getMessage());
         }
 
-        FileItem home = new FileItem();
-        home.setStorageRootId(rootId);
-        home.setParentId(null);
-        home.setOwnerUserId(userId);
-        home.setName(username);
-        home.setRelativePath(relativePath);
-        home.setItemType(ItemType.DIRECTORY);
-        home.setSizeBytes(0L);
-        home.setPrivacyMode(PrivacyMode.NORMAL);
-        home.setStatus(FileItemStatus.ACTIVE);
-        save(home);
+        FileItem spaceItem = new FileItem();
+        spaceItem.setStorageRootId(rootId);
+        spaceItem.setParentId(homeId);
+        spaceItem.setOwnerUserId(userId);
+        spaceItem.setName(PRIVACY_SPACE_NAME);
+        spaceItem.setRelativePath(rel);
+        spaceItem.setItemType(ItemType.DIRECTORY);
+        spaceItem.setSizeBytes(0L);
+        // 隐私空间恒为 PRIVATE，密码未设置（空哈希），首访时通过 setPrivacy 设置
+        spaceItem.setPrivacyMode(PrivacyMode.PRIVATE);
+        spaceItem.setPrivacyPasswordHash("");
+        spaceItem.setStatus(FileItemStatus.ACTIVE);
+        save(spaceItem);
 
-        log.info("已为用户 {} 创建主目录: {} (root={})", username, relativePath, rootId);
-        return home.getId();
+        log.info("已为用户 {} 创建隐私空间: {}", userId, rel);
+    }
+
+    /** 判断是否为隐私空间：名称为固定名，且父目录为根级目录（用户主目录） */
+    private boolean isPrivacySpace(FileItem f) {
+        if (f.getParentId() == null || !PRIVACY_SPACE_NAME.equals(f.getName())) {
+            return false;
+        }
+        FileItem parent = getById(f.getParentId());
+        return parent != null && parent.getParentId() == null;
+    }
+
+    /** 根级主目录与隐私空间不可重命名/删除/设隐私，管理员也不例外；action 用于错误文案 */
+    private void assertMutable(FileItem f, String action) {
+        if (f.getParentId() == null) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "主目录不可" + action);
+        }
+        if (isPrivacySpace(f)) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "隐私空间不可" + action);
+        }
     }
 
     // ---- 预览与进度 ----

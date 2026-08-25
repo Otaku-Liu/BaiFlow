@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -17,12 +18,21 @@ import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.data.AppDatabase;
 import com.baiflow.android.data.SyncService;
+import com.baiflow.android.model.ApiResponse;
+import com.baiflow.android.model.UserInfo;
+import com.baiflow.android.network.ApiClient;
+import com.baiflow.android.network.UiCallback;
 import com.baiflow.android.sync.SyncWorker;
 import com.baiflow.android.ui.activity.LanguageActivity;
 import com.baiflow.android.ui.activity.LoginActivity;
 import com.baiflow.android.ui.activity.PasswordActivity;
 import com.baiflow.android.ui.activity.ProfileActivity;
 import com.baiflow.android.ui.activity.ServerConfigActivity;
+import com.baiflow.android.util.AvatarLoader;
+import com.baiflow.android.util.FormatUtil;
+
+import retrofit2.Call;
+import retrofit2.Response;
 
 /**
  * 我的页 — 用户信息、修改资料、修改密码、语言设置、传输任务、服务器配置、退出登录。
@@ -31,6 +41,9 @@ public class MineFragment extends Fragment {
 
     private SessionManager session;
     private TextView tvAvatar, tvDisplayName;
+    private ImageView ivAvatar;
+    /** 上次已加载的头像 URL，避免 onResume 重复下载同一张 */
+    private String lastAvatarUrl;
 
     @Nullable
     @Override
@@ -46,6 +59,7 @@ public class MineFragment extends Fragment {
 
         tvAvatar = view.findViewById(R.id.tvAvatar);
         tvDisplayName = view.findViewById(R.id.tvDisplayName);
+        ivAvatar = view.findViewById(R.id.ivAvatar);
         TextView tvUsername = view.findViewById(R.id.tvUsername);
         TextView tvRole = view.findViewById(R.id.tvRole);
         refreshUserCard();
@@ -71,6 +85,42 @@ public class MineFragment extends Fragment {
         view.findViewById(R.id.btnLogout).setOnClickListener(v -> confirmLogout());
 
         updateModeRows(view);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // 从修改资料页返回（可能改了展示名/头像）后刷新
+        refreshUserCard();
+        // 头像/展示名可能在其他端（Web）改过：仅登录时缓存的本地态是旧的，进本页时从服务端拉最新
+        refreshUserFromServer();
+    }
+
+    /** 在线模式下从服务端拉取当前用户信息并刷新本地缓存（头像/展示名可能在其他端修改） */
+    private void refreshUserFromServer() {
+        if (!session.isOnlineMode()) {
+            return;
+        }
+        ApiClient.getInstance(session).getCurrentUser().enqueue(new UiCallback<ApiResponse<UserInfo>>(requireContext()) {
+            @Override
+            protected void onUiResponse(Call<ApiResponse<UserInfo>> call, Response<ApiResponse<UserInfo>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
+                    UserInfo user = response.body().getData();
+                    if (user != null) {
+                        session.saveUser(user.getId(), user.getUsername(), user.getDisplayName(),
+                                user.getAvatarUrl(), user.getRole());
+                        if (getActivity() != null) {
+                            refreshUserCard();
+                        }
+                    }
+                }
+            }
+
+            @Override
+            protected void onUiFailure(Call<ApiResponse<UserInfo>> call, Throwable t) {
+                // 刷新失败静默：保留本地缓存即可
+            }
+        });
     }
 
     /** 刷新模式指示与离线/同步/重连行的可见性 */
@@ -134,12 +184,34 @@ public class MineFragment extends Fragment {
         }).start();
     }
 
-    /** 刷新用户卡（展示名 + 头像首字） */
+    /** 刷新用户卡（展示名 + 头像：有 URL 加载图片，否则展示首字占位） */
     private void refreshUserCard() {
         String displayName = session.getDisplayName();
-        tvAvatar.setText(displayName != null && !displayName.isEmpty()
-                ? displayName.substring(0, displayName.offsetByCodePoints(0, 1)) : "?");
+        tvAvatar.setText(FormatUtil.firstCharOrQuestion(displayName));
         tvDisplayName.setText(displayName != null && !displayName.isEmpty() ? displayName : getString(R.string.mine_not_logged_in));
+        loadAvatar();
+    }
+
+    /** 后台加载头像；加载成功显示图片并隐藏首字占位，无头像/加载失败回退首字占位 */
+    private void loadAvatar() {
+        String fullUrl = AvatarLoader.resolveUrl(session.getServerUrl(), session.getAvatarUrl());
+        if (fullUrl == null || fullUrl.equals(lastAvatarUrl)) {
+            if (fullUrl == null) {
+                ivAvatar.setVisibility(View.GONE);
+                tvAvatar.setVisibility(View.VISIBLE);
+            }
+            return;
+        }
+        lastAvatarUrl = fullUrl;
+        AvatarLoader.loadInto(ivAvatar, fullUrl,
+                () -> {
+                    ivAvatar.setVisibility(View.VISIBLE);
+                    tvAvatar.setVisibility(View.GONE);
+                },
+                () -> {
+                    ivAvatar.setVisibility(View.GONE);
+                    tvAvatar.setVisibility(View.VISIBLE);
+                });
     }
 
     /** 退出登录：二次确认（清 token + 清该服务器本地缓存，保留服务器地址停在登录页） */

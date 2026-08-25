@@ -20,6 +20,7 @@ public class SessionManager {
     private static final String KEY_USER_ID = "user_id";
     private static final String KEY_USERNAME = "username";
     private static final String KEY_DISPLAY_NAME = "display_name";
+    private static final String KEY_AVATAR_URL = "avatar_url";
     private static final String KEY_ROLE = "role";
 
     private static SessionManager instance;
@@ -54,11 +55,12 @@ public class SessionManager {
     }
 
     // ---- User ----
-    public void saveUser(String id, String username, String displayName, String role) {
+    public void saveUser(String id, String username, String displayName, String avatarUrl, String role) {
         prefs.edit()
                 .putString(KEY_USER_ID, id)
                 .putString(KEY_USERNAME, username)
                 .putString(KEY_DISPLAY_NAME, displayName)
+                .putString(KEY_AVATAR_URL, avatarUrl)
                 .putString(KEY_ROLE, role)
                 .apply();
     }
@@ -70,6 +72,12 @@ public class SessionManager {
     }
     public String getUsername() { return prefs.getString(KEY_USERNAME, null); }
     public String getDisplayName() { return prefs.getString(KEY_DISPLAY_NAME, null); }
+
+    /** 单独更新头像 URL（更换头像后本地同步） */
+    public void saveAvatarUrl(String avatarUrl) {
+        prefs.edit().putString(KEY_AVATAR_URL, avatarUrl).apply();
+    }
+    public String getAvatarUrl() { return prefs.getString(KEY_AVATAR_URL, null); }
     public String getRole() { return prefs.getString(KEY_ROLE, null); }
 
     // ---- 离线模式（三态）----
@@ -97,6 +105,7 @@ public class SessionManager {
                 .remove(KEY_USER_ID)
                 .remove(KEY_USERNAME)
                 .remove(KEY_DISPLAY_NAME)
+                .remove(KEY_AVATAR_URL)
                 .remove(KEY_ROLE)
                 .putBoolean(KEY_OFFLINE, true)
                 .apply();
@@ -157,6 +166,7 @@ public class SessionManager {
                 .remove(KEY_USER_ID)
                 .remove(KEY_USERNAME)
                 .remove(KEY_DISPLAY_NAME)
+                .remove(KEY_AVATAR_URL)
                 .remove(KEY_ROLE)
                 .remove(KEY_LAST_SYNC_AT)
                 .putBoolean(KEY_OFFLINE, false)

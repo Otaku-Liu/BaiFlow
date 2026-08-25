@@ -30,8 +30,9 @@
 | 40102 | 用户名或密码错误 |
 | 40103 | 需要提取码 |
 | 40104 | 提取码错误 |
-| 40105 | 需要隐私文件夹密码 |
-| 40106 | 隐私文件夹密码错误 |
+| 40105 | 需要隐私空间/隐私文件夹密码 |
+| 40106 | 隐私空间/隐私文件夹密码错误 |
+| 40107 | 隐私空间尚未设置密码，需先设置 |
 | 40301 | 无权限 |
 | 40401 | 资源不存在 |
 | 40402 | 分享链接无效 |
@@ -55,8 +56,9 @@
   - 登录失败锁定：15 分钟内连续失败 5 次返回 `42301`，用户状态持久化为 `LOCKED`；锁键到期后由定时任务（每 60s）或登录兜底判定自动恢复为 `NORMAL`
 - `POST /api/auth/logout` — 吊销当前请求 token 对应的会话（立即生效）
 - `GET /api/auth/me`
-- `PATCH /api/auth/profile`
-- `POST /api/auth/avatar`（multipart, ≤1MB, jpg/png/gif/webp）
+- `PATCH /api/auth/profile` — 更新展示名，**不允许为空**（空值返回 `40001` 展示名不能为空）
+- `POST /api/auth/avatar`（multipart, ≤1MB, jpg/png/gif/webp）— 头像文件名带时间戳版本，返回 URL 每次上传唯一（避免浏览器缓存旧图）；服务端会删除旧头像文件；`/avatars/**` 为公开静态资源（生产 nginx alias，开发经后端静态映射）
+- `DELETE /api/auth/avatar` — 删除当前用户头像（删除文件 + 清空 avatarUrl），回到首字占位
 - `POST /api/auth/change-password` — 改密后吊销该用户全部会话（所有设备下线）
 - `GET /api/auth/sessions` — 当前用户的登录会话列表 `{ id, deviceName, deviceType, ip, lastUsedAt, createdAt, current }`
 - `GET /api/auth/devices` — 当前用户的登录设备列表（**含历史与在线状态**；强制下线（撤销全部会话）后变为离线）`{ deviceName, deviceType, firstLoginAt, lastLoginAt, lastActiveAt, online, current, activeSessionId }`
@@ -89,10 +91,12 @@
 
 **`viewUserId` 参数**：管理员传入此参数可切换查看指定用户的文件视图。非管理员或未传入时，文件列表自动限定在当前用户的主目录（以用户名命名的文件夹）内。普通用户无法访问主目录上层，确保文件隔离。
 
-隐私文件夹访问需传 `X-Privacy-Access-Token` 头，令牌有效期 30 分钟。
+**隐私空间（新模型）**：每个用户主目录下自动创建「隐私空间」子目录（`PRIVATE`、初始无密码）。首访时 `40107` 要求先设置密码（`POST privacy`）；已设置后每次进入需 `40105` 验证密码换取 `X-Privacy-Access-Token`（30 分钟）；**管理员访问免隐私密码**。主目录（根级文件夹）与「隐私空间」**均不可重命名、不可删除**（管理员也不可），主目录不可设隐私。任意文件夹不再提供「设为隐私」，仅隐私空间一个隐私入口；旧隐私文件夹保留兼容。已设密码的隐私空间 `POST privacy` 返回拒绝（暂不支持重置）。
 
 ### 分享
 - `POST/GET /api/shares` · `GET/PATCH/DELETE /api/shares/{id}`（PATCH 的 `status` 支持 `ACTIVE` / `DISABLED`，创建者可停用/启用）
+  - **分享类型自动推导**：`POST /api/shares` 的 `shareType` 已可选，服务端按目标的 `itemType` 自动推导（目录→FOLDER，文件→FILE），前端无需选择
+  - **隐私文件夹不可分享**：目标自身或其**任一父链**为 `PRIVATE` 时返回 `40301 隐私文件夹不可分享`（前端选择器已禁用隐私项）
 - `GET /api/shares/{id}/analytics`（管理员）
 - 分享提取码连续错误 5 次锁定 15 分钟（Redis）
 

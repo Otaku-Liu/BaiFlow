@@ -24,6 +24,8 @@
             </template>
           </el-dropdown>
           <span class="user-info" @click="profileDialogVisible = true">
+            <el-avatar v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" :size="28" class="header-avatar avatar-img" />
+            <el-avatar v-else :size="28" class="header-avatar avatar-fallback">{{ (authStore.user?.displayName || authStore.user?.username || '?')[0] }}</el-avatar>
             {{ authStore.user?.displayName || authStore.user?.username }}
           </span>
           <el-button type="danger" text @click="handleLogout">{{ t('common.logout') }}</el-button>
@@ -92,16 +94,24 @@
         </el-form-item>
         <el-form-item label="头像">
           <div class="avatar-section">
-            <el-avatar v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" :size="64" />
-            <el-avatar v-else :size="64">{{ (authStore.user?.displayName || authStore.user?.username || '?')[0] }}</el-avatar>
-            <el-upload
-              :show-file-list="false"
-              :before-upload="handleAvatarUpload"
-              accept=".jpg,.jpeg,.png,.gif,.webp"
-              style="margin-left:12px"
-            >
-              <el-button size="small">更换头像</el-button>
-            </el-upload>
+            <el-avatar v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" :size="80" class="avatar-img" />
+            <el-avatar v-else :size="80" class="avatar-fallback avatar-fallback-lg">{{ (authStore.user?.displayName || authStore.user?.username || '?')[0] }}</el-avatar>
+            <div class="avatar-actions">
+              <el-upload
+                :show-file-list="false"
+                :before-upload="handleAvatarUpload"
+                accept=".jpg,.jpeg,.png,.gif,.webp"
+              >
+                <el-button size="small">更换头像</el-button>
+              </el-upload>
+              <el-button
+                v-if="authStore.user?.avatarUrl"
+                size="small"
+                type="danger"
+                text
+                @click="handleDeleteAvatar"
+              >删除头像</el-button>
+            </div>
           </div>
         </el-form-item>
       </el-form>
@@ -169,7 +179,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { FolderOpened, Share, User, Fold, Expand, Document, ArrowDown, Memo } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
-import { updateProfile, uploadAvatar, changePassword, listDevices, revokeSession, deleteDevice } from '../api/auth'
+import { updateProfile, uploadAvatar, deleteAvatar, changePassword, listDevices, revokeSession, deleteDevice } from '../api/auth'
 import { formatDateTime } from '../utils/format'
 import FilesView from './FilesView.vue'
 import NotesView from './NotesView.vue'
@@ -301,12 +311,15 @@ function handleLocaleChange(lang) {
 }
 
 async function handleSaveProfile() {
+  if (!profileDisplayName.value || !profileDisplayName.value.trim()) {
+    ElMessage.warning('展示名不能为空')
+    return
+  }
   try {
-    const res = await updateProfile(profileDisplayName.value)
+    const res = await updateProfile(profileDisplayName.value.trim())
     ElMessage.success('资料已更新')
-    if (authStore.user) {
-      authStore.user.displayName = res.data?.data?.displayName || profileDisplayName.value
-    }
+    // 更新内存态并同步 localStorage，避免刷新后展示名还原
+    authStore.updateUser({ displayName: res.data?.data?.displayName || profileDisplayName.value })
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '保存失败')
   }
@@ -320,13 +333,32 @@ async function handleAvatarUpload(file) {
   try {
     const res = await uploadAvatar(file)
     ElMessage.success('头像已更新')
-    if (authStore.user) {
-      authStore.user.avatarUrl = res.data?.data?.avatarUrl || ''
-    }
+    // 更新内存态并同步 localStorage，避免刷新后头像还原
+    authStore.updateUser({ avatarUrl: res.data?.data?.avatarUrl || '' })
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '头像上传失败')
   }
   return false
+}
+
+async function handleDeleteAvatar() {
+  try {
+    await ElMessageBox.confirm('确定删除头像吗？删除后将显示默认首字头像。', '删除头像', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return // 用户取消
+  }
+  try {
+    await deleteAvatar()
+    ElMessage.success('头像已删除')
+    // 更新内存态并同步 localStorage，头像回到首字占位
+    authStore.updateUser({ avatarUrl: '' })
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '删除失败')
+  }
 }
 
 async function handleChangePassword() {
@@ -447,11 +479,35 @@ async function handleChangePassword() {
 }
 
 .user-info {
+  display: flex;
+  align-items: center;
   color: var(--el-text-color-secondary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: color 0.15s ease;
+}
+
+.header-avatar {
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+/* 带头像图片时用透明底（透明 PNG 抠图直接露出页面底色）+ 浅灰圆环边框 */
+.avatar-img {
+  --el-avatar-bg-color: transparent;
+  border: 1px solid #f2f2f7;
+}
+
+/* 无头像默认头像：浅灰底 + 白字首字，与 Android 一致（el-avatar 默认底色偏深、字号固定 14px） */
+.avatar-fallback {
+  --el-avatar-bg-color: #c0c4cc;
+  --el-avatar-text-color: #ffffff;
+  font-size: 14px;
+}
+
+.avatar-fallback-lg {
+  font-size: 32px;
 }
 
 .user-info:hover {
@@ -583,7 +639,15 @@ async function handleChangePassword() {
 .avatar-section {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
   gap: 12px;
+}
+
+.avatar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* ================================================================

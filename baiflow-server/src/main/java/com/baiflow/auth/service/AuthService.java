@@ -56,6 +56,14 @@ public interface AuthService {
     UserInfo uploadAvatar(String userId, MultipartFile file);
 
     /**
+     * 删除当前用户的头像（删除文件 + 清空 avatarUrl），回到首字占位。
+     *
+     * @param userId 当前用户 ID
+     * @return 更新后的用户信息（avatarUrl 为空）
+     */
+    UserInfo deleteAvatar(String userId);
+
+    /**
      * 修改当前用户的密码，并吊销其**全部**登录会话（所有设备强制下线，重新登录）。
      *
      * @param userId      当前用户 ID

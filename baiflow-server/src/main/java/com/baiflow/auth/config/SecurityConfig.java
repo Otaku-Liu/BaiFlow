@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        // 头像为公开静态资源（页面 <img> 直接引用，生产由 nginx alias 服务）
+                        .requestMatchers("/avatars/**").permitAll()
                         // 仅 ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/users/**").hasRole("ADMIN")

@@ -47,9 +47,9 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 ## 页面
 
 - 登录 / 服务器配置（连通性检测）→ **MainActivity**（底部三栏，`ViewPager2` 滑动 + 底部导航双向同步）
-  - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「三点」菜单（下拉：新建文件夹 / 上传文件）；长按文件/文件夹弹操作菜单（重命名 / 下载 / 删除，重命名走 `PATCH /api/files/{id}/rename`）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等）；不支持预览的文件点按弹下载确认框
+  - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「三点」菜单（下拉：新建文件夹 / 上传文件）；长按文件/文件夹弹操作菜单（重命名 / 下载 / 删除，重命名走 `PATCH /api/files/{id}/rename`）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等）；不支持预览的文件点按弹下载确认框。**隐私空间**：主目录下「隐私空间」文件夹，首次进入弹「设置密码」（`POST privacy`，40107），之后进入弹「输入密码」（`verifyPrivacy` 换令牌）；令牌仅存内存（`privacyTokens`），重进需重输；管理员访问后端直接放行
   - **随手记** `NotesFragment`：列表/搜索/删除 → `NoteEditActivity`（**所见即所得块编辑器**：RecyclerView 每块一个真实 View，文本 EditText 经 `BlockRichText` 渲染行内 markdown 的格式效果、编辑即预览，图片 ImageView，音频 `NoteAudioPlayerView`；加载 Markdown→`NoteBlocks.fromDoc`、保存 `NoteBlocks.toDoc`→Markdown，落库仍是 Markdown）→ `NoteDrawActivity`（画画）
-  - **我的** `MineFragment`：分组（账号/通用/同步）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认
+  - **我的** `MineFragment`：分组（账号/通用/同步）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认。头像展示：有 `avatarUrl` 时后台 OkHttp 拉取（`AvatarLoader`）圆形展示——头像框为**透明底 + 浅灰圆环边框**（`bg_avatar_border`，透明 PNG 抠图直接露底色）；无头像时展示**浅灰底 + 展示名首字**（`bg_avatar` 浅灰）。修改资料页（`ProfileActivity`）支持**更换/删除头像**：选图 → `ImageUtil` 缩放/EXIF 校正/压缩 ≤1MB → `POST /api/auth/avatar` 上传；删除走 `DELETE /api/auth/avatar`（二次确认），删除后回到首字占位。进入「我的」页时（`onResume`）在线模式会调 `/auth/me` 刷新本地用户信息（头像/展示名可能在其他端如 Web 修改）
 
 ## 多语言（i18n）
 
