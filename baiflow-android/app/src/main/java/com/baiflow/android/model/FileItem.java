@@ -30,6 +30,10 @@ public class FileItem implements java.io.Serializable {
     private String createdAt;
     @SerializedName("updatedAt")
     private String updatedAt;
+    @SerializedName("lastOpenedAt")
+    private String lastOpenedAt;
+    @SerializedName("childCount")
+    private Long childCount;
 
     public String getId() { return id; }
     public String getStorageRootId() { return storageRootId; }
@@ -41,6 +45,9 @@ public class FileItem implements java.io.Serializable {
     public String getPrivacyMode() { return privacyMode; }
     public String getStatus() { return status; }
     public String getCreatedAt() { return createdAt; }
+    public String getUpdatedAt() { return updatedAt; }
+    public String getLastOpenedAt() { return lastOpenedAt; }
+    public Long getChildCount() { return childCount; }
     public boolean isDirectory() { return "DIRECTORY".equals(itemType); }
     public boolean isPrivate() { return "PRIVATE".equals(privacyMode); }
 }

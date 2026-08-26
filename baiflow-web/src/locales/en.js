@@ -69,6 +69,8 @@ export default {
   },
   files: {
     title: 'Files',
+    sizeCount: 'Size/Items',
+    itemCount: '{count} items',
     viewUserSpace: 'View user space',
     currentPath: 'Path: ',
     upLevel: 'Up',
@@ -185,6 +187,7 @@ export default {
   },
   users: {
     title: 'Users',
+    avatar: 'Avatar',
     searchDisplayName: 'Search display name',
     role: 'Role',
     filterRole: 'Role',

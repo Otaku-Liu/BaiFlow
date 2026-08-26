@@ -17,7 +17,6 @@ import android.text.style.UnderlineSpan;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,10 +25,11 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
@@ -48,6 +48,7 @@ import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.sync.SyncWorker;
 import com.baiflow.android.ui.adapter.NoteBlockAdapter;
 import com.baiflow.android.util.KeyboardUtil;
+import com.baiflow.android.widget.DropdownMenu;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -60,7 +61,7 @@ import java.util.List;
  * 加载：Markdown → {@link MarkdownParser} → {@link NoteBlocks#fromDoc} → RecyclerView；
  * 保存：块 → {@link NoteBlocks#toDoc} → {@link MarkdownEmitter} → Room（离线优先，同步不变）。
  */
-public class NoteEditActivity extends AppCompatActivity {
+public class NoteEditActivity extends BaseActivity {
 
     public static final String EXTRA_LOCAL_ID = "local_id";
     public static final String EXTRA_TITLE = "note_title";
@@ -349,23 +350,17 @@ public class NoteEditActivity extends AppCompatActivity {
 
     /** 块顶部「＋」：弹出插入菜单（文本/标题/图片/音频），插到该块上方 */
     private void showInsertAboveMenu(int position, View anchor) {
-        PopupMenu menu = new PopupMenu(this, anchor, android.view.Gravity.NO_GRAVITY, 0, R.style.Ios_PopupMenu);
-        menu.getMenu().add(0, 1, 0, getString(R.string.note_block_text));
-        menu.getMenu().add(0, 2, 0, getString(R.string.note_block_heading));
-        menu.getMenu().add(0, 3, 0, getString(R.string.note_edit_image_title));
-        menu.getMenu().add(0, 4, 0, getString(R.string.note_edit_recording_title));
-        menu.setOnMenuItemClickListener(item -> {
-            switch (item.getItemId()) {
-                case 1: insertBlockAt(NoteBlocks.TEXT, 1, position); break;
-                case 2: insertBlockAt(NoteBlocks.HEADING, 1, position); break;
-                case 3: pendingInsertIdx = position; imagePicker.launch("image/*"); break;
-                case 4: pendingInsertIdx = position;
-                        recordPermission.launch(android.Manifest.permission.RECORD_AUDIO); break;
-                default: break;
-            }
-            return true;
-        });
-        menu.show();
+        java.util.List<DropdownMenu.Option> options = new java.util.ArrayList<>();
+        options.add(new DropdownMenu.Option(getString(R.string.note_block_text),
+                () -> insertBlockAt(NoteBlocks.TEXT, 1, position)));
+        options.add(new DropdownMenu.Option(getString(R.string.note_block_heading),
+                () -> insertBlockAt(NoteBlocks.HEADING, 1, position)));
+        options.add(new DropdownMenu.Option(getString(R.string.note_edit_image_title),
+                () -> { pendingInsertIdx = position; imagePicker.launch("image/*"); }));
+        options.add(new DropdownMenu.Option(getString(R.string.note_edit_recording_title),
+                () -> { pendingInsertIdx = position;
+                        recordPermission.launch(android.Manifest.permission.RECORD_AUDIO); }));
+        DropdownMenu.show(this, anchor, options);
     }
 
     /** 在指定位置插入文本类块并聚焦（「在上方插入」） */
@@ -553,7 +548,7 @@ public class NoteEditActivity extends AppCompatActivity {
 
     /** 录音对话框：MediaRecorder 录音 → 追加音频块 */
     private void startRecordingDialog() {
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.note_edit_recording_title))
                 .setNegativeButton(getString(R.string.common_cancel), null)
                 .create();
@@ -758,7 +753,7 @@ public class NoteEditActivity extends AppCompatActivity {
 
     /** 乐观并发冲突弹窗：覆盖 / 重新加载 */
     private void showConflictDialog(final boolean finishAfter) {
-        new AlertDialog.Builder(this)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.note_edit_conflict_title))
                 .setMessage(getString(R.string.note_edit_conflict_message))
                 .setPositiveButton(getString(R.string.note_edit_overwrite), (d, w) -> {

@@ -69,6 +69,8 @@ export default {
   },
   files: {
     title: '文件中心',
+    sizeCount: '大小/项数',
+    itemCount: '{count} 项',
     viewUserSpace: '查看用户空间',
     currentPath: '当前路径：',
     upLevel: '上一级',
@@ -185,6 +187,7 @@ export default {
   },
   users: {
     title: '用户管理',
+    avatar: '头像',
     searchDisplayName: '搜索展示名',
     role: '角色',
     filterRole: '角色',

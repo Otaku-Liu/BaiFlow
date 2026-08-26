@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.view.MotionEvent;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
@@ -27,9 +26,9 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
  * <p>
  * 用 {@link ViewPager2} 承载三个 Fragment，支持左右滑动切换，与底部导航双向同步。
  * 应用入口：未登录时先引导到服务器配置/登录；已登录直接进入三栏界面。
- * 注册设备网络监听：断网即时提示「无网络连接」，恢复时提示「网络已恢复」（见 docs/11-android-network-error.md）。
+ * 注册设备网络监听：断网即时提示「无网络连接」，恢复时提示「网络已恢复」（见 docs/05-android.md「失败处理」）。
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseActivity {
 
     private ViewPager2 viewPager;
     private BottomNavigationView bottomNav;

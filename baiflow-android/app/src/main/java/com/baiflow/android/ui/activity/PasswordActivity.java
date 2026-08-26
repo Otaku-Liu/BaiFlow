@@ -7,7 +7,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
@@ -26,7 +25,7 @@ import retrofit2.Response;
 /**
  * 修改密码页 — 验证旧密码后更新；服务端吊销全部会话，所有设备强制下线重新登录。
  */
-public class PasswordActivity extends AppCompatActivity {
+public class PasswordActivity extends BaseActivity {
 
     private SessionManager session;
     private ApiClient client;

@@ -10,7 +10,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
@@ -26,7 +25,7 @@ import com.baiflow.android.util.KeyboardUtil;
  * 注意：在 Android 模拟器中连接本机后端请用 {@code http://10.0.2.2:8080}
  * （10.0.2.2 指向宿主机回环；不要用 127.0.0.1，那是模拟器自身）。
  */
-public class ServerConfigActivity extends AppCompatActivity {
+public class ServerConfigActivity extends BaseActivity {
 
     private EditText etServerUrl;
     private Button btnConnect;

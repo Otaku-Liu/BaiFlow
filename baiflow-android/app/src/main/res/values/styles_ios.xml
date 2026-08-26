@@ -36,17 +36,22 @@
         <item name="android:stateListAnimator">@null</item>
     </style>
 
-    <!-- 圆角下拉菜单（新建等 PopupMenu） -->
-    <style name="Ios.PopupMenu" parent="Widget.MaterialComponents.PopupMenu">
-        <item name="android:popupBackground">@drawable/bg_popup_rounded</item>
-    </style>
-
     <!-- 文字按钮（链接式，如"上传/下载/保存"）— 与返回按钮共用一个按压样式：背景不变、按下变浅蓝 -->
     <style name="Ios.Button.Text" parent="Widget.MaterialComponents.Button.TextButton">
         <item name="android:textSize">15sp</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:textColor">@color/text_accent_selector</item>
         <item name="android:background">@android:color/transparent</item>
+    </style>
+
+    <!-- 弹窗动作行（长摁弹窗）：整行可点、48dp 高、水波纹按压；危险项（如立即删除）由布局覆盖为红色 -->
+    <style name="Ios.DialogAction">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
     </style>
 
     <!-- ==================== 输入框 ==================== -->

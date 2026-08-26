@@ -33,7 +33,7 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 ## 上传下载
 
 - 小文件 Retrofit multipart 上传；长任务前台服务（UploadService / DownloadService）带通知
-- 下载计次由后端记录（见 `docs/13-download-records.md`）
+- 下载计次由后端记录（见 `docs/02-database.md`、`docs/03-api.md`）
 - **下载落公共 Download 文件夹**：API 29+ 走 `MediaStore.Downloads`（作用域存储，无需权限，系统「下载」/文件管理器可见）；API 26-28 写 `Environment.DIRECTORY_DOWNLOADS`，下载前申请 `WRITE_EXTERNAL_STORAGE`
 - **不支持预览的文件**：点按弹「暂不支持在线预览」对话框（含「下载」按钮），**不自动下载**，手动点「下载」才下载
 - **预览渲染**：视频/音频用 Media3 ExoPlayer（视频 `PlayerView`、音频 `PlayerControlView`，正确处理旋转元数据、宽高比、控制器时长）；横屏视频按「旋转 90/270 或有效宽高为横」自动转横屏
@@ -49,15 +49,22 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 - 登录 / 服务器配置（连通性检测）→ **MainActivity**（底部三栏，`ViewPager2` 滑动 + 底部导航双向同步）
   - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「三点」菜单（下拉：新建文件夹 / 上传文件）；长按文件/文件夹弹操作菜单（重命名 / 下载 / 删除，重命名走 `PATCH /api/files/{id}/rename`）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等）；不支持预览的文件点按弹下载确认框。**隐私空间**：主目录下「隐私空间」文件夹，首次进入弹「设置密码」（`POST privacy`，40107），之后进入弹「输入密码」（`verifyPrivacy` 换令牌）；令牌仅存内存（`privacyTokens`），重进需重输；管理员访问后端直接放行
   - **随手记** `NotesFragment`：列表/搜索/删除 → `NoteEditActivity`（**所见即所得块编辑器**：RecyclerView 每块一个真实 View，文本 EditText 经 `BlockRichText` 渲染行内 markdown 的格式效果、编辑即预览，图片 ImageView，音频 `NoteAudioPlayerView`；加载 Markdown→`NoteBlocks.fromDoc`、保存 `NoteBlocks.toDoc`→Markdown，落库仍是 Markdown）→ `NoteDrawActivity`（画画）
-  - **我的** `MineFragment`：分组（账号/通用/同步）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认。头像展示：有 `avatarUrl` 时后台 OkHttp 拉取（`AvatarLoader`）圆形展示——头像框为**透明底 + 浅灰圆环边框**（`bg_avatar_border`，透明 PNG 抠图直接露底色）；无头像时展示**浅灰底 + 展示名首字**（`bg_avatar` 浅灰）。修改资料页（`ProfileActivity`）支持**更换/删除头像**：选图 → `ImageUtil` 缩放/EXIF 校正/压缩 ≤1MB → `POST /api/auth/avatar` 上传；删除走 `DELETE /api/auth/avatar`（二次确认），删除后回到首字占位。进入「我的」页时（`onResume`）在线模式会调 `/auth/me` 刷新本地用户信息（头像/展示名可能在其他端如 Web 修改）
+  - **我的** `MineFragment`：分组（账号/通用/同步）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认 + `doLogout()` 幂等守卫（`logoutStarted` 标志）防连点——任何重复触发都被兜底，不重复执行、不闪退。头像展示：有 `avatarUrl` 时后台 OkHttp 拉取（`AvatarLoader`）圆形展示——头像框为**透明底 + 浅灰圆环边框**（`bg_avatar_border`，透明 PNG 抠图直接露底色）；无头像时展示**浅灰底 + 展示名首字**（`bg_avatar` 浅灰）。修改资料页（`ProfileActivity`）支持**更换头像**：头像**居中**（96dp），圆内**贴底一条 24dp 半透明黑色「编辑」带**（矩形被父容器 `clipToOutline` 的圆形 outline 裁成弓形），点击整圆 → 系统选图 → `ImageUtil` 缩放/EXIF 校正/压缩 ≤1MB → `POST /api/auth/avatar` 上传；上传期间色带改显「上传中…」并禁用点击。**Android 端不提供删除头像**（服务端 `DELETE /api/auth/avatar` 与 Web 端入口保留）。头像为即时上传，展示名称走「保存」按钮。进入「我的」页时（`onResume`）在线模式会调 `/auth/me` 刷新本地用户信息（头像/展示名可能在其他端如 Web 修改）
 
 ## 多语言（i18n）
 
-默认中文 + 英文；「我的 → 语言」用 `AppCompatDelegate.setApplicationLocales` 持久化并重建；布局 `@string/key`、Java `getString(R.string.key)`、带参 `%1$s`。
+默认中文 + 英文。语言持久化到 `SessionManager`（`getLanguage`/`saveLanguage`，SharedPreferences），由 `BaseActivity.attachBaseContext` 应用到每个 Activity（`createConfigurationContext` + `Locale.setDefault`），`applyOverrideConfiguration` 保留深/浅色 UI 模式；全部 Activity 继承 `BaseActivity`。切换语言 = `saveLanguage` + **`CLEAR_TASK` 重启回主界面**（任务内页面按新语言重建，普通启动路径走 `windowBackground` 应用底色，不闪黑）。首次使用未设置语言时返回原样 Context，走系统默认语言。布局 `@string/key`、Java `getString(R.string.key)`、带参 `%1$s`。
 
 ## 失败处理
 
-- 网络失败（见 `docs/11-android-network-error.md`）：`UiCallback` 统一处理——收到响应视为成功联系，IOException 按无网络/无法连接全局 Toast + 去重；HTTP 5xx 全局兜底；OkHttp 超时 10s；断网由 MainActivity 监听即时提示。后台传输服务不弹 UI。
+- 网络失败：`network/NetworkFeedback`（静态单例）+ `network/UiCallback<T>` 统一处理。**网络失败 ≠ 会话失效**：断网/服务器宕机不清会话、不回登录页，用户留在当前页可重试。
+  - 交互请求（UiCallback）：收到任何 HTTP 响应视为成功联系并清除断连标记；IOException 按 `classify()` 分类（设备无网→「无网络连接」，有网但请求失败→「无法连接服务器」）；HTTP 5xx 全局兜底「服务器异常」。
+  - 全局统一 Toast + **时段内去重**（同一断连时段只提示一次，任一次响应成功即清除），断连结束后弹一次「网络已恢复」。
+  - 断网由 `MainActivity` 注册 `ConnectivityManager` NetworkCallback 即时提示（onLost→「无网络连接」 / onAvailable→恢复），onDestroy 注销；覆盖文件/笔记/我的三个 Tab。
+  - 登录页/服务器配置页：onFailure 用 `classify()` 友好文案**内联**提示，不触发全局 Toast（避免双弹）。
+  - 不再向用户展示 `t.getMessage()` 异常原文/服务器 IP/技术细节。
+  - 后台上传/下载前台服务、WorkManager 后台同步**不弹 UI**，保持各自失败机制。
+  - 超时：仅 connect 30s→10s（连不上更快反馈），read/write 保持 60s（下载/大响应需要长读）。
 - token 失效：`AuthInterceptor` 401 清会话回登录
 - 上传/下载失败：任务保留 + 错误原因记录
 
@@ -66,6 +73,11 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 集中式 iOS 风格设计系统（`res/values/styles_ios.xml`，`@style/Ios.*`），新增样式一律加进该文件，不写硬编码色值/圆角（详见 `docs/08-ios-design-system.md`）：
 
 - 组件：按钮（Primary / Text / **DangerOutline** 白底红字）、输入框、标题栏（居中标题 + 返回图标）、卡片、圆角弹窗（16dp）/ 下拉（12dp）
+- **弹窗统一走 `MaterialAlertDialogBuilder`**：从 `materialAlertDialogTheme` 读 shape，16dp 圆角全局生效（appcompat `AlertDialog.Builder` 不套 shape、显示直角，已弃用）；`themes.xml` 中语义错配的 `alertDialogTheme` 配置已移除。详见 `docs/08-ios-design-system.md`
+- **文件中心长摁弹窗**：自定义布局（`dialog_file_info.xml`）上半简介区（图标/名称/大小/创建/修改/上次打开时间），下半动作行（重命名/下载/「立即删除」红色，删除仍二次确认）；`Ios.DialogAction` 动作行样式；**隐私文件夹/项目仅展示简介**（隐藏重命名/下载/立即删除及全部动作分隔线，后端同样拒绝，需先移除隐私）；**时间空值显示「--」**；**文件夹大小按需计算**——弹窗打开时异步拉取 `GET /api/files/{id}/size` 更新简介大小行（失败回落「文件夹」标记）；弹窗四边 padding 一致（16dp）
+- **文件中心列表行**：文件夹行 meta 显示**直接子项数**（`childCount`，「N 项」，文件 + 子文件夹） + 右侧「>」箭头（`ivChevron`，表示可进入下一级）；文件行 meta 显示字节大小；不再显示「文件夹」提示字（界面空间有限，**不展示创建时间**；长摁弹窗简介区仍展示，时间精确到时分秒）
+- **文件中心排序**：工具栏「刷新」与「三点」间排序按钮（`btnSort`，`ic_sort` 原排序图标），弹出 名称/创建时间/文件大小 单选菜单（`DropdownMenu`），当前项**左侧 √ 勾选、右侧「>」图标指示方向**（`ic_chevron_up` / `ic_chevron_down`），**再点当前项切换升/降序**；排序走后端 `sort` + `dir` 参数，目录始终优先。详见 `docs/03-api.md`
+- **下拉菜单统一**：全 app 下拉（新建/排序/块类型/块上方插入）走自定义 `DropdownMenu` 组件——固定宽度、每行 44dp（与设置页选项卡一致）、行间**整行** 1dp 浅灰分隔线（`@color/divider`，占满整行不缩进）、**白底 + 细边框 + 投影**区分背景、选中项 √ 黑色、右侧箭头 20dp。详见 `docs/08-ios-design-system.md`
 - **按压渐变**：`widget/` 的 `AnimatedTextButton` / `AnimatedTextLabel` / `AnimatedTintImageView`，文字/图标按压「蓝→浅蓝」平滑过渡（`text_accent_selector`）；返回/刷新/上一级用单色 PNG + tint 参与渐变
 - 文件类型图标：彩色 PNG（`res/drawable/ic_type_*`，含 md；Web 端复用同一批 PNG 展示）
 

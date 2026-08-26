@@ -2,8 +2,6 @@ package com.baiflow.android.network;
 
 import android.os.Build;
 import android.util.Log;
-import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.os.LocaleListCompat;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.model.*;
 import okhttp3.*;
@@ -101,9 +99,9 @@ public class ApiClient {
             // 设备标识（登录时服务端据此建会话，供 Web 端设备管理/强制下线）
             builder.header("X-Device-Type", "ANDROID");
             builder.header("X-Device-Name", deviceName());
-            // 服务端 i18n：按应用语言偏好发 Accept-Language（未设置时默认 zh-CN）
-            LocaleListCompat locales = AppCompatDelegate.getApplicationLocales();
-            String lang = locales.isEmpty() ? "zh" : locales.get(0).getLanguage();
+            // 服务端 i18n：按应用语言偏好发 Accept-Language（SessionManager 持久化，未设置时默认 zh-CN）
+            String appLang = session.getLanguage();
+            String lang = (appLang == null || appLang.isEmpty()) ? "zh" : appLang;
             builder.header("Accept-Language", "en".equals(lang) ? "en" : "zh-CN");
             Request request = builder.build();
 
@@ -184,9 +182,6 @@ public class ApiClient {
         @POST("auth/avatar")
         Call<ApiResponse<UserInfo>> uploadAvatar(@Part MultipartBody.Part file);
 
-        @DELETE("auth/avatar")
-        Call<ApiResponse<UserInfo>> deleteAvatar();
-
         @POST("auth/change-password")
         Call<ApiResponse<Map<String, Object>>> changePassword(@Body Map<String, String> body);
 
@@ -198,7 +193,9 @@ public class ApiClient {
                 @Query("page") int page,
                 @Query("size") int size,
                 @Query("viewUserId") String viewUserId,
-                @Header("X-Privacy-Access-Token") String privacyToken
+                @Header("X-Privacy-Access-Token") String privacyToken,
+                @Query("sort") String sort,
+                @Query("dir") String dir
         );
 
         // --- 用户（管理员） ---
@@ -233,6 +230,12 @@ public class ApiClient {
         @GET("files/{id}/preview")
         Call<ResponseBody> previewFile(
                 @Path("id") String fileId,
+                @Header("X-Privacy-Access-Token") String privacyToken
+        );
+
+        @GET("files/{id}/size")
+        Call<ApiResponse<Long>> getFileSize(
+                @Path("id") String id,
                 @Header("X-Privacy-Access-Token") String privacyToken
         );
 
@@ -336,11 +339,6 @@ public class ApiClient {
         return getService().uploadAvatar(buildFilePart(bytes, fileName, mime != null ? mime : "image/jpeg"));
     }
 
-    /** 删除当前用户头像，成功返回 avatarUrl 为空的用户信息 */
-    public Call<ApiResponse<UserInfo>> deleteAvatar() {
-        return getService().deleteAvatar();
-    }
-
     public Call<ApiResponse<Map<String, Object>>> changePassword(String oldPassword, String newPassword) {
         Map<String, String> body = new java.util.HashMap<>();
         body.put("oldPassword", oldPassword != null ? oldPassword : "");
@@ -350,8 +348,8 @@ public class ApiClient {
 
     public Call<ApiResponse<PagedResult<FileItem>>> listFiles(String storageRootId, String parentId,
                                                                 int page, int size, String viewUserId,
-                                                                String privacyToken) {
-        return getService().listFiles(storageRootId, parentId, page, size, viewUserId, privacyToken);
+                                                                String privacyToken, String sort, String dir) {
+        return getService().listFiles(storageRootId, parentId, page, size, viewUserId, privacyToken, sort, dir);
     }
 
     /** 管理员：分页列出用户（用于切换 viewUserId 查看用户文件） */
@@ -414,6 +412,11 @@ public class ApiClient {
     /** 获取文件预览字节流（inline 模式，带鉴权） */
     public Call<ResponseBody> previewFile(String fileId, String privacyToken) {
         return getService().previewFile(fileId, privacyToken);
+    }
+
+    /** 计算文件/文件夹大小（文件夹递归汇总子树内文件字节数） */
+    public Call<ApiResponse<Long>> getFileSize(String id, String privacyToken) {
+        return getService().getFileSize(id, privacyToken);
     }
 
     public Call<ApiResponse<Map<String, Object>>> deleteFile(String id, String privacyToken) {

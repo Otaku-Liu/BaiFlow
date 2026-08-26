@@ -8,8 +8,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
@@ -30,7 +29,7 @@ import retrofit2.Response;
 /**
  * 登录页 — 用户名密码登录 BaiFlow 服务器。
  */
-public class LoginActivity extends AppCompatActivity {
+public class LoginActivity extends BaseActivity {
 
     private EditText etUsername, etPassword;
     private Button btnLogin, btnChangeServer;
@@ -143,7 +142,7 @@ public class LoginActivity extends AppCompatActivity {
     private void maybePromptUploadLocal() {
         int count = AppDatabase.get(this).noteDao().countLocalOnly();
         if (count == 0) return;
-        new AlertDialog.Builder(this)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.offline_upload_prompt_title))
                 .setMessage(getString(R.string.offline_upload_prompt_message, count))
                 .setPositiveButton(getString(R.string.offline_upload_yes), (d, w) -> {

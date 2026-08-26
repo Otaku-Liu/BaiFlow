@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS `bf_file_item` (
     `status`                VARCHAR(16)   NOT NULL DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE（正常）/ DELETED（已软删除）',
     `created_at`            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `last_opened_at`        TIMESTAMP     NULL COMMENT '上次打开时间（文件预览/下载、进入目录时更新；不含分享下载）',
     `deleted_at`            TIMESTAMP     NULL COMMENT '软删除时间（NULL 表示未删除）',
     PRIMARY KEY (`id`),
     KEY `idx_file_item_storage_parent` (`storage_root_id`, `parent_id`),
@@ -315,3 +316,16 @@ CREATE TABLE IF NOT EXISTS `bf_user_device` (
     UNIQUE KEY `uk_user_device` (`user_id`, `device_name`),
     KEY `idx_ud_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户登录设备表（按 user+device_name 登记，在线状态由活跃会话判定）';
+
+-- -----------------------------------------------------------
+-- 幂等补列：bf_file_item.last_opened_at（老库升级；新库由上方 CREATE TABLE 创建）
+-- 可重复迁移每次启动重跑，MySQL 8 无 ADD COLUMN IF NOT EXISTS，用 information_schema 判断 + PREPARE 动态 SQL
+-- -----------------------------------------------------------
+SET @__bf_col = (SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bf_file_item' AND COLUMN_NAME = 'last_opened_at');
+SET @__bf_sql = IF(@__bf_col = 0,
+    'ALTER TABLE `bf_file_item` ADD COLUMN `last_opened_at` TIMESTAMP NULL COMMENT ''上次打开时间（文件预览/下载、进入目录时更新；不含分享下载）'' AFTER `updated_at`',
+    'SELECT 1');
+PREPARE __bf_stmt FROM @__bf_sql;
+EXECUTE __bf_stmt;
+DEALLOCATE PREPARE __bf_stmt;

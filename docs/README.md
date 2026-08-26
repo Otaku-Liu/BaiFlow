@@ -38,12 +38,11 @@ cd deploy && docker compose up -d
 | [04-frontend.md](04-frontend.md) | Web 前端设计与 Apple 风格 Design Token |
 | [05-android.md](05-android.md) | Android 客户端设计 |
 | [06-coding-standards.md](06-coding-standards.md) | 编码规范（后端/前端/Android） |
-| [07-quick-notes.md](07-quick-notes.md) | ADR：随手记（便签/笔记）方案与三阶段实施计划 |
-| [08-ios-design-system.md](08-ios-design-system.md) | ADR：Android iOS 风格设计系统（集中式 styles） |
+| [07-quick-notes.md](07-quick-notes.md) | 随手记（便签/笔记）方案与三阶段实施计划 |
+| [08-ios-design-system.md](08-ios-design-system.md) | Android iOS 风格设计系统（集中式 styles） |
 | [09-auth-sessions.md](09-auth-sessions.md) | 登录会话与设备管理（认证模型 2） |
-| [10-web-connection-timeout.md](10-web-connection-timeout.md) | Web 连接超时检测与恢复 |
-| [11-android-network-error.md](11-android-network-error.md) | Android 网络错误处理 |
 | [12-android-offline-mode.md](12-android-offline-mode.md) | Android 离线模式与随手记同步 |
-| [13-download-records.md](13-download-records.md) | ADR：文件下载记录与下载安全 |
 | [14-brand-assets.md](14-brand-assets.md) | 品牌资源与图标规范 |
 | [glossary.md](glossary.md) | 术语表 |
+
+单个功能或修复不单开文档：功能现状直接写进对应主文档（Web 行为 → `04`，Android 行为 → `05`，表结构 → `02`，接口 → `03`），根因分析与排障过程不留档。

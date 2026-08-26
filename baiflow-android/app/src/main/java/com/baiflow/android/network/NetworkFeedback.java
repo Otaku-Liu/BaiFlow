@@ -17,7 +17,7 @@ import com.baiflow.android.R;
  * - HTTP 5xx 全局兜底提示「服务器异常」，非 5xx 响应清除去重；
  * - 分类：设备无网 → 无网络连接；有网但请求失败 → 无法连接服务器。
  * <p>
- * 见 docs/11-android-network-error.md。
+ * 见 docs/05-android.md「失败处理」。
  */
 public final class NetworkFeedback {
 

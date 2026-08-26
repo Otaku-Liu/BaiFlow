@@ -79,13 +79,15 @@
 - `POST /api/storage-roots/{id}/check`（管理员检测 NAS 连通性）
 
 ### 文件
-- `GET /api/files?storageRootId=&parentId=&page=&size=&viewUserId=`（文件列表每项含 `downloadCount`）
+- `GET /api/files?storageRootId=&parentId=&page=&size=&viewUserId=&sort=&dir=`（文件列表每项含 `downloadCount`、`lastOpenedAt`、`childCount`——目录的直接活跃子项数（文件+子文件夹），**隐私目录为 null 不返回**；`sort`：`name`/`createdAt`/`size`（默认 `name`），`dir`：`asc`/`desc`（缺省按惯例：名称升序 / 创建时间降序 / 大小降序），**任何排序都目录优先**；非法 `sort` 回落 `name`）
 - `POST /api/files/upload`（支持 `viewUserId` 参数）
 - `GET /api/files/download/{fileId}`（登录用户直接下载，写入下载记录）
 - `GET /api/files/{id}/downloads` — 文件的下载记录分页（时间/来源/下载人/IP；本人文件，管理员可查任意）
+- aria2 URL/磁力/BT 下载任务中心（`/api/downloads**`）已整体移除，文件下载仅经上述两条通道（登录直接下载 + 分享下载）
 - `POST /api/files/folders`（支持 `viewUserId` 参数）
 - `PATCH /api/files/{id}/rename` · `PATCH /api/files/{id}/move`
 - `DELETE /api/files/{id}`（软删除；**级联删除该文件的播放/阅读进度行**）
+- **隐私限制**：主目录、根级隐私空间、`privacyMode == PRIVATE` 的隐私文件夹本身**不支持重命名/删除**（需先 `DELETE /api/files/{id}/privacy` 移除隐私）；重命名/删除隐私文件夹**内**的项目需 `X-Privacy-Access-Token`
 - `POST /api/files/{id}/privacy` · `DELETE /api/files/{id}/privacy`
 - `POST /api/files/{id}/privacy/verify`
 
@@ -109,6 +111,7 @@
 
 ### 文件预览与进度
 - `GET /api/files/{id}/preview` — inline 流式返回文件（支持 Range 请求），Content-Type 按扩展名推断。前端通过 Axios 获取 blob 后创建 Object URL 加载
+- `GET /api/files/{id}/size` — 计算文件/文件夹大小：文件返回自身 `sizeBytes`，文件夹用 MySQL 递归 CTE 汇总子树内所有活跃文件字节数（SQL 见 `docs/02-database.md` 常用查询）。权限复用文件操作的归属 + 隐私校验：文件校验父目录链隐私（`checkPrivacyAccess(parentId)`），文件夹从自身开始校验（`checkPrivacyAccess(id)`，隐私文件夹本身未解锁不可计算）；隐私分支需 `X-Privacy-Access-Token`
 - `GET /api/files/{id}/progress` — 查询当前用户的播放/阅读进度 `{ positionType, positionValue, updatedAt }`
 - `PUT /api/files/{id}/progress` — 保存进度 `{ positionType, positionValue }`
 
@@ -148,4 +151,6 @@ SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GE
 - 上传文件名清洗非法字符
 - 普通用户文件视图自动限定在主目录内（`parentId` 为空时重定向到主目录）
 - 普通用户通过 user_storage_permission 校验范围
+- 下载通道仅两条：登录用户（owner/admin，文件归属 + 隐私校验）与有效分享链接（token/过期/次数/提取码）；**不存在匿名直下端点**
+- 所有下载写入 `bf_download_record`，可追溯并按文件聚合下载次数（ADMIN 审计）
 - 公开分享接口记录访问日志

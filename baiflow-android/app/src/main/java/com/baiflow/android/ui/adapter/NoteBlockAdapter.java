@@ -15,7 +15,6 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -28,6 +27,7 @@ import com.baiflow.android.editor.EditorStyle;
 import com.baiflow.android.editor.NoteBlocks;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.ui.view.NoteAudioPlayerView;
+import com.baiflow.android.widget.DropdownMenu;
 
 import java.io.File;
 import java.util.List;
@@ -329,15 +329,12 @@ public class NoteBlockAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         }
 
         private void showTypeMenu(View anchor, int pos) {
-            PopupMenu menu = new PopupMenu(et.getContext(), anchor, Gravity.NO_GRAVITY, 0, R.style.Ios_PopupMenu);
-            menu.getMenu().add(0, 1, 0, et.getContext().getString(R.string.note_block_text));
-            menu.getMenu().add(0, 2, 0, et.getContext().getString(R.string.note_block_heading));
-            menu.setOnMenuItemClickListener(item -> {
-                int type = item.getItemId() == 2 ? NoteBlocks.HEADING : NoteBlocks.TEXT;
-                listener.onSwitchType(pos, type, 1);
-                return true;
-            });
-            menu.show();
+            java.util.List<DropdownMenu.Option> options = new java.util.ArrayList<>();
+            options.add(new DropdownMenu.Option(et.getContext().getString(R.string.note_block_text),
+                    () -> listener.onSwitchType(pos, NoteBlocks.TEXT, 1)));
+            options.add(new DropdownMenu.Option(et.getContext().getString(R.string.note_block_heading),
+                    () -> listener.onSwitchType(pos, NoteBlocks.HEADING, 1)));
+            DropdownMenu.show(et.getContext(), anchor, options);
         }
     }
 

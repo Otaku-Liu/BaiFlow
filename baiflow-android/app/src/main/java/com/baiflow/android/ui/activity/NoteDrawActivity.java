@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.baiflow.android.R;
 import com.baiflow.android.ui.NoteDrawView;
@@ -14,7 +13,7 @@ import java.io.ByteArrayOutputStream;
 /**
  * 画画页 — 手写画布，保存时导出 PNG 字节经 Result 回传给编辑器插入为图片。
  */
-public class NoteDrawActivity extends AppCompatActivity {
+public class NoteDrawActivity extends BaseActivity {
 
     /** 结果中携带的 PNG 字节数组 */
     public static final String EXTRA_PNG = "png";

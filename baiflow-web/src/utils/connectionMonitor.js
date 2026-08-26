@@ -5,7 +5,7 @@
  * （含 4xx/5xx）都视为服务器可达并刷新基准；某次请求发生网络级失败（无响应）时，
  * 若距上次成功联系已 ≥ THRESHOLD_MS 则判定超时。
  *
- * 设计说明见 docs/10-web-connection-timeout.md：
+ * 设计说明见 docs/04-frontend.md「401 与网络级失败（服务器连接超时）」：
  * - 计时从进入界面（首次登录态请求）起算；
  * - 阈值前单次失败静默，不打扰用户；
  * - timeoutFired 去重，防并发失败重复触发。
@@ -27,7 +27,7 @@ export function startMonitor() {
 /**
  * 确保检测已启动，但**不**重置基准/去重标志。
  * 供请求拦截器调用：登录态首个请求时启动，后续请求不再拨动 lastContactAt——
- * 否则每次请求都会把基准拨到「现在」，30s 判定永远无法触发（见 docs/10-web-connection-timeout.md §4）。
+ * 否则每次请求都会把基准拨到「现在」，30s 判定永远无法触发（见 docs/04-frontend.md「401 与网络级失败」）。
  */
 export function ensureMonitor() {
   if (!started) startMonitor()

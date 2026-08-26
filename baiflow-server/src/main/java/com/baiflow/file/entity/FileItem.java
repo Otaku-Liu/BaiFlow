@@ -66,6 +66,9 @@ public class FileItem {
     /** 更新时间 */
     private LocalDateTime updatedAt;
 
+    /** 上次打开时间（文件预览/下载、进入目录时更新；不含分享下载） */
+    private LocalDateTime lastOpenedAt;
+
     /** 删除时间（软删除时写入） */
     private LocalDateTime deletedAt;
 }

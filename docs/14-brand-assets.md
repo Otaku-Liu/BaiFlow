@@ -1,14 +1,11 @@
-# 14 · 品牌资产：App 图标与 Web Logo（ADR）
+# 14 · 品牌资产：App 图标与 Web Logo
 
 > 状态：**已落地**（2026-08-21）
-> 类型：架构决策记录（ADR）
 > 相关：`docs/04-frontend.md`、`docs/05-android.md`
 
-## 1. 背景
+品牌资产复用品牌图经图标生成器导出的多平台套件（Android legacy/round mipmap、Web favicon 等），不重绘；项目内只补齐生成器缺失的 Android adaptive icon、透明 mark 与 Manifest/HTML 接线。
 
-品牌图此前两处空白：Android 无启动图标（系统默认机器人），Web 无 favicon/logo。用户提供品牌图，并用图标生成器导出多平台套件。
-
-## 2. 决策
+## 1. 设计要点
 
 - **复用生成器产物**（Android legacy/round mipmap、Web favicon），不重绘。
 - 本项目只补生成器缺失的三项：
@@ -18,7 +15,7 @@
 - 权威 mark 源 = **去背景后的透明 PNG**（备份在 `docs/assets/brand/mark-source.png`），派生 adaptive 前景与 `logo-mark.png`。
 - 不接入 iOS/macOS/tvOS/watchOS 资产（本项目只有 Android + Web）。
 
-## 3. 调色板
+## 2. 调色板
 
 | 角色 | 色值 |
 |---|---|
@@ -26,7 +23,7 @@
 | 浅蓝 | `#D8F0FF` |
 | 背景 | `#FFFFFF` |
 
-## 4. Android
+## 3. Android
 
 `baiflow-android/app/src/main/res/`：
 
@@ -40,7 +37,7 @@
 
 `AndroidManifest.xml` 已配置 `android:icon` / `android:roundIcon` → `@mipmap/ic_launcher`。
 
-## 5. Web
+## 4. Web
 
 `baiflow-web/public/brand/`：
 
@@ -54,7 +51,7 @@
 
 接线：`index.html`（favicon + apple-touch-icon + theme-color + OG）、`LoginView.vue`（登录卡片）、`HomeView.vue`（顶栏）。
 
-## 6. 派生规则
+## 5. 派生规则
 
 透明 mark 源按用途缩放居中：
 
@@ -63,6 +60,6 @@
 
 生成脚本为一次性工具，未入库。
 
-## 7. 待办
+## 6. 待办
 
 - Play Store 512px 图标在 `docs/assets/brand/play_store_512.png`，上架时取用。

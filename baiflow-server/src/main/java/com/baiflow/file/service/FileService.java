@@ -44,12 +44,14 @@ public interface FileService extends IService<FileItem> {
      * @param isAdmin            调用者是否拥有 ROLE_ADMIN
      * @param privacyAccessToken 隐私访问令牌（可空，进入隐私文件夹时必须提供）
      * @param viewUserId         管理员视角切换（非 null 时限定到该用户文件范围）；非管理员忽略此参数
+     * @param sort               排序字段：name / createdAt / size（默认 name）
+     * @param dir                排序方向：asc / desc；缺省时按惯例（名称升序 / 创建时间降序 / 大小降序）；目录始终优先
      * @return 分页文件项列表
      * @throws com.baiflow.common.exception.BusinessException FORBIDDEN 无访问权限
      */
     IPage<FileItemInfo> listFiles(String storageRootId, String parentId, int page, int size,
                                   String userId, boolean isAdmin, String privacyAccessToken,
-                                  String viewUserId);
+                                  String viewUserId, String sort, String dir);
 
     /**
      * 接收多部分文件上传，将文件写入存储根目录内的磁盘位置，计算 SHA-256 哈希，并持久化元数据。
@@ -83,6 +85,14 @@ public interface FileService extends IService<FileItem> {
      * @throws com.baiflow.common.exception.BusinessException FILE_OPERATION_FAILED 目标项是目录而非文件
      */
     Resource downloadFile(String fileId, String userId, boolean isAdmin, String privacyAccessToken);
+
+    /**
+     * 计算文件/文件夹大小：文件返回自身字节数，文件夹递归汇总子树内所有活跃文件的字节数。
+     * 校验与 {@link #downloadFile} 相同的所有权与隐私访问。
+     *
+     * @return 字节数（文件夹无文件时为 0）
+     */
+    Long computeSize(String id, String userId, boolean isAdmin, String privacyAccessToken);
 
     /**
      * 分页查询某文件的下载记录（本人文件；管理员可查任意）。校验与 {@link #downloadFile} 相同的所有权。

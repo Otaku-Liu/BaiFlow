@@ -49,6 +49,16 @@
                 android:contentDescription="@string/files_refresh" />
 
             <com.baiflow.android.widget.AnimatedTintImageView
+                android:id="@+id/btnSort"
+                android:layout_width="40dp"
+                android:layout_height="match_parent"
+                android:padding="10dp"
+                android:src="@drawable/ic_sort"
+                android:tint="@color/text_accent_selector"
+                android:scaleType="fitCenter"
+                android:contentDescription="@string/files_sort" />
+
+            <com.baiflow.android.widget.AnimatedTintImageView
                 android:id="@+id/btnNew"
                 android:layout_width="40dp"
                 android:layout_height="match_parent"

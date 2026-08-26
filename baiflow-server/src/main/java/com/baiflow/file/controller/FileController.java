@@ -53,12 +53,14 @@ public class FileController {
                                                   @RequestParam(defaultValue = "1") int page,
                                                   @RequestParam(defaultValue = "50") int size,
                                                   @RequestParam(required = false) String viewUserId,
+                                                  @RequestParam(defaultValue = "name") String sort,
+                                                  @RequestParam(required = false) String dir,
                                                   @RequestHeader(value = "X-Privacy-Access-Token",
                                                           required = false) String privacyAccessToken,
                                                   Authentication auth) {
         return ApiResponse.success(
                 fileService.listFiles(storageRootId, parentId, page, size,
-                        auth.getPrincipal().toString(), isAdmin(auth), privacyAccessToken, viewUserId));
+                        auth.getPrincipal().toString(), isAdmin(auth), privacyAccessToken, viewUserId, sort, dir));
     }
 
     /**
@@ -78,6 +80,19 @@ public class FileController {
         return ApiResponse.success(
                 fileService.uploadFile(storageRootId, parentId, file,
                         userId, effectiveUserId, privacyAccessToken));
+    }
+
+    /**
+     * 计算文件/文件夹大小：文件返回自身字节数，文件夹递归汇总子树内文件字节数。
+     * 隐私文件夹内目标需要 X-Privacy-Access-Token 头。
+     */
+    @GetMapping("/{id}/size")
+    public ApiResponse<Long> size(@PathVariable String id,
+                                  @RequestHeader(value = "X-Privacy-Access-Token",
+                                          required = false) String privacyAccessToken,
+                                  Authentication auth) {
+        return ApiResponse.success(fileService.computeSize(id, auth.getPrincipal().toString(),
+                isAdmin(auth), privacyAccessToken));
     }
 
     /**

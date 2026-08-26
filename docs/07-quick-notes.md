@@ -1,16 +1,13 @@
-# 07 · 随手记（便签/笔记）方案（ADR）
+# 07 · 随手记（便签/笔记）方案
 
 > 状态：**Phase 1 已实现**（2026-08-05，后端 + Web + SSE）；**Phase 2（Android 富文本编辑器 + 笔记媒体）已实现**（2026-08-06）；Phase 3（离线同步）待实施
-> 类型：架构决策记录（ADR）
 > 相关：`docs/01-architecture.md`、`docs/02-database.md`、`docs/03-api.md`、`docs/04-frontend.md`、`docs/05-android.md`、`docs/08-ios-design-system.md`
-
-## 1. 背景与目标
 
 在 BaiFlow 中新增「随手记」：浏览器随手记笔记，Android App 可查看与编辑，**内容与阅读进度跨设备同步**。定位为轻量便签（类似 Apple 备忘录），非完整笔记应用。
 
-## 2. Grilling 决策
+## 1. 关键约定
 
-| 决策 | 结论 |
+| 项 | 说明 |
 |---|---|
 | 功能定位 | 便签/笔记（标题 + Markdown 正文） |
 | 手机端 | Android App |
@@ -21,16 +18,16 @@
 | 内容同步 | SSE 推送 `NOTE_UPDATED` + 打开时拉取 |
 | 阅读进度 | 新表 `bf_note_progress`（复用 SCROLL_PERCENT 思路） |
 | Android 离线 | Room 本地缓存 + WorkManager 后台同步 |
-| 冲突策略 | **乐观并发**：保存携带 `baseUpdatedAt`，若被其他设备改过返回 `40901`（NOTE_CONFLICT），客户端弹「覆盖 / 重新加载」让用户选择（不再是静默后写覆盖） |
+| 冲突策略 | **乐观并发**：保存携带 `baseUpdatedAt`，若被其他设备改过返回 `40901`（NOTE_CONFLICT），客户端弹「覆盖 / 重新加载」让用户选择 |
 | 管理范围 | 最小集：标题 + 正文 + 时间 + 搜索 + 删除 |
 | 实施节奏 | 分三阶段（①后端+Web ②Android 在线 ③Android 离线+同步） |
 
-## 3. 关键事实与前置缺口
+## 2. 关键事实与前置缺口
 
-- **SSE `/api/events`**：原为缺口（`docs/03-api.md` 规划了 `GET /api/events`，但服务端无 SseEmitter / 事件通道），**Phase 1 已补齐**（`com.baiflow.event`：`SseService` 用户连接注册表 + `EventController` + 30s 心跳清理）。`NOTE_UPDATED` 已接入；曾规划的 `TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 从未接入，且 aria2 下载模块已移除，2026-08-09 已从 `SseEventType` 移除。
+- **SSE `/api/events`**：原为缺口（`docs/03-api.md` 规划了 `GET /api/events`，但服务端无 SseEmitter / 事件通道），**Phase 1 已补齐**（`com.baiflow.event`：`SseService` 用户连接注册表 + `EventController` + 30s 心跳清理）。`NOTE_UPDATED` 已接入；`TRANSFER_PROGRESS` / `DOWNLOAD_COMPLETED` / `DOWNLOAD_FAILED` / `NOTIFICATION_CREATED` 从未接入，且 aria2 下载模块已移除，2026-08-09 已从 `SseEventType` 移除。
 - 数据库迁移：统一 schema 可重复迁移 `R__V1_init.sql`（项目约定新表一律追加此文件；含 `bf_playback_progress` / `bf_note` / `bf_note_progress` / `bf_note_media` / `bf_auth_session` 五张表，全部表与字段均带注释）。
 
-## 4. 数据库
+## 3. 数据库
 
 `bf_note`：
 ```sql
@@ -81,7 +78,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 ```
 媒体文件落磁盘（`baiflow.notes.media-path` 专用目录，文件名 `<mediaId>.<ext>`），本表只存元数据；独立于文件中心，不参与 `/api/files` 列表，不受存储根/隐私文件夹约束。
 
-## 5. API 设计
+## 4. API 设计
 
 ### 笔记 CRUD
 - `GET /api/notes?page=&size=&keyword=&viewUserId=` — 分页列表；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换
@@ -113,7 +110,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 - **冲突**：乐观并发（保存携带 `baseUpdatedAt`，被改过返回 `40901`（NOTE_CONFLICT），客户端选覆盖 / 重新加载）
 - **删除**：软删除标记随增量拉取同步
 
-## 6. 后端改动（Phase 1）
+## 5. 后端改动（Phase 1）
 
 | # | 文件 | 操作 | 说明 |
 |---|---|---|---|
@@ -124,7 +121,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 | 5 | `NoteProgress.java` + Mapper | **新建** | 进度实体（对齐 PlaybackProgress 模式） |
 | 6 | SSE 基础设施 | **新建** | SseEmitter + 事件发布/订阅 + `/api/events` |
 
-## 7. Web 改动（Phase 1）
+## 6. Web 改动（Phase 1）
 
 | # | 文件 | 操作 | 说明 |
 |---|---|---|---|
@@ -133,7 +130,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 | 9 | 路由 + 侧边栏 | 修改 | 加「随手记」入口 |
 | 10 | SSE 监听 + 进度 | 修改 | 收 `NOTE_UPDATED` 刷新当前笔记；滚动防抖保存 SCROLL_PERCENT |
 
-## 8. Android 改动
+## 7. Android 改动
 
 ### Phase 2（在线笔记，已实现 2026-08-06）
 
@@ -167,7 +164,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 - **增量合并**：`updatedAfter` 拉取，按服务端时间戳合并
 - **冲突**：对齐在线端乐观并发（覆盖 / 重新加载）
 
-## 9. 安全
+## 8. 安全
 
 - 非管理员只能访问自己的笔记（`ownerUserId` 隔离，沿用文件模式）；管理员可 `viewUserId` 切换
 - 笔记与文件系统隔离，不进入文件中心；不受存储根目录 / 隐私文件夹约束
@@ -175,7 +172,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 - SSE 端点需会话 token 鉴权（`?token=`）；`NOTE_UPDATED` 只推送给笔记所有者
 - 本期不做公开分享（`/api/public/**` 不涉及笔记与媒体）
 
-## 10. 范围与边界
+## 9. 范围与边界
 
 - **已支持**（Phase 2）：图片/录音/画画媒体（经 `bf_note_media` 专用存储 + 正文引用）
 - **本期不做**：标签/置顶/分类、回收站、笔记间链接、实时协同编辑（OT/CRDT）——SSE 仅做"刷新通知"，非协同编辑
@@ -184,7 +181,7 @@ CREATE TABLE IF NOT EXISTS bf_note_media (
 - **分享**：本期不做笔记分享
 - **孤儿媒体**：本期不清理（笔记软删除不影响媒体）
 
-## 11. 文档同步（实现时）
+## 10. 文档同步（实现时）
 
 - `docs/02-database.md`：登记 `bf_note`、`bf_note_progress`
 - `docs/03-api.md`：登记 `/api/notes`、进度端点、`/api/events` 的 `NOTE_UPDATED`

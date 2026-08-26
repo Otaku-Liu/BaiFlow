@@ -17,7 +17,7 @@ import retrofit2.Response;
  *   HTTP 5xx 全局兜底提示「服务器异常」，非 5xx 清除 5xx 去重标记。
  * - onFailure：网络级失败（IOException）统一分类提示，页面无需再写网络错误 Toast。
  * <p>
- * 见 docs/11-android-network-error.md。后台传输服务用 {@code execute()} 同步调用，
+ * 见 docs/05-android.md「失败处理」。后台传输服务用 {@code execute()} 同步调用，
  * 不经过本包装，因此不会对后台任务弹 UI。
  */
 public abstract class UiCallback<T> implements Callback<T> {

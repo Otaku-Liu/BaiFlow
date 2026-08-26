@@ -94,11 +94,18 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
     @Override
     public IPage<FileItemInfo> listFiles(String rootId, String parentId, int page, int size,
                                          String userId, boolean isAdmin, String privacyAccessToken,
-                                         String viewUserId) {
+                                         String viewUserId, String sort, String dir) {
         storageService.getByIdOrThrow(rootId);
+
+        // 归一化排序字段与方向：非法字段回落 name；dir 缺省按惯例（名称升序 / 创建时间降序 / 大小降序）
+        String effectiveSort = "createdAt".equals(sort) ? "createdAt" : "size".equals(sort) ? "size" : "name";
+        String effectiveDir = (dir == null || dir.isBlank())
+                ? ("name".equals(effectiveSort) ? "asc" : "desc")
+                : dir;
 
         // 非管理员：只能看自己的文件，且以主目录为根
         String effectiveOwner = isAdmin && viewUserId != null ? viewUserId : userId;
+        boolean openedFolder = parentId != null && !parentId.isBlank();
         if (!isAdmin || viewUserId != null) {
             // 确保用户存在
             User u = userMapper.selectById(effectiveOwner);
@@ -115,13 +122,20 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         // 进入文件夹前检查隐私保护
         checkPrivacyAccess(parentId, userId, privacyAccessToken);
 
+        // 进入具体文件夹时记录该目录的上次打开时间（root 视图 parentId 为空不记录）
+        if (openedFolder) {
+            touchFolderOpen(parentId, userId, isAdmin);
+        }
+
         List<FileItem> items;
         if (!isAdmin || viewUserId != null) {
             // 限定到指定用户的文件
-            items = list(childrenWrapper(rootId, parentId, effectiveOwner, FileItemStatus.ACTIVE.name()));
+            items = list(childrenWrapper(rootId, parentId, effectiveOwner, FileItemStatus.ACTIVE.name(),
+                    effectiveSort, effectiveDir));
         } else {
             // 管理员查看所有文件
-            items = list(childrenWrapper(rootId, parentId, null, FileItemStatus.ACTIVE.name()));
+            items = list(childrenWrapper(rootId, parentId, null, FileItemStatus.ACTIVE.name(),
+                    effectiveSort, effectiveDir));
         }
 
         int total = items.size();
@@ -131,8 +145,17 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         // 批量统计本页文件的下载次数（CLIENT + SHARE 均计入）
         Map<String, Long> counts = downloadRecordService.countByFileIds(
                 subList.stream().map(FileItem::getId).toList());
+        // 批量统计本页目录的直接子项数（文件 + 子文件夹）；隐私目录不返回（null）
+        List<String> dirIds = subList.stream()
+                .filter(f -> f.getItemType() == ItemType.DIRECTORY)
+                .map(FileItem::getId)
+                .toList();
+        Map<String, Long> childCounts = dirIds.isEmpty() ? java.util.Map.of() : childCountsByParents(dirIds);
         List<FileItemInfo> recs = subList.stream()
-                .map(f -> FileItemInfo.from(f, counts.getOrDefault(f.getId(), 0L).intValue()))
+                .map(f -> FileItemInfo.from(f,
+                        counts.getOrDefault(f.getId(), 0L).intValue(),
+                        f.getItemType() == ItemType.DIRECTORY && f.getPrivacyMode() != PrivacyMode.PRIVATE
+                                ? childCounts.get(f.getId()) : null))
                 .toList();
         IPage<FileItemInfo> r = new Page<>(page, size, total);
         r.setRecords(recs);
@@ -225,7 +248,27 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         if (!Files.exists(fp)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "磁盘文件不存在");
         }
+        // 记录上次打开时间（预览复用本方法，故预览/下载都会更新）
+        touchLastOpened(f.getId());
         return new FileSystemResource(fp);
+    }
+
+    @Override
+    public Long computeSize(String id, String userId, boolean isAdmin, String privacyAccessToken) {
+        FileItem f = getById(id);
+        if (f == null || f.getStatus() != FileItemStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "文件不存在");
+        }
+        checkOwnership(f, userId, isAdmin);
+        if (f.getItemType() != ItemType.DIRECTORY) {
+            // 文件：隐私来自父目录链
+            checkPrivacyAccess(f.getParentId(), userId, privacyAccessToken);
+            return f.getSizeBytes() != null ? f.getSizeBytes() : 0L;
+        }
+        // 目录：从自身开始查隐私——隐私文件夹本身未解锁不可计算大小（与 glossary「隐私文件夹不提供大小」一致）
+        checkPrivacyAccess(f.getId(), userId, privacyAccessToken);
+        Long sum = baseMapper.sumFolderSize(id);
+        return sum != null ? sum : 0L;
     }
 
     @Override
@@ -290,6 +333,7 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         FileItem f = checkActive(id);
         checkOwnership(f, userId, isAdmin);
         assertMutable(f, "重命名");
+        assertNotPrivate(f, "重命名");
         // NAS 离线时禁止写入
         requireStorageAvailable(storageService.getByIdOrThrow(f.getStorageRootId()));
 
@@ -358,6 +402,7 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         FileItem f = checkActive(id);
         checkOwnership(f, userId, isAdmin);
         assertMutable(f, "删除");
+        assertNotPrivate(f, "删除");
         // NAS 离线时禁止写入
         requireStorageAvailable(storageService.getByIdOrThrow(f.getStorageRootId()));
 
@@ -675,13 +720,13 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
      * 子项查询公共条件：根目录 + 父目录（空视为根）+ 可选所有者/状态筛选，排序「目录优先、名称升序」。
      */
     private LambdaQueryWrapper<FileItem> childrenWrapper(String rootId, String parentId,
-                                                         String ownerUserId, String status) {
+                                                         String ownerUserId, String status, String sort, String dir) {
         LambdaQueryWrapper<FileItem> wrapper = new LambdaQueryWrapper<FileItem>()
                 .eq(FileItem::getStorageRootId, rootId)
                 .eq(ownerUserId != null, FileItem::getOwnerUserId, ownerUserId)
                 .eq(status != null, FileItem::getStatus, status)
-                .orderByDesc(FileItem::getItemType)
-                .orderByAsc(FileItem::getName);
+                .orderByDesc(FileItem::getItemType);  // 目录优先：任何排序下都保持目录在前
+        applySort(wrapper, sort, dir);
         String p = parentOrNull(parentId);
         if (p == null) {
             wrapper.isNull(FileItem::getParentId);
@@ -689,6 +734,54 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
             wrapper.eq(FileItem::getParentId, p);
         }
         return wrapper;
+    }
+
+    /** 二级排序：按 sort 字段 + dir 方向；非法 sort 回落名称 */
+    private void applySort(LambdaQueryWrapper<FileItem> wrapper, String sort, String dir) {
+        boolean desc = "desc".equals(dir);
+        if ("createdAt".equals(sort)) {
+            if (desc) wrapper.orderByDesc(FileItem::getCreatedAt); else wrapper.orderByAsc(FileItem::getCreatedAt);
+        } else if ("size".equals(sort)) {
+            if (desc) wrapper.orderByDesc(FileItem::getSizeBytes); else wrapper.orderByAsc(FileItem::getSizeBytes);
+        } else {
+            if (desc) wrapper.orderByDesc(FileItem::getName); else wrapper.orderByAsc(FileItem::getName);
+        }
+    }
+
+    /** 批量统计直接活跃子项数：parent_id -> count（供列表目录行展示「N 项」） */
+    private Map<String, Long> childCountsByParents(List<String> parentIds) {
+        Map<String, Long> result = new java.util.HashMap<>();
+        for (Map<String, Object> row : baseMapper.countChildrenByParents(parentIds)) {
+            Object pid = row.get("parent_id");
+            Object cnt = row.get("cnt");
+            if (pid != null && cnt != null) {
+                result.put(pid.toString(), ((Number) cnt).longValue());
+            }
+        }
+        return result;
+    }
+
+    /** 记录「上次打开时间」：显式 SET updated_at = updated_at，利用 MySQL ON UPDATE CURRENT_TIMESTAMP「显式赋值当前值时不触发」的规则，避免打开≠修改 */
+    private void touchLastOpened(String fileItemId) {
+        lambdaUpdate().eq(FileItem::getId, fileItemId)
+                .set(FileItem::getLastOpenedAt, LocalDateTime.now())
+                .setSql("updated_at = updated_at")
+                .update();
+    }
+
+    /** 进入目录时记录「上次打开时间」：仅当目标确为目录且调用者有权访问（无权静默跳过，不改变现有列表行为） */
+    private void touchFolderOpen(String folderId, String userId, boolean isAdmin) {
+        if (folderId == null) {
+            return;
+        }
+        FileItem folder = getById(folderId);
+        if (folder == null || folder.getItemType() != ItemType.DIRECTORY) {
+            return;
+        }
+        if (!isAdmin && !userId.equals(folder.getOwnerUserId())) {
+            return;
+        }
+        touchLastOpened(folderId);
     }
 
     /**
@@ -829,6 +922,13 @@ public class FileServiceImpl extends ServiceImpl<FileItemMapper, FileItem> imple
         }
         if (isPrivacySpace(f)) {
             throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "隐私空间不可" + action);
+        }
+    }
+
+    /** 隐私文件夹本身不支持重命名/删除（需先移除隐私再操作）；不用于 setPrivacy（改密码/设隐私） */
+    private void assertNotPrivate(FileItem f, String action) {
+        if (f.getPrivacyMode() == PrivacyMode.PRIVATE) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "隐私文件夹需先移除隐私后再" + action);
         }
     }
 

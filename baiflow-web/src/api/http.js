@@ -12,7 +12,7 @@ http.interceptors.request.use((config) => {
   const authStore = useAuthStore()
   if (authStore.token) {
     config.headers.Authorization = `Bearer ${authStore.token}`
-    // 登录态首个请求时启动连接超时检测（仅首次生效，不重置基准；见 docs/10-web-connection-timeout.md）
+    // 登录态首个请求时启动连接超时检测（仅首次生效，不重置基准；见 docs/04-frontend.md「401 与网络级失败」）
     ensureMonitor()
   }
   // 传递当前语言偏好给后端，用于 i18n 错误消息

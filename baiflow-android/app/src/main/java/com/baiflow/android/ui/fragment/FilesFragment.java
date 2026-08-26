@@ -15,7 +15,6 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.PopupMenu;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -24,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -43,6 +43,7 @@ import com.baiflow.android.transfer.UploadService;
 import com.baiflow.android.ui.activity.PreviewActivity;
 import com.baiflow.android.util.DownloadUtil;
 import com.baiflow.android.util.FormatUtil;
+import com.baiflow.android.widget.DropdownMenu;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -91,6 +92,12 @@ public class FilesFragment extends Fragment {
     private String currentParentId;
     private String currentPath = "";
     private String currentViewUserId;   // 管理员切换的目标用户 ID（null = 全部）
+    /** 列表排序字段：name（默认）/ createdAt / size；目录始终优先 */
+    private String currentSort = "name";
+    /** 排序方向：asc / desc（切换字段时用惯例默认：名称升序/创建时间降序/大小降序） */
+    private String currentDir = "asc";
+    /** 排序按钮（打开排序菜单；方向用菜单内「>」图标指示） */
+    private View btnSort;
 
     // 隐私文件夹映射: folderId -> accessToken
     private final Map<String, String> privacyTokens = new java.util.HashMap<>();
@@ -142,6 +149,9 @@ public class FilesFragment extends Fragment {
         swipeRefresh.setOnRefreshListener(this::loadFiles);
         // 「新建」按钮：在按钮下方弹出 新建文件夹 / 上传文件 下拉
         btnNew.setOnClickListener(this::showNewMenu);
+        // 「排序」按钮：弹出 名称/创建时间/文件大小 排序菜单（点击当前项切换升/降序）
+        btnSort = view.findViewById(R.id.btnSort);
+        btnSort.setOnClickListener(this::showSortMenu);
         // 「刷新」按钮：重新加载当前目录
         view.findViewById(R.id.btnRefresh).setOnClickListener(v -> loadFiles());
         // 「上一级」按钮：逐级返回，根目录时置灰
@@ -332,28 +342,19 @@ public class FilesFragment extends Fragment {
 
     // ---- 新建（新建文件夹 / 上传文件） ----
 
-    /** 「新建」按钮：在按钮下方弹出 新建文件夹 / 上传文件 下拉（圆角） */
+    /** 「新建」按钮：在按钮下方弹出 新建文件夹 / 上传文件 下拉（统一样式） */
     private void showNewMenu(View anchor) {
-        PopupMenu menu = new PopupMenu(requireContext(), anchor,
-                android.view.Gravity.NO_GRAVITY, 0, R.style.Ios_PopupMenu);
-        menu.getMenu().add(0, 1, 0, getString(R.string.files_new_folder));
-        menu.getMenu().add(0, 2, 0, getString(R.string.files_upload));
-        menu.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == 1) {
-                showNewFolderDialog();
-            } else {
-                filePicker.launch("*/*");
-            }
-            return true;
-        });
-        menu.show();
+        java.util.List<DropdownMenu.Option> options = new java.util.ArrayList<>();
+        options.add(new DropdownMenu.Option(getString(R.string.files_new_folder), this::showNewFolderDialog));
+        options.add(new DropdownMenu.Option(getString(R.string.files_upload), () -> filePicker.launch("*/*")));
+        DropdownMenu.show(requireContext(), anchor, options);
     }
 
     /** 新建文件夹：输入名称 → 调后端创建 → 刷新列表 */
     private void showNewFolderDialog() {
         final EditText input = new EditText(requireContext());
         input.setHint(getString(R.string.files_new_folder_hint));
-        new AlertDialog.Builder(requireContext())
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(getString(R.string.files_new_folder))
                 .setView(input)
                 .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
@@ -401,7 +402,7 @@ public class FilesFragment extends Fragment {
 
         String token = effectivePrivacyToken();
 
-        client.listFiles(currentRootId, currentParentId, 1, 100, currentViewUserId, token)
+        client.listFiles(currentRootId, currentParentId, 1, 100, currentViewUserId, token, currentSort, currentDir)
                 .enqueue(new UiCallback<ApiResponse<PagedResult<FileItem>>>(requireContext()) {
                     @Override
                     protected void onUiResponse(Call<ApiResponse<PagedResult<FileItem>>> call,
@@ -502,7 +503,7 @@ public class FilesFragment extends Fragment {
     /** 隐私密码输入弹窗骨架：设置/验证共用，仅文案与回调不同 */
     private void showPrivacyInputDialog(int titleRes, int msgRes, int hintRes, int buttonRes,
                                         int minLen, java.util.function.Consumer<String> onPassword) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
         builder.setTitle(getString(titleRes));
         builder.setMessage(getString(msgRes));
 
@@ -628,9 +629,17 @@ public class FilesFragment extends Fragment {
             FileItem item = items.get(pos);
 
             holder.tvName.setText(item.getName());
-            String meta = item.isDirectory() ? getString(R.string.files_folder) : FormatUtil.formatSize(item.getSizeBytes());
-            if (item.getCreatedAt() != null) { meta += " · " + item.getCreatedAt().substring(0, 10); }
-            holder.tvMeta.setText(meta);
+            if (item.isDirectory()) {
+                // 文件夹：显示子项数（隐私文件夹不提供，显示 "-" 对齐 Web）；并显示「>」箭头表示可进入下一级
+                Long count = item.getChildCount();
+                holder.tvMeta.setText(count != null
+                        ? getString(R.string.files_item_count, count)
+                        : "-");
+                holder.ivChevron.setVisibility(View.VISIBLE);
+            } else {
+                holder.tvMeta.setText(FormatUtil.formatSize(item.getSizeBytes()));
+                holder.ivChevron.setVisibility(View.GONE);
+            }
 
             holder.ivIcon.setImageResource(iconFor(item));
 
@@ -699,12 +708,14 @@ public class FilesFragment extends Fragment {
         class ViewHolder extends RecyclerView.ViewHolder {
             ImageView ivIcon;
             TextView tvName, tvMeta, tvPrivacyTag;
+            ImageView ivChevron;
             ViewHolder(View v) {
                 super(v);
                 ivIcon = v.findViewById(R.id.ivIcon);
                 tvName = v.findViewById(R.id.tvName);
                 tvMeta = v.findViewById(R.id.tvMeta);
                 tvPrivacyTag = v.findViewById(R.id.tvPrivacyTag);
+                ivChevron = v.findViewById(R.id.ivChevron);
             }
         }
     }
@@ -728,7 +739,7 @@ public class FilesFragment extends Fragment {
 
     /** 不支持预览的文件：提示 + 手动确认下载（不自动下载） */
     private void showUnsupportedDownloadDialog(FileItem item) {
-        new AlertDialog.Builder(requireContext())
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(getString(R.string.preview_unsupported))
                 .setMessage(getString(R.string.files_unsupported_download_prompt, item.getName()))
                 .setPositiveButton(getString(R.string.files_download), (d, w) -> downloadFile(item))
@@ -736,27 +747,132 @@ public class FilesFragment extends Fragment {
                 .show();
     }
 
+    /** 文件/文件夹长摁弹窗：上半简介（图标/名称/大小/创建/修改/上次打开），下半动作（重命名/下载/立即删除红色） */
     private void showFileContextMenu(FileItem item) {
-        String rename = getString(R.string.files_rename);
-        String[] options = item.isDirectory()
-                ? new String[]{rename, getString(R.string.common_delete)}
-                : new String[]{rename, getString(R.string.files_download), getString(R.string.common_delete)};
-        new AlertDialog.Builder(requireContext())
-                .setTitle(item.getName())
-                .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        showRenameDialog(item);
-                    } else if (which == 1) {
-                        if (item.isDirectory()) {
-                            confirmDelete(item);
-                        } else {
-                            downloadFile(item);
-                        }
-                    } else if (which == 2) {
-                        confirmDelete(item);
-                    }
-                })
+        View content = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_file_info, null);
+
+        ((ImageView) content.findViewById(R.id.dialogFileIcon)).setImageResource(adapter.iconFor(item));
+        ((TextView) content.findViewById(R.id.dialogFileName)).setText(item.getName());
+
+        TextView tvMeta = content.findViewById(R.id.dialogFileMeta);
+        if (item.isDirectory()) {
+            if (item.isPrivate()) {
+                // 隐私文件夹大小不可未解锁计算（后端也会拒绝）：直接显示文件夹标记，与 Web 端一致不提供大小
+                tvMeta.setText(getString(R.string.files_folder));
+            } else {
+                // 文件夹大小按需计算：弹窗打开时异步拉取（递归汇总子树），meta 行先占位后更新
+                tvMeta.setText(getString(R.string.files_info_size, getString(R.string.files_size_loading)));
+                loadFolderSize(item, tvMeta);
+            }
+        } else {
+            tvMeta.setText(getString(R.string.files_info_size, FormatUtil.formatSize(item.getSizeBytes())));
+        }
+        ((TextView) content.findViewById(R.id.dialogFileCreated))
+                .setText(getString(R.string.files_info_created, formatOrDash(item.getCreatedAt())));
+        ((TextView) content.findViewById(R.id.dialogFileModified))
+                .setText(getString(R.string.files_info_modified, formatOrDash(item.getUpdatedAt())));
+        ((TextView) content.findViewById(R.id.dialogFileLastOpened))
+                .setText(getString(R.string.files_info_last_opened, formatOrDash(item.getLastOpenedAt())));
+
+        boolean isFolder = item.isDirectory();
+        boolean isPrivate = item.isPrivate();
+        View actionDownload = content.findViewById(R.id.actionDownload);
+        View dividerDownloadDelete = content.findViewById(R.id.dividerDownloadDelete);
+        if (isPrivate) {
+            // 隐私文件夹/项目不支持重命名/删除（后端同样拒绝）：仅展示简介，隐藏动作区及全部动作分隔线
+            content.findViewById(R.id.dividerActionsTop).setVisibility(View.GONE);
+            content.findViewById(R.id.actionRename).setVisibility(View.GONE);
+            content.findViewById(R.id.dividerRenameDownload).setVisibility(View.GONE);
+            actionDownload.setVisibility(View.GONE);
+            dividerDownloadDelete.setVisibility(View.GONE);
+            content.findViewById(R.id.actionDelete).setVisibility(View.GONE);
+        } else if (!isFolder) {
+            actionDownload.setVisibility(View.VISIBLE);
+            dividerDownloadDelete.setVisibility(View.VISIBLE);
+        }
+
+        AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext())
+                .setView(content)
+                .setCancelable(true)
                 .show();
+
+        if (!isPrivate) {
+            content.findViewById(R.id.actionRename).setOnClickListener(v -> {
+                dialog.dismiss();
+                showRenameDialog(item);
+            });
+            if (!isFolder) {
+                actionDownload.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    downloadFile(item);
+                });
+            }
+            content.findViewById(R.id.actionDelete).setOnClickListener(v -> {
+                dialog.dismiss();
+                confirmDelete(item);
+            });
+        }
+    }
+
+    /** ISO 时间 → 可读串；空/无效显示 "--" */
+    private String formatOrDash(String iso) {
+        String formatted = FormatUtil.formatDateTime(iso);
+        return formatted.isEmpty() ? "--" : formatted;
+    }
+
+    /** 文件夹大小按需计算：异步拉取后端递归汇总值并更新弹窗 meta 行；失败回落「文件夹」标记 */
+    private void loadFolderSize(FileItem item, TextView tvMeta) {
+        client.getFileSize(item.getId(), effectivePrivacyToken())
+                .enqueue(new UiCallback<ApiResponse<Long>>(requireContext()) {
+                    @Override
+                    protected void onUiResponse(Call<ApiResponse<Long>> call, Response<ApiResponse<Long>> response) {
+                        if (getActivity() == null) {
+                            return;
+                        }
+                        if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
+                            Long size = response.body().getData();
+                            tvMeta.setText(getString(R.string.files_info_size,
+                                    FormatUtil.formatSize(size != null ? size : 0L)));
+                        }
+                    }
+
+                    @Override
+                    protected void onUiFailure(Call<ApiResponse<Long>> call, Throwable t) {
+                        // 网络失败已由 UiCallback 统一提示；meta 回落「文件夹」占位
+                        if (getActivity() != null) {
+                            tvMeta.setText(getString(R.string.files_folder));
+                        }
+                    }
+                });
+    }
+
+    /** 排序菜单：名称/创建时间/文件大小（√ 勾选当前项，「>」图标居右指示方向）；再点当前项切换升/降序 */
+    private void showSortMenu(View anchor) {
+        java.util.List<DropdownMenu.Option> options = new java.util.ArrayList<>();
+        options.add(sortOption("name", getString(R.string.files_sort_name)));
+        options.add(sortOption("createdAt", getString(R.string.files_sort_created)));
+        options.add(sortOption("size", getString(R.string.files_sort_size)));
+        DropdownMenu.show(requireContext(), anchor, options);
+    }
+
+    /** 排序菜单项：当前排序项 √ + 右侧方向箭头（升序向上、降序向下） */
+    private DropdownMenu.Option sortOption(String field, String label) {
+        boolean active = field.equals(currentSort);
+        int rightIcon = active
+                ? ("asc".equals(currentDir) ? R.drawable.ic_chevron_up : R.drawable.ic_chevron_down)
+                : 0;
+        return new DropdownMenu.Option(label, active, rightIcon, () -> selectSort(field));
+    }
+
+    /** 选择排序：再点当前项切换升/降序；切字段用该字段惯例默认方向 */
+    private void selectSort(String field) {
+        if (field.equals(currentSort)) {
+            currentDir = "desc".equals(currentDir) ? "asc" : "desc";
+        } else {
+            currentSort = field;
+            currentDir = "name".equals(field) ? "asc" : "desc";
+        }
+        loadFiles();
     }
 
     /** 重命名：预填原名并全选，确定后调后端重命名 → 刷新列表 */
@@ -766,7 +882,7 @@ public class FilesFragment extends Fragment {
         String name = item.getName() != null ? item.getName() : "";
         input.setText(name);
         input.setSelection(0, name.length());
-        new AlertDialog.Builder(requireContext())
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(getString(R.string.files_rename))
                 .setView(input)
                 .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
@@ -806,7 +922,7 @@ public class FilesFragment extends Fragment {
     }
 
     private void confirmDelete(FileItem item) {
-        new AlertDialog.Builder(requireContext())
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(getString(R.string.common_confirm_delete))
                 .setMessage(getString(R.string.common_delete_message, item.getName()))
                 .setPositiveButton(getString(R.string.common_delete), (dialog, which) -> {

@@ -10,10 +10,10 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 |---|---|---|
 | 登录 | `/login` | 用户名密码登录 |
 | 主布局 | `/` | 侧边栏 + 顶栏 + 内容区，需登录 |
-| 文件中心 | `/` 内 | 管理员用户切换、面包屑、文件列表（双击/按钮预览）、上传/下载/重命名/删除、隐私空间（密码保护，进入即验证） |
+| 文件中心 | `/` 内 | 管理员用户切换、面包屑、文件列表（双击/按钮预览）、上传/下载/重命名/删除、隐私空间（密码保护，进入即验证）；**列头排序**（`el-table` `sortable="custom"`：`prop`→`sort` 映射 `name`/`createdAt`/`size`（`sizeBytes`→`size`），列 `:sort-orders` 固定单方向——`name` 升序 / `createdAt` 降序 / 大小降序，点到已排序列（`order` 为空）回落默认 `name`；`sort` 状态存组件内 ref，跨目录导航保持、刷新/离开重置；「目录优先」由后端保证）；**大小/项数列**——文件显示字节大小，文件夹直接显示子项数（`childCount`，隐私文件夹显示「-」） |
 | 随手记 | `/` 内 | 笔记列表 + **所见即所得块编辑器**（`NoteBlockEditor`：文本/标题块 + 图片/音频媒体，contenteditable 就地渲染行内格式、编辑即预览；浮动 B/I/U/S 格式条；顶部「＋」在上方插入）、搜索、SSE 实时同步、跨设备续读进度、笔记媒体渲染（经 `?token=` 鉴权） |
 | 分享管理 | `/` 内 | 分享链接创建/查看/撤销、访问日志（管理员） |
-| 用户管理 | `/` 内 | 管理员可见：用户列表、创建/编辑、批量删除、重置密码 |
+| 用户管理 | `/` 内 | 管理员可见：用户列表（**头像列** `el-avatar`：`avatarUrl` 有则图、无则取 `displayName`/`username` 首字回退，样式与 `HomeView` 一致——透明底图 + 浅灰 `#c0c4cc` 首字）、创建/编辑、批量删除、重置密码 |
 | 操作日志 | `/` 内 | 管理员可见：`el-sub-menu` 子菜单入口 |
 | 登录日志 | `/` 内 | 管理员可见：分页表格，用户名模糊搜索、日期时间范围、登录结果筛选 |
 | 个人资料 | 弹窗 | 展示名、更换/删除头像、修改密码、登录设备管理（强制下线） |
@@ -57,9 +57,19 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 ## API 调用
 
 - Axios 统一注入 Bearer token
-- 401 统一跳转登录页；**网络级失败（连不上/超时/断网）**：距上次成功联系 ≥30s 判定「服务器连接超时」→ 提示后回登录页（**保留 token**，登录页提供「重新连接」），见 `docs/10-web-connection-timeout.md`
 - 管理员文件列表传入 `viewUserId` 参数切换用户视角
+- 文件中心排序复用后端 `GET /api/files` 的 `sort` 参数（`name`/`createdAt`/`size`，固定方向、目录优先由后端保证）；**Web 不调用 `/files/{id}/size`**——文件夹大小 Web 直接显示子项数，该大小端点仅供 Android 长摁弹窗异步拉取
 - 文件上传显示进度，文件下载使用浏览器下载能力
+
+### 401 与网络级失败（服务器连接超时）
+
+- **401**：`http.js` 收到 401 → `clearSession()` 清会话 → ElMessage「登录已过期」→ 约 1.5s 后整页跳转登录页（`window.location.href='/login'`）；服务器可达（有响应）即不会触发超时。
+- **连接超时检测**：仅依赖实际请求失败（不做心跳轮询）。收到任何 HTTP 响应（含 4xx/5xx）即 `noteContact()` 刷新基准并视为服务器可达；登录态请求发生网络级失败（`error.response` 为空：连不上/请求超时/断网）且距上次成功联系 ≥`THRESHOLD_MS`(30s) 判定超时；阈值前的单次失败**静默**（避免笔记自动保存等高频请求刷屏），`timeoutFired` 去重防并发失败重复触发。
+  - **处理**：置 `authStore.connectionTimeout=true` + ElMessage「服务器连接超时」→ `App.vue` watch 后约 1.5s `router.push('/login')` **客户端路由跳转**（不整页刷新，**保留 token**；超时≠会话失效，服务器会话未删除）。
+  - **登录页超时态**（`connectionTimeout` 驱动）：「无法连接服务器」`el-alert` 提示条 + 登录表单仍可用 + 「重新连接」按钮；重连先 `GET /api/health`（公开免认证）再 `GET /auth/me`——会话有效则 `setSession` 清标志并重启检测回主界面，401 则 `clearSession` 转正常登录表单，仍失败保持超时态。
+  - **路由守卫**：`to.path==='/login' && isLoggedIn && !connectionTimeout` 才弹回主界面；连接超时态（保留 token）放行登录页以便展示「重新连接」。
+  - **组件**：`utils/connectionMonitor.js`（模块级状态 `started`/`lastContactAt`/`timeoutFired`，导出 `startMonitor`/`ensureMonitor`/`noteContact`/`resetMonitor`/`shouldFireTimeout`）、`api/http.js`（登录态首个请求 `ensureMonitor()` 仅首次启动、不重置基准）、`stores/auth.js`（`connectionTimeout` 状态；`setSession` 清标志并 `startMonitor`，`clearSession` 复位并 `resetMonitor`）、`api/health.js`（`getHealth`）。
+  - **边界**：仅 Web 管理台；Android 有独立重试/同步机制不做，公共分享页（GUEST）无会话不适用；仅请求驱动 → 用户闲置无请求时断连无法即时发现，冷启动后需有请求且距起点 ≥30s 才触发。
 
 ## 视觉风格 · Apple 风格 (iOS 11-14)
 
@@ -110,14 +120,14 @@ Finder 列表视图风格：无斑马纹、hover 行浅蓝底、行高 `44px`。
 
 当前使用 Element Plus Icons，后续可换 `lucide-vue-next`。
 
-## ADR-001：Apple 风格决策摘要
+## Apple 风格设计摘要
 
-| 决策 | 选择 | 理由 |
-|---|---|---|
-| 技术路径 | 深度定制 Element Plus | 换 UI 库成本过高 |
-| 设计语言 | iOS 11-14 | 卡片化、简约、触控友好 |
-| 字体 | Inter | Web 上最接近 SF Pro 的替代 |
-| 侧边栏 | 浅灰无边框（iPad 分栏） | 最匹配管理台场景 |
+| 项 | 说明 |
+|---|---|
+| 技术路径 | 深度定制 Element Plus |
+| 设计语言 | iOS 11-14（卡片化、简约、触控友好） |
+| 字体 | Inter |
+| 侧边栏 | 浅灰无边框（iPad 分栏） |
 
 ## 弹窗组件统一
 

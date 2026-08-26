@@ -76,10 +76,14 @@ docs/               项目文档（需求、架构、API、数据库等）
 - `docs/04-frontend.md` — Web 前端设计与 Apple 风格 Design Token
 - `docs/05-android.md` — Android 客户端设计
 - `docs/06-coding-standards.md` — 编码规范（后端/前端/Android）
-- `docs/07-quick-notes.md` — ADR：随手记（便签/笔记）方案与三阶段实施计划
-- `docs/08-ios-design-system.md` — ADR：Android iOS 风格设计系统（集中式 styles）
-- `docs/13-download-records.md` — ADR：文件下载记录、下载次数统计与下载安全管理（移除 aria2 下载中心）
+- `docs/07-quick-notes.md` — 随手记（便签/笔记）方案与三阶段实施计划
+- `docs/08-ios-design-system.md` — Android iOS 风格设计系统（集中式 styles）
+- `docs/09-auth-sessions.md` — 登录会话与设备管理
+- `docs/12-android-offline-mode.md` — Android 离线模式
+- `docs/14-brand-assets.md` — 品牌资产：App 图标与 Web Logo
 - `docs/glossary.md` — 术语表
+
+单个功能/修复不单开文档：功能现状写进上面对应的主文档（Web 行为 → `04`、Android 行为 → `05`、表结构 → `02`、接口 → `03`），根因分析与排障过程不入库。
 
 ## 测试与验收
 

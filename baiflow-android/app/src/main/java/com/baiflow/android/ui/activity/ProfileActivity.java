@@ -13,8 +13,6 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
@@ -31,9 +29,10 @@ import retrofit2.Call;
 import retrofit2.Response;
 
 /**
- * 修改资料页 — 编辑展示名称、更换/删除头像并保存。
+ * 修改资料页 — 编辑展示名称、更换头像并保存。
+ * 头像为即时上传（点头像直接选图、选完就传），展示名称需点「保存」提交。
  */
-public class ProfileActivity extends AppCompatActivity {
+public class ProfileActivity extends BaseActivity {
 
     private static final int AVATAR_MAX_DIMENSION = 512;
 
@@ -41,8 +40,9 @@ public class ProfileActivity extends AppCompatActivity {
     private ApiClient client;
     private EditText etDisplayName;
     private TextView tvAvatarLetter;
+    private TextView tvAvatarEditBand;
     private ImageView ivAvatar;
-    private View btnDeleteAvatar;
+    private View avatarContainer;
 
     /** 头像选择（系统图片选择器，无需运行时权限） */
     private final ActivityResultLauncher<String> pickAvatar =
@@ -69,60 +69,75 @@ public class ProfileActivity extends AppCompatActivity {
         etDisplayName = findViewById(R.id.etDisplayName);
         etDisplayName.setText(session.getDisplayName() != null ? session.getDisplayName() : "");
         tvAvatarLetter = findViewById(R.id.tvAvatarLetter);
+        tvAvatarEditBand = findViewById(R.id.tvAvatarEditBand);
         ivAvatar = findViewById(R.id.ivAvatar);
-        btnDeleteAvatar = findViewById(R.id.btnDeleteAvatar);
+        avatarContainer = findViewById(R.id.avatarContainer);
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnSave).setOnClickListener(v -> saveProfile());
-        findViewById(R.id.btnChangeAvatar).setOnClickListener(v -> pickAvatar.launch("image/*"));
-        btnDeleteAvatar.setOnClickListener(v -> confirmDeleteAvatar());
+        // 整个头像圆（含底部「编辑」带）点击后直接拉起系统图片选择器
+        avatarContainer.setOnClickListener(v -> pickAvatar.launch("image/*"));
 
         loadCurrentAvatar();
     }
 
-    /** 加载当前头像预览（后台拉取；无头像时展示展示名首字占位并隐藏删除按钮） */
+    /** 上传中：编辑带改显「上传中…」并禁用整圆点击，避免重复选图 */
+    private void setUploading(boolean uploading) {
+        tvAvatarEditBand.setText(uploading ? R.string.mine_avatar_uploading : R.string.mine_avatar_edit);
+        avatarContainer.setEnabled(!uploading);
+    }
+
+    /** 切换头像图片与首字占位的显隐 */
+    private void showAvatarImage(boolean show) {
+        ivAvatar.setVisibility(show ? View.VISIBLE : View.GONE);
+        tvAvatarLetter.setVisibility(show ? View.GONE : View.VISIBLE);
+    }
+
+    /** 加载当前头像预览（后台拉取；无头像时展示展示名首字占位） */
     private void loadCurrentAvatar() {
         tvAvatarLetter.setText(FormatUtil.firstCharOrQuestion(session.getDisplayName()));
 
         String fullUrl = AvatarLoader.resolveUrl(session.getServerUrl(), session.getAvatarUrl());
         if (fullUrl == null) {
-            ivAvatar.setVisibility(View.GONE);
-            btnDeleteAvatar.setVisibility(View.GONE);
+            showAvatarImage(false);
             return;
         }
-        btnDeleteAvatar.setVisibility(View.VISIBLE);
         AvatarLoader.loadInto(ivAvatar, fullUrl,
-                () -> ivAvatar.setVisibility(View.VISIBLE),
-                () -> ivAvatar.setVisibility(View.GONE));
+                () -> showAvatarImage(true),
+                () -> showAvatarImage(false));
     }
 
-    /** 选图后：后台缩放压缩 → 上传 → 更新本地会话与预览 */
+    /** 选图后：后台缩放压缩 → 上传 → 更新本地会话与预览；每条结束分支都要还原「上传中」态 */
     private void uploadAvatar(Uri uri) {
+        setUploading(true);
         new Thread(() -> {
             byte[] jpeg = ImageUtil.scaleDown(getApplicationContext(), uri, AVATAR_MAX_DIMENSION, 1024 * 1024);
             if (jpeg == null) {
-                runOnUiThread(() -> Toast.makeText(ProfileActivity.this,
-                        R.string.mine_avatar_upload_failed, Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> {
+                    setUploading(false);
+                    Toast.makeText(ProfileActivity.this,
+                            R.string.mine_avatar_upload_failed, Toast.LENGTH_SHORT).show();
+                });
                 return;
             }
             client.uploadAvatar(jpeg, "avatar.jpg", "image/jpeg")
                     .enqueue(new UiCallback<ApiResponse<UserInfo>>(ProfileActivity.this) {
                         @Override
                         protected void onUiResponse(Call<ApiResponse<UserInfo>> call, Response<ApiResponse<UserInfo>> response) {
+                            setUploading(false);
                             if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                                 UserInfo data = response.body().getData();
                                 if (data != null && data.getAvatarUrl() != null && !data.getAvatarUrl().isEmpty()) {
                                     session.saveAvatarUrl(data.getAvatarUrl());
                                 }
                                 Toast.makeText(ProfileActivity.this, R.string.mine_avatar_updated, Toast.LENGTH_SHORT).show();
-                                btnDeleteAvatar.setVisibility(View.VISIBLE);
                                 // 直接用刚选的原图刷新预览（后台解码，≤512px 很快）
                                 new Thread(() -> {
                                     Bitmap preview = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
                                     runOnUiThread(() -> {
                                         if (preview != null) {
                                             ivAvatar.setImageBitmap(preview);
-                                            ivAvatar.setVisibility(View.VISIBLE);
+                                            showAvatarImage(true);
                                         }
                                     });
                                 }).start();
@@ -135,44 +150,11 @@ public class ProfileActivity extends AppCompatActivity {
 
                         @Override
                         protected void onUiFailure(Call<ApiResponse<UserInfo>> call, Throwable t) {
-                            // 网络失败已由 UiCallback 统一提示
+                            // 网络失败已由 UiCallback 统一提示，这里只还原上传态
+                            setUploading(false);
                         }
                     });
         }).start();
-    }
-
-    /** 删除头像：二次确认 → 调接口 → 清本地会话 → 回到首字占位 */
-    private void confirmDeleteAvatar() {
-        new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.mine_delete_avatar))
-                .setMessage(getString(R.string.mine_avatar_delete_confirm))
-                .setPositiveButton(getString(R.string.common_confirm), (d, w) -> deleteAvatar())
-                .setNegativeButton(getString(R.string.common_cancel), null)
-                .show();
-    }
-
-    private void deleteAvatar() {
-        client.deleteAvatar().enqueue(new UiCallback<ApiResponse<UserInfo>>(this) {
-            @Override
-            protected void onUiResponse(Call<ApiResponse<UserInfo>> call, Response<ApiResponse<UserInfo>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
-                    // "无头像"与服务端约定为空字符串
-                    session.saveAvatarUrl("");
-                    Toast.makeText(ProfileActivity.this, R.string.mine_avatar_deleted, Toast.LENGTH_SHORT).show();
-                    ivAvatar.setVisibility(View.GONE);
-                    btnDeleteAvatar.setVisibility(View.GONE);
-                } else if (response.code() < 500) {
-                    String msg = response.body() != null ? response.body().getMessage()
-                            : getString(R.string.mine_avatar_delete_failed);
-                    Toast.makeText(ProfileActivity.this, msg, Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            protected void onUiFailure(Call<ApiResponse<UserInfo>> call, Throwable t) {
-                // 网络失败已由 UiCallback 统一提示
-            }
-        });
     }
 
     private void saveProfile() {

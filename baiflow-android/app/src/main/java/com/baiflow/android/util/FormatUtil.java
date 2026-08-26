@@ -1,9 +1,26 @@
 package com.baiflow.android.util;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 /** 通用格式化工具 */
 public final class FormatUtil {
 
+    private static final DateTimeFormatter DT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     private FormatUtil() {
+    }
+
+    /** ISO 时间串（服务端 LocalDateTime）→ "yyyy-MM-dd HH:mm:ss"；空/解析失败返回 "" */
+    public static String formatDateTime(String iso) {
+        if (iso == null || iso.isEmpty()) {
+            return "";
+        }
+        try {
+            return LocalDateTime.parse(iso).format(DT_FORMAT);
+        } catch (java.time.format.DateTimeParseException e) {
+            return "";
+        }
     }
 
     /** 字节数 → 可读大小（B/KB/MB/GB） */

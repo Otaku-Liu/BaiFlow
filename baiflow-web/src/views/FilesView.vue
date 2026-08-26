@@ -52,8 +52,9 @@
     </el-dialog>
 
     <!-- 文件列表表格 -->
-    <el-table :data="fileStore.items" v-loading="loading" stripe style="margin-top:16px" @row-dblclick="onRowDblClick">
-      <el-table-column :label="t('common.name')" min-width="280">
+    <el-table :data="fileStore.items" v-loading="loading" stripe style="margin-top:16px"
+      @row-dblclick="onRowDblClick" @sort-change="onSortChange">
+      <el-table-column :label="t('common.name')" min-width="280" prop="name" sortable="custom" :sort-orders="['ascending']">
         <template #default="{ row }">
           <div class="name-cell">
             <img v-if="row.itemType === 'DIRECTORY'" :src="folderIconPath" class="file-type-icon" alt="" />
@@ -63,10 +64,13 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.size')" align="right">
-        <template #default="{ row }">{{ row.itemType === 'DIRECTORY' ? '-' : formatSize(row.sizeBytes) }}</template>
+      <el-table-column :label="t('files.sizeCount')" align="right" prop="sizeBytes" sortable="custom" :sort-orders="['descending']">
+        <template #default="{ row }">
+          <span v-if="row.itemType !== 'DIRECTORY'">{{ formatSize(row.sizeBytes) }}</span>
+          <span v-else>{{ row.childCount != null ? t('files.itemCount', { count: row.childCount }) : '-' }}</span>
+        </template>
       </el-table-column>
-<el-table-column :label="t('files.uploadTime')">
+      <el-table-column :label="t('files.uploadTime')" prop="createdAt" sortable="custom" :sort-orders="['descending']">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column :label="t('files.downloadCount')" width="110" align="right">
@@ -257,6 +261,8 @@ function restoreFilePath() {
 watch(() => [fileStore.currentRootId, fileStore.breadcrumb, viewUserId.value], persistFilePath, { deep: true })
 
 const loading = ref(false)
+/** 排序字段（name 默认 / createdAt / size），方向固定（名称升/上传时间降/大小降），目录优先由后端保证 */
+const sort = ref('name')
 const showUploadDialog = ref(false)
 const showNewFolderDialog = ref(false)
 const showRenameDialog = ref(false)
@@ -368,7 +374,8 @@ async function loadFiles() {
       storageRootId: rootId.value,
       parentId: folderId || undefined,
       page: fileStore.page,
-      size: fileStore.size
+      size: fileStore.size,
+      sort: sort.value
     }
     // 管理员选择查看其他用户空间时传递 viewUserId
     if (authStore.isAdmin && viewUserId.value) {
@@ -386,6 +393,14 @@ async function loadFiles() {
   } finally {
     loading.value = false
   }
+}
+
+/** 列头点击排序：prop→sort 映射，方向由列 :sort-orders 固定；点到已排序列（order 为空）回落到默认名称 */
+function onSortChange({ prop, order }) {
+  sort.value = prop === 'createdAt' ? 'createdAt' : prop === 'sizeBytes' ? 'size' : 'name'
+  if (!order) sort.value = 'name'
+  fileStore.page = 1
+  loadFiles()
 }
 
 /** 导航到指定目录 */

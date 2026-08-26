@@ -33,6 +33,12 @@
     <!-- 用户表格 -->
     <el-table :data="users" v-loading="loading" @selection-change="handleSelectionChange" stripe>
       <el-table-column type="selection" width="45" :selectable="isRowSelectable" />
+      <el-table-column :label="t('users.avatar')" width="70">
+        <template #default="{ row }">
+          <el-avatar v-if="row.avatarUrl" :src="row.avatarUrl" :size="36" class="avatar-img" />
+          <el-avatar v-else :size="36" class="avatar-fallback">{{ (row.displayName || row.username || '?')[0] }}</el-avatar>
+        </template>
+      </el-table-column>
       <el-table-column prop="username" :label="t('users.loginUsername')" min-width="120" />
       <el-table-column prop="displayName" :label="t('users.displayNameOpt')" min-width="120" />
       <el-table-column prop="role" :label="t('users.role')" width="100">
@@ -434,6 +440,15 @@ onMounted(fetchUsers)
 
 <style scoped>
 .users-view { min-height: 400px; }
+
+/* 头像：有图透明底，无头像浅灰底 + 白字首字（与 HomeView 一致） */
+.avatar-img {
+  --el-avatar-bg-color: transparent;
+}
+.avatar-fallback {
+  --el-avatar-bg-color: #c0c4cc;
+  --el-avatar-text-color: #ffffff;
+}
 
 .filter-bar { margin-bottom: 16px; }
 

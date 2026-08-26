@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 文件/文件夹长摁弹窗：上半简介（图标/名称/大小/创建/修改/上次打开），下半动作（重命名/下载/立即删除红色） -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- 头部：图标 + 名称 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/dialogFileIcon"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/files_type_icon_desc" />
+
+        <TextView
+            android:id="@+id/dialogFileName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+    </LinearLayout>
+
+    <!-- 简介行：文件夹标记/大小、创建、修改、上次打开 -->
+    <TextView
+        android:id="@+id/dialogFileMeta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary" />
+
+    <TextView
+        android:id="@+id/dialogFileCreated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary" />
+
+    <TextView
+        android:id="@+id/dialogFileModified"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary" />
+
+    <TextView
+        android:id="@+id/dialogFileLastOpened"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary" />
+
+    <!-- 与动作区分隔（隐私项隐藏动作区时一并隐藏） -->
+    <View
+        android:id="@+id/dividerActionsTop"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="14dp"
+        android:background="@color/divider" />
+
+    <!-- 动作列表 -->
+    <TextView
+        android:id="@+id/actionRename"
+        style="@style/Ios.DialogAction"
+        android:text="@string/files_rename" />
+
+    <View
+        android:id="@+id/dividerRenameDownload"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider" />
+
+    <TextView
+        android:id="@+id/actionDownload"
+        style="@style/Ios.DialogAction"
+        android:text="@string/files_download"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/dividerDownloadDelete"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/actionDelete"
+        style="@style/Ios.DialogAction"
+        android:text="@string/files_delete_immediately"
+        android:textColor="@color/danger" />
+</LinearLayout>

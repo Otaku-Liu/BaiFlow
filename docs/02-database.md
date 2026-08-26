@@ -33,11 +33,15 @@
 `id, name, type(LOCAL/NAS_MOUNT), root_path, status(ACTIVE/OFFLINE/DISABLED), readonly, created_at, updated_at`
 
 ### file_item — 文件/目录元数据
-`id, storage_root_id, parent_id, owner_user_id, name, relative_path, item_type(FILE/DIRECTORY), size_bytes, mime_type, hash_sha256, privacy_mode(NORMAL/PRIVATE), privacy_password_hash, status(ACTIVE/DELETED), created_at, updated_at, deleted_at`
+`id, storage_root_id, parent_id, owner_user_id, name, relative_path, item_type(FILE/DIRECTORY), size_bytes, mime_type, hash_sha256, privacy_mode(NORMAL/PRIVATE), privacy_password_hash, status(ACTIVE/DELETED), created_at, updated_at, last_opened_at, deleted_at`
 
 `mime_type` 字段前端不展示（文件名自带扩展名），后端用于预览 MIME 路由和 Content-Type 返回。
 
 **隐私空间（新模型）**：每个用户主目录下固定一个名为「隐私空间」的子目录（`privacy_mode=PRIVATE`，密码未设置时 `privacy_password_hash` 为空）。首访设密码、之后输密码换取 `private_folder_access` 令牌进入；管理员免验证。任意文件夹不再单独设为隐私。
+
+**`last_opened_at`**：上次打开时间。文件预览/下载时刷新、进入目录时刷新该目录；分享下载不更新所有者文件的打开时间。刷新时保持 `updated_at` 不变（打开操作不改变「修改时间」）。
+
+**`child_count`**：目录的直接活跃子项数（文件 + 子文件夹），由 `listFiles` 按 `parent_id` 派生统计，**非存储列**；隐私目录返回 null 不展示。
 
 ### private_folder_access — 隐私访问会话
 `id, user_id, file_item_id, access_token_hash, expires_at, created_at`
@@ -97,6 +101,22 @@ Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体�
 登录设备登记（按 `user_id + device_name` 唯一）：每次登录 upsert，**登出不删，保留登录历史**。在线状态由「是否存在未过期会话（bf_auth_session）」判定；`GET /api/auth/devices` 返回本表**全部历史 + 在线/离线状态**，强制下线（撤销该设备全部会话）后变为离线，`DELETE /api/auth/devices` 删除离线设备记录后不再展示。
 
 > 以上 5 张表统一由可重复迁移 `db/R__V1_init.sql` 创建（**项目约定：新表一律追加进 `R__V1_init.sql`，不单独建迁移脚本**；可重复迁移文件有改动即自动重新执行，全表 `IF NOT EXISTS` 幂等），**所有表与字段均带 COMMENT 注释**，便于管理与理解。
+
+## 常用查询
+
+### 文件/文件夹大小（递归汇总）
+
+`GET /api/files/{id}/size` 计算文件/文件夹大小：文件直接返回自身 `size_bytes`；文件夹用 **MySQL 8 递归 CTE** 按 `parent_id` 树汇总其子树内所有活跃文件字节数（目录深度不限，避免 `relative_path LIKE` 的通配符转义问题）。下述 SQL 使用实际数据库表名 `bf_file_item`：
+
+```sql
+WITH RECURSIVE sub_tree AS (
+  SELECT id FROM bf_file_item WHERE id = #{folderId} AND status = 'ACTIVE'
+  UNION ALL
+  SELECT c.id FROM bf_file_item c JOIN sub_tree s ON c.parent_id = s.id WHERE c.status = 'ACTIVE'
+)
+SELECT COALESCE(SUM(size_bytes), 0) FROM bf_file_item
+WHERE id IN (SELECT id FROM sub_tree) AND item_type = 'FILE'
+```
 
 ## 主要索引
 

@@ -20,7 +20,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -46,7 +45,7 @@ import retrofit2.Response;
  * <p>
  * 其余类型显示「暂不支持在线预览」并提供下载。与 Web 端预览能力对齐。
  */
-public class PreviewActivity extends AppCompatActivity {
+public class PreviewActivity extends BaseActivity {
 
     private static final String EXTRA_FILE_ID = "file_id";
     private static final String EXTRA_FILE_NAME = "file_name";

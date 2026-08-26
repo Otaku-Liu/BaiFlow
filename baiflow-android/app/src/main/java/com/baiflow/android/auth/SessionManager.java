@@ -22,6 +22,7 @@ public class SessionManager {
     private static final String KEY_DISPLAY_NAME = "display_name";
     private static final String KEY_AVATAR_URL = "avatar_url";
     private static final String KEY_ROLE = "role";
+    private static final String KEY_LANGUAGE = "language";
 
     private static SessionManager instance;
     private final Context appContext;
@@ -53,6 +54,10 @@ public class SessionManager {
         String server = getServerUrl();
         return server != null ? server + "/api/" : null;
     }
+
+    // ---- Language（应用语言，BaseActivity 应用；替代 AppCompatDelegate.setApplicationLocales） ----
+    public void saveLanguage(String lang) { prefs.edit().putString(KEY_LANGUAGE, lang).apply(); }
+    public String getLanguage() { return prefs.getString(KEY_LANGUAGE, ""); }
 
     // ---- User ----
     public void saveUser(String id, String username, String displayName, String avatarUrl, String role) {

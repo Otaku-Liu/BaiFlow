@@ -1,25 +1,27 @@
 package com.baiflow.android.ui.activity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.RadioButton;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.os.LocaleListCompat;
 
 import com.baiflow.android.R;
+import com.baiflow.android.auth.SessionManager;
 
 /**
- * 语言设置页 — 选择中文 / English；AppCompat 持久化并自动重建应用语言。
+ * 语言设置页 — 选择中文 / English；持久化到 SessionManager，切换后重启任务回主界面
+ * （替代 AppCompatDelegate.setApplicationLocales，避免其强制重建导致切换黑屏，见 docs/19）。
  */
-public class LanguageActivity extends AppCompatActivity {
+public class LanguageActivity extends BaseActivity {
 
+    private SessionManager session;
     private RadioButton rbChinese;
     private RadioButton rbEnglish;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        session = SessionManager.getInstance(this);
         setContentView(R.layout.activity_language);
 
         rbChinese = findViewById(R.id.rbChinese);
@@ -41,8 +43,11 @@ public class LanguageActivity extends AppCompatActivity {
     }
 
     private void applyLanguage(String tag) {
-        // 立即同步选中态；setApplicationLocales 触发重建是异步的，不能等重建才反映
+        // 立即同步选中态；持久化语言，重启任务回主界面（普通启动路径走窗口底色，不闪黑）
         updateSelection(tag);
-        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag));
+        session.saveLanguage(tag);
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
     }
 }

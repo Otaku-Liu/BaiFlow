@@ -8,9 +8,8 @@
         <item name="android:statusBarColor">@color/primary</item>
         <!-- 窗口背景设为应用底色，避免语言切换等 Activity 重建时黑/白闪烁 -->
         <item name="android:windowBackground">@color/background</item>
-        <!-- 统一弹窗圆角（Material / appcompat AlertDialog） -->
+        <!-- 统一弹窗圆角：MaterialAlertDialogBuilder 读取，16dp 圆角全局生效（appcompat 的 alertDialogTheme 语义不匹配、已弃用，见 docs/15） -->
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.BaiFlow.Dialog</item>
-        <item name="alertDialogTheme">@style/ThemeOverlay.BaiFlow.Dialog</item>
     </style>
 
     <!-- 圆角弹窗：16dp 圆角，所有 AlertDialog 共用 -->
@@ -36,6 +35,9 @@
     <color name="danger">#FF3B30</color>
     <!-- 头像占位底色/边框（浅灰，与 Web 端 el-avatar 默认底一致） -->
     <color name="avatar_bg">#C0C4CC</color>
+    <!-- 头像底部「编辑」色带：半透明黑（照片隐约透出）+ 白字 -->
+    <color name="avatar_edit_bg">#99000000</color>
+    <color name="avatar_edit_text">#FFFFFF</color>
 
     <!-- 富文本编辑器专用（代码块/行内代码底色） -->
     <color name="code_bg">#F2F2F7</color>

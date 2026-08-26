@@ -5,7 +5,7 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: '',
     user: null,
-    // 服务器连接超时态：保留 token 但临时展示登录页（见 docs/10-web-connection-timeout.md）
+    // 服务器连接超时态：保留 token 但临时展示登录页（见 docs/04-frontend.md「401 与网络级失败」）
     connectionTimeout: false
   }),
 

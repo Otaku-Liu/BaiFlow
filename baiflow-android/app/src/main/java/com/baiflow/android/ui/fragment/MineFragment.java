@@ -11,7 +11,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import androidx.fragment.app.Fragment;
 
 import com.baiflow.android.R;
@@ -44,6 +44,8 @@ public class MineFragment extends Fragment {
     private ImageView ivAvatar;
     /** 上次已加载的头像 URL，避免 onResume 重复下载同一张 */
     private String lastAvatarUrl;
+    /** 登出是否已开始（幂等守卫：防连点/双弹窗重复执行 doLogout 触发 Fragment detach 闪退） */
+    private boolean logoutStarted;
 
     @Nullable
     @Override
@@ -156,7 +158,7 @@ public class MineFragment extends Fragment {
             session.saveOffline(false);
             startActivity(new Intent(requireContext(), LoginActivity.class));
         } else {
-            new AlertDialog.Builder(requireContext())
+            new MaterialAlertDialogBuilder(requireContext())
                     .setTitle(getString(R.string.mine_offline_confirm_title))
                     .setMessage(getString(R.string.mine_offline_confirm_msg))
                     .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
@@ -216,7 +218,7 @@ public class MineFragment extends Fragment {
 
     /** 退出登录：二次确认（清 token + 清该服务器本地缓存，保留服务器地址停在登录页） */
     private void confirmLogout() {
-        new AlertDialog.Builder(requireContext())
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(getString(R.string.mine_logout_confirm_title))
                 .setMessage(getString(R.string.mine_logout_confirm_msg))
                 .setPositiveButton(getString(R.string.common_confirm), (d, w) -> doLogout())
@@ -226,6 +228,10 @@ public class MineFragment extends Fragment {
 
     /** 登出：清 token + 清该服务器本地缓存（两级语义，见 docs/12 §2），保留服务器地址停在登录页 */
     private void doLogout() {
+        if (logoutStarted) {
+            return;
+        }
+        logoutStarted = true;
         String partition = session.getDataPartition();
         session.clearSession();
         if (!SessionManager.PARTITION_LOCAL.equals(partition)) {

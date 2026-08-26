@@ -53,26 +53,33 @@
         android:padding="24dp"
         android:gravity="top">
 
-        <!-- 头像：预览 + 更换按钮 -->
+        <!-- 头像：居中，整圆（含底部「编辑」带）点击弹出动作面板（更换/删除头像） -->
         <LinearLayout
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
+            android:gravity="center_horizontal"
             android:layout_marginBottom="24dp">
 
+            <!-- background 提供圆形 outline 供 clipToOutline 裁切子视图；水波纹改挂 foreground -->
             <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp">
+                android:id="@+id/avatarContainer"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:clipToOutline="true"
+                android:background="@drawable/bg_avatar"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/mine_change_avatar">
 
                 <TextView
                     android:id="@+id/tvAvatarLetter"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="center"
-                    android:textSize="24sp"
-                    android:textColor="@color/white"
-                    android:background="@drawable/bg_avatar" />
+                    android:textSize="36sp"
+                    android:textColor="@color/white" />
 
                 <ImageView
                     android:id="@+id/ivAvatar"
@@ -82,26 +89,21 @@
                     android:clipToOutline="true"
                     android:background="@drawable/bg_avatar_border"
                     android:visibility="gone"
-                    android:contentDescription="@string/mine_change_avatar" />
+                    android:importantForAccessibility="no" />
+
+                <!-- 编辑带：贴底矩形，被父容器圆形 outline 裁成弓形；上传中改显「上传中…」 -->
+                <TextView
+                    android:id="@+id/tvAvatarEditBand"
+                    android:layout_width="match_parent"
+                    android:layout_height="24dp"
+                    android:layout_gravity="bottom"
+                    android:gravity="center"
+                    android:text="@string/mine_avatar_edit"
+                    android:textSize="12sp"
+                    android:textColor="@color/avatar_edit_text"
+                    android:background="@color/avatar_edit_bg"
+                    android:importantForAccessibility="no" />
             </FrameLayout>
-
-            <com.baiflow.android.widget.AnimatedTextButton
-                android:id="@+id/btnChangeAvatar"
-                style="@style/Ios.Button.Text"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginStart="20dp"
-                android:text="@string/mine_change_avatar" />
-
-            <com.baiflow.android.widget.AnimatedTextButton
-                android:id="@+id/btnDeleteAvatar"
-                style="@style/Ios.Button.Text"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginStart="8dp"
-                android:textColor="@color/danger"
-                android:visibility="gone"
-                android:text="@string/mine_delete_avatar" />
         </LinearLayout>
 
         <com.google.android.material.textfield.TextInputLayout

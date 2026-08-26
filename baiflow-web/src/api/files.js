@@ -1,13 +1,14 @@
 import http from './http'
 import { useAuthStore } from '../stores/auth'
 
-/** 文件列表查询参数 */
-export function listFiles({ storageRootId, parentId, page = 1, size = 50, viewUserId }, privacyToken) {
+/** 文件列表查询参数（sort：name 默认 / createdAt / size，固定方向、目录优先） */
+export function listFiles({ storageRootId, parentId, page = 1, size = 50, viewUserId, sort }, privacyToken) {
   const headers = {}
   if (privacyToken) headers['X-Privacy-Access-Token'] = privacyToken
   const params = { storageRootId, page, size }
   if (parentId) params.parentId = parentId
   if (viewUserId) params.viewUserId = viewUserId
+  if (sort && sort !== 'name') params.sort = sort
   return http.get('/files', { params, headers })
 }
 
