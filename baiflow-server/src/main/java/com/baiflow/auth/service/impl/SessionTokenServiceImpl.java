@@ -48,6 +48,10 @@ public class SessionTokenServiceImpl implements SessionTokenService {
         session.setCreatedAt(now);
         session.setLastUsedAt(now);
         session.setExpiresAt(now.plus(expiryFor(session.getDeviceType())));
+        // 登录即清理该用户已过期的历史会话，控制表体积（走 idx_user 索引，无需定时任务）
+        authSessionService.remove(new LambdaQueryWrapper<AuthSession>()
+                .eq(AuthSession::getUserId, userId)
+                .lt(AuthSession::getExpiresAt, now));
         authSessionService.save(session);
         return new CreatedSession(token, session.getId(), session.getExpiresAt());
     }

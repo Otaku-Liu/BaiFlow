@@ -1,6 +1,6 @@
-# 14 · 品牌资产：App 图标与 Web Logo
+# 08 · 品牌资产：App 图标与 Web Logo
 
-> 状态：**已落地**（2026-08-21）
+> 状态：已落地
 > 相关：`docs/04-frontend.md`、`docs/05-android.md`
 
 品牌资产复用品牌图经图标生成器导出的多平台套件（Android legacy/round mipmap、Web favicon 等），不重绘；项目内只补齐生成器缺失的 Android adaptive icon、透明 mark 与 Manifest/HTML 接线。

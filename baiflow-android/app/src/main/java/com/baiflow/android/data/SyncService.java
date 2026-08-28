@@ -26,7 +26,7 @@ import retrofit2.Response;
  * - pushOutbox：tombstone 删除 + dirty 笔记 create/update（带 baseUpdatedAt，冲突标记不丢数据）；
  * - pull：updatedAfter 增量拉取（含软删除标记），合并本地镜像，缓存服务端媒体；
  * - 首次同步全量拉取；仅在线模式执行，离线/本地模式不跑。
- * 见 docs/12-android-offline-mode.md §6。
+ * 见 docs/05-android.md「离线三态」。
  */
 public final class SyncService {
 

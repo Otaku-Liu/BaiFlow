@@ -57,12 +57,13 @@ npm run dev
 npm run build
 ```
 
-### 4. Docker Compose（MySQL + Redis）
+### 4. Docker Compose（部署 server + web，MySQL/Redis 复用已有容器）
 ```powershell
 cd deploy
 copy .env.example .env
-# 编辑 .env 修改默认密码
-docker compose up -d
+# 编辑 .env 填入 MySQL/Redis 连接信息与管理员密码
+docker compose up -d --build
+# 重启 server/web：docker compose restart（MySQL/Redis 独立管理）
 ```
 
 ## 项目阶段

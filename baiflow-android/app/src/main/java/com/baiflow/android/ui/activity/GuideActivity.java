@@ -9,7 +9,7 @@ import com.baiflow.android.auth.SessionManager;
 
 /**
  * 首次启动引导页 — 「设置服务器」/「暂不，先本地使用」二选一。
- * 见 docs/12-android-offline-mode.md §4。
+ * 见 docs/05-android.md「离线三态」。
  */
 public class GuideActivity extends BaseActivity {
 

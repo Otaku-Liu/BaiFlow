@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 笔记后台同步 Worker — 网络恢复/周期触发；离线/本地模式不执行（SyncService 内判断）。
- * 见 docs/12-android-offline-mode.md §6。
+ * 见 docs/05-android.md「离线三态」。
  */
 public class SyncWorker extends Worker {
 

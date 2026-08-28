@@ -32,9 +32,9 @@ Vue 3 Web 管理台          Android Java App
 ## 模块边界
 
 - **baiflow-server**：核心业务、权限、数据库、文件操作、下载任务、随手记笔记、SSE 事件、对外 API。文件路径只在服务端存在。
-- **数据访问层**：每个实体有对应 `IService`（实体 Service），领域 Service `extends IService<主实体>` 或注入实体 Service；单表查询在 Service 层用 `lambdaQuery()` / `getOne` / `list` / `count` / `page`，Mapper 保持纯 `BaseMapper`；仅多表 JOIN / 特殊 SQL（审计登录日志、笔记进度 upsert）留在 XML Mapper（见 `docs/06-coding-standards.md`）
+- **数据访问层**：实体 Service（IService）承载单表查询（`lambdaQuery()` 等），Mapper 保持纯 `BaseMapper`；仅多表 JOIN / 特殊 SQL 留在 XML Mapper（见 `docs/06-coding-standards.md`）
 - **baiflow-web**：Web 管理台，只通过 REST API 通信。
-- **baiflow-android**：移动端文件查看、上传、下载（随手记在线/离线阶段规划见 `docs/07-quick-notes.md`）。
+- **baiflow-android**：移动端文件查看、上传、下载、随手记（在线 + 离线三态）。
 - **deploy**：Docker Compose、Nginx、环境变量。
 
 ### SSE 事件（`com.baiflow.event`）
@@ -45,7 +45,7 @@ Vue 3 Web 管理台          Android Java App
 ## MVP 功能
 
 ### 认证与权限
-- 用户名密码登录 + **登录会话 token**（长会话，吊销驱动 + 滑动续期：ANDROID 180 天 / WEB 约 2h 不活跃兜底，见 `docs/09-auth-sessions.md`）
+- 用户名密码登录 + **登录会话 token**（长会话，吊销驱动 + 滑动续期：ANDROID 180 天 / WEB 约 2h 不活跃兜底）
 - 三种角色：ADMIN、USER、GUEST
 - 访客通过分享 URL 访问，不登录管理台
 
@@ -83,29 +83,31 @@ Vue 3 Web 管理台          Android Java App
 
 ## 非目标
 
-- 第一版不做团队协作空间；在线预览仅覆盖图片/视频/音频/PDF/文本/Markdown（随手记笔记为块式编辑器直接编辑，Office 文档暂不支持在线预览）
-- 不自研 BT/磁力下载协议
-- 不做 WebDAV/SMB/NFS 客户端
-- 不做复杂自动化流程
+- 在线预览仅覆盖图片/视频/音频/PDF/文本/Markdown（随手记笔记为块式编辑器直接编辑，Office 文档暂不支持在线预览）
+- 随手记不做标签/置顶/分类、回收站、笔记间链接、实时协同编辑（SSE 仅做刷新通知）与笔记分享
+- 登录会话不做多设备登录冲突提示/挤线（各设备独立会话，自行管理）
 
 ## 部署
 
 ```
-/opt/baiflow/
-  app/           # 应用
-  data/files/    # 文件存储
-  data/downloads/ # 下载目录
-  mysql/         # 数据库
-  nginx/         # Web 服务
-  logs/          # 日志
+/data/baiflow/
+  files/         # 文件存储根
+  avatars/       # 头像（Nginx 直接 serve）
+  notes-media/   # 笔记媒体
 ```
 
-### Docker Compose 服务
-- `deploy/docker-compose.yml`：`mysql` + `redis`（数据库 / 缓存）
-- 应用服务（server / web / nginx）单独运行，部署脚本化规划中
+### Docker Compose（server + web 容器化）
+- `deploy/docker-compose.yml`：`server`（Spring Boot，宿主机 8080）+ `web`（Nginx，宿主机 8088），host 网络直连服务器上**已有的 MySQL/Redis 容器**（不重建、不动数据）
+- 连接信息与管理员密码配在 `deploy/.env`（模板 `deploy/.env.example`）；数据目录默认 `/data/baiflow`（`BAIFLOW_DATA_DIR`）bind mount 进容器
+- 首次启动自动建表（Flyway `R__V1_init.sql`）、创建初始管理员、创建存储根目录
+- 首次启动：`cd deploy && docker compose up -d --build`；重启 server/web：`docker compose restart`（MySQL/Redis 为服务器既有容器，独立管理，不随 compose 重启）
+
+### 镜像构建
+- `baiflow-server/Dockerfile`：Maven 多阶段 → Temurin JRE
+- `baiflow-web/Dockerfile`：Node 构建 → Nginx（`baiflow-web/nginx.conf` 容器版配置）
 
 ### Nginx 职责
-- 托管静态文件、`/api/` 反代、SSE 支持、HTTPS、上传大小限制
+- 托管静态文件、`/api/` 反代（127.0.0.1:8080）、SSE 支持、Range/流式透传、上传大小限制、头像静态服务
 
 ## 安全基线
 

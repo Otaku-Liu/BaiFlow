@@ -5,7 +5,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 ## A
 
 - **Auth Session（登录会话）**
-  长会话 token + 服务端逐请求校验（`bf_auth_session`）的认证模型：吊销驱动，ANDROID 滑动续期（180 天不活跃兜底）/ WEB 固定 2h。见 `docs/09-auth-sessions.md`。
+  长会话 token + 服务端逐请求校验（`bf_auth_session`）的认证模型：吊销驱动，ANDROID 滑动续期（180 天不活跃兜底）/ WEB 固定 2h。见 `docs/02-database.md`「auth_session」、`docs/03-api.md`「认证」。
 
 - **强制下线（Force Logout）**
   吊销某设备的登录会话，对方下次请求 401 被踢回登录。Web 个人资料弹窗「登录设备」里操作。
@@ -30,7 +30,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 ## D
 
 - **设计系统（Design System）**
-  一套集中的样式/组件规范，一处定义、全局复用。BaiFlow Android 用 `styles_ios.xml` + 主题 + drawable 集中定义 iOS 风组件样式，布局通过 `@style/Ios.*` 引用继承，避免逐控件手改。见 `docs/08-ios-design-system.md`。
+  一套集中的样式/组件规范，一处定义、全局复用。BaiFlow Android 用 `styles_ios.xml` + 主题 + drawable 集中定义 iOS 风组件样式，布局通过 `@style/Ios.*` 引用继承，避免逐控件手改。见 `docs/07-ios-design-system.md`。
 
 ## I
 
@@ -56,9 +56,9 @@ BaiFlow 涉及的关键术语速查。按字母序。
   笔记正文格式。随手记笔记 Web 端与 Android 端均为**所见即所得块编辑器**（块存「行内 markdown 源」，contenteditable/Spannable 就地渲染行内格式、编辑即预览；Web 用 showdown+turndown 往返，Android 用 BlockRichText 往返），存储仍为 Markdown 源；文件预览抽屉的 .md 文件预览用 showdown 渲染为 HTML。
 
 - **MaterialAlertDialogBuilder**
-  Material Components 的 AlertDialog 构建器（`com.google.android.material.dialog`）：从 `materialAlertDialogTheme` 解析 shape，用 `ShapeAppearanceDrawable` **程序化设置弹窗背景**，因此圆角一定生效。BaiFlow Android 全项目弹窗统一用它构建（不再用 appcompat `AlertDialog.Builder`），16dp 圆角全局生效。见 `docs/08-ios-design-system.md`。
+  Material Components 的 AlertDialog 构建器（`com.google.android.material.dialog`）：从 `materialAlertDialogTheme` 解析 shape，用 `ShapeAppearanceDrawable` **程序化设置弹窗背景**，因此圆角一定生效。BaiFlow Android 全项目弹窗统一用它构建（不再用 appcompat `AlertDialog.Builder`），16dp 圆角全局生效。见 `docs/07-ios-design-system.md`。
 - **materialAlertDialogTheme / alertDialogTheme**
-  两个语义不同的主题属性：`materialAlertDialogTheme` 供 `MaterialAlertDialogBuilder` 读取（parent 应为 `ThemeOverlay.MaterialComponents.MaterialAlertDialog`）；`alertDialogTheme` 供 appcompat `AlertDialog.Builder` 读取（parent 应为 appcompat 链）。**不可混用**——把 MaterialAlertDialog 主题配到 `alertDialogTheme` 上，appcompat 弹窗不会套 shape，表现为直角/默认圆角。见 `docs/08-ios-design-system.md`。
+  两个语义不同的主题属性：`materialAlertDialogTheme` 供 `MaterialAlertDialogBuilder` 读取（parent 应为 `ThemeOverlay.MaterialComponents.MaterialAlertDialog`）；`alertDialogTheme` 供 appcompat `AlertDialog.Builder` 读取（parent 应为 appcompat 链）。**不可混用**——把 MaterialAlertDialog 主题配到 `alertDialogTheme` 上，appcompat 弹窗不会套 shape，表现为直角/默认圆角。见 `docs/07-ios-design-system.md`。
 - **幂等守卫（Idempotent Guard）**
   Android 防重复执行的轻量手段：方法内加标志位（如 `logoutStarted`），首行 `if (flag) return; flag = true;`，后续任何重复触发直接返回。用于 `doLogout()` 兜底连点/双弹窗导致的重复执行（重复 `startActivity` + `finish` 会触发 Fragment detach 闪退）。见 `docs/05-android.md`。
 
@@ -70,10 +70,10 @@ BaiFlow 涉及的关键术语速查。按字母序。
 ## O
 
 - **Offline Mode（离线模式）**
-  Android 三态之一（本地模式 / 在线模式 / 离线模式）：已配服务器但主动离线（清 token 留缓存），随手记用本地镜像 + outbox，文件中心禁用；重连必须重新登录。本地模式（未配服务器）免登录纯本地；在线模式（服务器 + token）全功能。见 `docs/12-android-offline-mode.md`。
+  Android 三态之一（本地模式 / 在线模式 / 离线模式）：已配服务器但主动离线（清 token 留缓存），随手记用本地镜像 + outbox，文件中心禁用；重连必须重新登录。本地模式（未配服务器）免登录纯本地；在线模式（服务器 + token）全功能。见 `docs/05-android.md`「离线三态」。
 
 - **Outbox（离线变更队列）**
-  离线模式下本地笔记的待同步标记（`dirty + source`），重连登录后先推 outbox（create/update 带 `baseUpdatedAt`、TOMBSTONE 删除），再按 `updatedAfter` 拉增量合并。Android 离线编辑时写入本地队列，恢复联网后逐个推送。见 `docs/12-android-offline-mode.md`。
+  离线模式下本地笔记的待同步标记（`dirty + source`），重连登录后先推 outbox（create/update 带 `baseUpdatedAt`、TOMBSTONE 删除），再按 `updatedAfter` 拉增量合并。Android 离线编辑时写入本地队列，恢复联网后逐个推送。见 `docs/05-android.md`「离线三态」。
 
 ## P
 
@@ -120,7 +120,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 - **WorkManager**
   Android 后台任务调度（本项目传输功能已用）。随手记离线同步用它实现"恢复联网 / 周期"触发同步。
 - **文件夹大小 / 项数**
-  文件夹无固有大小。Web 文件中心**直接显示子项数**（`childCount`：该文件夹一级下活跃文件+子文件夹数，后端列表批量 `GROUP BY parent_id` 统计），文件列仍显示字节大小，表头「大小/项数」；Android 长摁弹窗显示**递归字节大小**（`GET /api/files/{id}/size`，MySQL 8 递归 CTE 按 `parent_id` 树汇总子树文件字节数，深度不限）。隐私文件夹两项均不提供（`childCount` 为 null、`/size` 目录分支从自身校验隐私）。见 `docs/17`、`docs/18`。
+  文件夹无固有大小。Web 文件中心**直接显示子项数**（`childCount`：该文件夹一级下活跃文件+子文件夹数，后端列表批量 `GROUP BY parent_id` 统计），文件列仍显示字节大小，表头「大小/项数」；Android 长摁弹窗显示**递归字节大小**（`GET /api/files/{id}/size`，MySQL 8 递归 CTE 按 `parent_id` 树汇总子树文件字节数，深度不限）。隐私文件夹两项均不提供（`childCount` 为 null、`/size` 目录分支从自身校验隐私）。见 `docs/02-database.md`、`docs/03-api.md`。
 
 - **文件下载记录（Download Record）**
   每次下载（文件中心直接下载 / 分享下载）写入 `bf_download_record`，供文件中心下载次数统计与 ADMIN 审计。直接下载记录下载人（CLIENT）；分享下载下载人为空、关联分享 ID（SHARE）。下载通道仅两条：登录用户（owner/admin）或有效分享链接，无匿名直下。见 `docs/02-database.md`、`docs/03-api.md`。
@@ -129,4 +129,4 @@ BaiFlow 涉及的关键术语速查。按字母序。
 
 - **内容同步**：编辑保存 → 服务端 `updated_at=now` → SSE 推 `NOTE_UPDATED` → 其他端刷新
 - **阅读进度**：滚动 → 防抖保存 `bf_note_progress` → 换端打开时自动恢复到记录位置并提示「已恢复到上次观看位置」；回顶保存 0 清除历史
-- **离线（Phase 3）**：离线编辑 → Room + outbox → 联网 → 推 PATCH + `updatedAfter` 拉取合并 → 冲突对齐在线端乐观并发（覆盖 / 重载）
+- **离线**：离线编辑 → Room + outbox → 联网 → 推 PATCH + `updatedAfter` 拉取合并 → 冲突对齐在线端乐观并发（覆盖 / 重载）

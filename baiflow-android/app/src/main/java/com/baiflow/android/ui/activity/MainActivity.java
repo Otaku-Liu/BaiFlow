@@ -48,7 +48,7 @@ public class MainActivity extends BaseActivity {
         }
         session.saveGuideShown();
 
-        // 三态分发（见 docs/12-android-offline-mode.md §4）：
+        // 三态分发（见 docs/05-android.md「离线三态」）：
         // 本地模式 / 在线模式 / 离线模式 → 主界面；服务器已设但未登录且未离线 → 登录页（登录门槛）
         if (!session.isLocalMode() && !session.isOnlineMode() && !session.isOfflineMode()) {
             startActivity(new Intent(this, LoginActivity.class));

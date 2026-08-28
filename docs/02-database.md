@@ -93,7 +93,7 @@ Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体�
 ### auth_session — 登录会话
 `id, user_id, device_name, device_type(ANDROID/WEB), ip, user_agent, token_hash(SHA-256), expires_at, last_used_at, created_at`
 
-登录会话（模型 2）：每次请求按 `token_hash` 精确查询校验（记录存在 && 未过期），吊销即**删除记录**（即时生效），历史由审计日志留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`）。ANDROID / WEB 会话均**滑动续期**（活跃请求顺延 `expires_at`，不活跃兜底：ANDROID 180 天 / WEB 约 2h）。`token_hash` 只存哈希，数据库泄露不暴露可用 token。详见 `docs/09-auth-sessions.md`。
+登录会话（模型 2）：每次请求按 `token_hash` 精确查询校验（记录存在 && 未过期），吊销即**删除记录**（即时生效），历史由审计日志留痕（`LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED`）。ANDROID / WEB 会话均**滑动续期**（活跃请求顺延 `expires_at`，距上次写库 >1h 才落库；不活跃兜底：ANDROID 180 天 / WEB 约 2h）。`token_hash` 只存哈希，数据库泄露不暴露可用 token。每次登录会顺手清理该用户已过期的历史会话（走 `idx_user` 索引，控制表体积，无需定时任务）。
 
 ### user_device — 用户登录设备
 `id, user_id, device_name, device_type(ANDROID/WEB), first_login_at, last_login_at, updated_at`

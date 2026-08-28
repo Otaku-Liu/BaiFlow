@@ -123,7 +123,7 @@
 - `GET /api/notes?page=&size=&keyword=&viewUserId=` — 分页列出笔记（不含正文，按更新时间倒序）；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换
 - `POST /api/notes` — 新建 `{ title, content }`（content 为 Markdown）
 - `GET /api/notes/{id}` — 详情（含 Markdown 正文）
-- `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt? }`，服务端刷新 `updated_at`；`baseUpdatedAt` 为乐观并发依据，早于服务端当前 `updated_at` 时返回业务码 `40901`（NOTE_CONFLICT，客户端可选覆盖/重新加载）
+- `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt? }`，服务端刷新 `updated_at`；`baseUpdatedAt` 为乐观并发依据，早于服务端当前 `updated_at` 时返回业务码 `40901`（NOTE_CONFLICT，客户端可选覆盖/重新加载）；同秒内（TIMESTAMP 秒级精度）并发写仍后写覆盖
 - `DELETE /api/notes/{id}` — 软删除（status=DELETED；**级联删除该笔记的阅读进度行**）
 - `GET /api/notes/{id}/progress` — 查询当前用户对笔记的阅读进度 `{ positionType, positionValue, updatedAt }`
 - `PUT /api/notes/{id}/progress` — 保存阅读进度 `{ positionValue }`（滚动百分比 0~1）
@@ -133,7 +133,7 @@
 - `GET /api/notes/media/{id}` — 读取媒体内容（inline）；鉴权 Bearer 头或 `?token=`（供 Web `<img>/<audio>` 渲染）；所有者或管理员
 - 正文引用约定：图片/画画 `![名称](/api/notes/media/{mediaId})`；录音 `[录音](/api/notes/media/{mediaId}?mediaType=audio)`（`mediaType=audio` 供渲染器识别音频）
 
-笔记独立于文件系统，不受存储根目录/隐私文件夹约束。Android 离线增量同步（`updatedAfter`）随客户端离线阶段落地。笔记媒体独立存储，不进文件中心列表。
+笔记独立于文件系统，不受存储根目录/隐私文件夹约束。Android 离线增量同步（`updatedAfter`）已落地。笔记媒体独立存储，不进文件中心列表；孤儿媒体不清理（笔记软删除不影响媒体）。
 
 ### 审计日志（管理员）
 - `GET /api/admin/audit-logs/login` — 分页查询登录与会话操作日志（`LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED` / `ACCOUNT_LOCKED` / `ACCOUNT_UNLOCKED`），支持用户名模糊搜索、操作类型和日期范围筛选

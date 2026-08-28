@@ -36,7 +36,7 @@ import java.util.List;
  * <p>
  * 离线模式三态共用：数据一律读本地 Room（分区键 = 服务器地址 或 LOCAL）；在线模式
  * resume/下拉时后台同步并刷新。管理员用户切换仅在线模式显示。
- * 见 docs/12-android-offline-mode.md。
+ * 见 docs/05-android.md「离线三态」。
  */
 public class NotesFragment extends Fragment {
 

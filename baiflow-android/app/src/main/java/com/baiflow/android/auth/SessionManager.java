@@ -132,7 +132,7 @@ public class SessionManager {
         prefs.edit().putString(KEY_LAST_SYNC_AT, iso != null ? iso : "").apply();
     }
 
-    // ---- 三态判断（见 docs/12-android-offline-mode.md §4）----
+    // ---- 三态判断（见 docs/05-android.md「离线三态」）----
 
     /** 本地模式：未配服务器，免登录纯本地 */
     public boolean isLocalMode() {

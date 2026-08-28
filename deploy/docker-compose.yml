@@ -1,26 +1,46 @@
-services:
-  mysql:
-    image: mysql:8.4
-    container_name: baiflow-mysql
-    restart: unless-stopped
-    env_file:
-      - .env.example
-    environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    ports:
-      - "${MYSQL_PORT:-13306}:3306"
-    volumes:
-      - ./data/mysql:/var/lib/mysql
+# BaiFlow 部署 —— 仅管理 server + web 两个容器。
+# MySQL/Redis 用服务器上已有的容器，经 host 网络直连（不重建、不动数据、不随 compose 重启）。
+#
+# 用法：
+#   cd deploy
+#   cp .env.example .env            # 填入 MySQL/Redis 连接信息与管理员密码
+#   docker compose up -d --build    # 首次启动
+#   docker compose restart          # 重启 server + web（MySQL/Redis 各自独立管理，不用管）
+#
+# 说明：
+#   - host 网络模式：server 监听宿主机 8080，web(Nginx) 监听宿主机 8088，
+#     server 通过 127.0.0.1 连现有 MySQL/Redis。
+#   - 数据目录（文件/头像/笔记媒体）默认 /data/baiflow，改 .env 的 BAIFLOW_DATA_DIR。
 
-  redis:
-    image: redis:7.4
-    container_name: baiflow-redis
+services:
+  server:
+    build: ../baiflow-server
+    image: baiflow-server:latest
+    container_name: baiflow-server
     restart: unless-stopped
-    env_file:
-      - .env.example
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
-    ports:
-      - "${REDIS_PORT:-16379}:6379"
+    network_mode: host
+    environment:
+      BAIFLOW_DB_URL: jdbc:mysql://${MYSQL_HOST:-127.0.0.1}:${MYSQL_PORT:-3306}/${MYSQL_DATABASE:-baiflow}?connectionTimeZone=Asia/Shanghai
+      BAIFLOW_DB_USERNAME: ${MYSQL_USER:-root}
+      BAIFLOW_DB_PASSWORD: ${MYSQL_PASSWORD:?请在 deploy/.env 设置 MYSQL_PASSWORD}
+      BAIFLOW_REDIS_HOST: ${REDIS_HOST:-127.0.0.1}
+      BAIFLOW_REDIS_PORT: ${REDIS_PORT:-6379}
+      BAIFLOW_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      BAIFLOW_INIT_ADMIN_USERNAME: ${BAIFLOW_ADMIN:-admin}
+      BAIFLOW_INIT_ADMIN_PASSWORD: ${BAIFLOW_ADMIN_PASSWORD:?请在 deploy/.env 设置 BAIFLOW_ADMIN_PASSWORD}
+      BAIFLOW_STORAGE_ROOT: /data/baiflow/files
+      BAIFLOW_AVATAR_PATH: /data/baiflow/avatars
+      BAIFLOW_NOTE_MEDIA_PATH: /data/baiflow/notes-media
     volumes:
-      - ./data/redis:/data
+      - ${BAIFLOW_DATA_DIR:-/data/baiflow}:/data/baiflow
+
+  web:
+    build: ../baiflow-web
+    image: baiflow-web:latest
+    container_name: baiflow-web
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - server
+    volumes:
+      - ${BAIFLOW_DATA_DIR:-/data/baiflow}:/data/baiflow

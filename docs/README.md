@@ -36,13 +36,10 @@ cd deploy && docker compose up -d
 | [02-database.md](02-database.md) | 数据库表结构与索引 |
 | [03-api.md](03-api.md) | API 约定与接口清单 |
 | [04-frontend.md](04-frontend.md) | Web 前端设计与 Apple 风格 Design Token |
-| [05-android.md](05-android.md) | Android 客户端设计 |
+| [05-android.md](05-android.md) | Android 客户端设计（含随手记离线三态） |
 | [06-coding-standards.md](06-coding-standards.md) | 编码规范（后端/前端/Android） |
-| [07-quick-notes.md](07-quick-notes.md) | 随手记（便签/笔记）方案与三阶段实施计划 |
-| [08-ios-design-system.md](08-ios-design-system.md) | Android iOS 风格设计系统（集中式 styles） |
-| [09-auth-sessions.md](09-auth-sessions.md) | 登录会话与设备管理（认证模型 2） |
-| [12-android-offline-mode.md](12-android-offline-mode.md) | Android 离线模式与随手记同步 |
-| [14-brand-assets.md](14-brand-assets.md) | 品牌资源与图标规范 |
+| [07-ios-design-system.md](07-ios-design-system.md) | Android iOS 风格设计系统（集中式 styles） |
+| [08-brand-assets.md](08-brand-assets.md) | 品牌资源与图标规范 |
 | [glossary.md](glossary.md) | 术语表 |
 
 单个功能或修复不单开文档：功能现状直接写进对应主文档（Web 行为 → `04`，Android 行为 → `05`，表结构 → `02`，接口 → `03`），根因分析与排障过程不留档。

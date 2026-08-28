@@ -63,13 +63,11 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 
 ### 401 与网络级失败（服务器连接超时）
 
-- **401**：`http.js` 收到 401 → `clearSession()` 清会话 → ElMessage「登录已过期」→ 约 1.5s 后整页跳转登录页（`window.location.href='/login'`）；服务器可达（有响应）即不会触发超时。
-- **连接超时检测**：仅依赖实际请求失败（不做心跳轮询）。收到任何 HTTP 响应（含 4xx/5xx）即 `noteContact()` 刷新基准并视为服务器可达；登录态请求发生网络级失败（`error.response` 为空：连不上/请求超时/断网）且距上次成功联系 ≥`THRESHOLD_MS`(30s) 判定超时；阈值前的单次失败**静默**（避免笔记自动保存等高频请求刷屏），`timeoutFired` 去重防并发失败重复触发。
-  - **处理**：置 `authStore.connectionTimeout=true` + ElMessage「服务器连接超时」→ `App.vue` watch 后约 1.5s `router.push('/login')` **客户端路由跳转**（不整页刷新，**保留 token**；超时≠会话失效，服务器会话未删除）。
-  - **登录页超时态**（`connectionTimeout` 驱动）：「无法连接服务器」`el-alert` 提示条 + 登录表单仍可用 + 「重新连接」按钮；重连先 `GET /api/health`（公开免认证）再 `GET /auth/me`——会话有效则 `setSession` 清标志并重启检测回主界面，401 则 `clearSession` 转正常登录表单，仍失败保持超时态。
-  - **路由守卫**：`to.path==='/login' && isLoggedIn && !connectionTimeout` 才弹回主界面；连接超时态（保留 token）放行登录页以便展示「重新连接」。
-  - **组件**：`utils/connectionMonitor.js`（模块级状态 `started`/`lastContactAt`/`timeoutFired`，导出 `startMonitor`/`ensureMonitor`/`noteContact`/`resetMonitor`/`shouldFireTimeout`）、`api/http.js`（登录态首个请求 `ensureMonitor()` 仅首次启动、不重置基准）、`stores/auth.js`（`connectionTimeout` 状态；`setSession` 清标志并 `startMonitor`，`clearSession` 复位并 `resetMonitor`）、`api/health.js`（`getHealth`）。
-  - **边界**：仅 Web 管理台；Android 有独立重试/同步机制不做，公共分享页（GUEST）无会话不适用；仅请求驱动 → 用户闲置无请求时断连无法即时发现，冷启动后需有请求且距起点 ≥30s 才触发。
+- **401**：`http.js` 收到 401 → `clearSession()` 清会话 → 提示「登录已过期」→ 整页跳转登录页。
+- **连接超时**（`utils/connectionMonitor.js` + `api/http.js`）：仅依赖实际请求失败，不做心跳轮询。登录态请求发生网络级失败（`error.response` 为空：连不上/超时/断网）且距上次成功联系 ≥30s 判定超时；阈值前的单次失败**静默**（避免笔记自动保存等高频请求刷屏），`timeoutFired` 去重。
+  - **处理**：置 `authStore.connectionTimeout=true` → `App.vue` 约 1.5s 后 `router.push('/login')` **客户端路由跳转**（不整页刷新，**保留 token**；超时≠会话失效）。
+  - **登录页超时态**：「无法连接服务器」提示条 + 登录表单仍可用 + 「重新连接」按钮（重连先 `GET /api/health` 再 `/auth/me`：有效则回主界面，401 转正常登录表单）。
+  - **边界**：仅 Web 管理台；GUEST 公共分享页无会话不适用；仅请求驱动，用户闲置无请求时无法即时发现断连。
 
 ## 视觉风格 · Apple 风格 (iOS 11-14)
 
