@@ -25,8 +25,8 @@ import retrofit2.Response;
  * <p>
  * - pushOutbox：tombstone 删除 + dirty 笔记 create/update（带 baseUpdatedAt，冲突标记不丢数据）；
  * - pull：updatedAfter 增量拉取（含软删除标记），合并本地镜像，缓存服务端媒体；
- * - 首次同步全量拉取；仅在线模式执行，离线/本地模式不跑。
- * 见 docs/05-android.md「离线三态」。
+ * - 首次同步全量拉取；仅在线模式执行。
+ * 见 docs/05-android.md「在线同步」。
  */
 public final class SyncService {
 
@@ -57,6 +57,8 @@ public final class SyncService {
             String partition = session.getDataPartition();
             pushOutbox(context, client, dao, partition);
             pull(context, session, client, dao, partition);
+            // 自动清理：媒体缓存超上限则 LRU 淘汰（仅服务端媒体缓存，离线新建不动）
+            MediaFiles.enforceLimit(context, session.getCacheLimitMb());
             return true;
         } catch (IOException e) {
             return false;
@@ -65,15 +67,9 @@ public final class SyncService {
         }
     }
 
-    /** 是否还有待上传的本地模式笔记（首次登录「上传前询问」） */
-    public static boolean hasLocalOnlyNotes(Context context) {
-        return AppDatabase.get(context).noteDao().countLocalOnly() > 0;
-    }
-
-    /** 把本地模式笔记迁移到服务器分区（用户确认上传后调用），由后续同步推送到服务端 */
+    /** 把遗留的本地分区笔记迁移到当前服务器分区（升级路径，用户确认上传后调用），由后续同步推送到服务端 */
     public static void migrateLocalNotes(Context context) {
         SessionManager session = SessionManager.getInstance(context);
-        if (session.isLocalMode()) return;
         LocalNoteDao dao = AppDatabase.get(context).noteDao();
         String partition = session.getDataPartition();
         for (LocalNote n : dao.listLocalOnly()) {
@@ -189,55 +185,139 @@ public final class SyncService {
             }
             return;
         }
-        // 拉详情（含正文）合并
-        Response<ApiResponse<NoteDetail>> resp = client.getNote(s.getId()).execute();
-        if (!resp.isSuccessful() || resp.body() == null || !resp.body().isOk()
-                || resp.body().getData() == null) return;
-        NoteDetail d = resp.body().getData();
+        // 增量模式列表携带正文，直接合并；旧服务端不带正文时回退逐条拉详情（N+1 兜底）
+        String content = s.getContent();
+        if (content != null) {
+            mergeDetail(context, dao, partition, s.getId(), s.getTitle(), content, s.getUpdatedAt());
+            cacheMedia(context, client, content);
+        } else {
+            Response<ApiResponse<NoteDetail>> resp = client.getNote(s.getId()).execute();
+            if (!resp.isSuccessful() || resp.body() == null || !resp.body().isOk()
+                    || resp.body().getData() == null) return;
+            NoteDetail d = resp.body().getData();
+            mergeDetail(context, dao, partition, d.getId(), d.getTitle(), d.getContent(), d.getUpdatedAt());
+            cacheMedia(context, client, d.getContent());
+        }
+    }
+
+    /** 把服务端笔记详情合并进本地 Room（新增或覆盖镜像；dirty 笔记已在上层提前 return） */
+    private static void mergeDetail(Context context, LocalNoteDao dao, String partition,
+                                    String id, String title, String content, String updatedAt) {
+        LocalNote local = dao.getByServerId(id, partition);
         if (local == null) {
             LocalNote n = new LocalNote();
-            n.serverId = d.getId();
+            n.serverId = id;
             n.serverUrl = partition;
-            n.title = d.getTitle() != null ? d.getTitle() : "";
-            n.content = d.getContent() != null ? d.getContent() : "";
-            n.baseUpdatedAt = d.getUpdatedAt();
+            n.title = title != null ? title : "";
+            n.content = content != null ? content : "";
+            n.baseUpdatedAt = updatedAt;
             n.source = SOURCE_SYNCED;
             n.createdAt = System.currentTimeMillis();
             n.updatedAt = System.currentTimeMillis();
             n.dirty = false;
             dao.insert(n);
         } else {
-            local.title = d.getTitle() != null ? d.getTitle() : "";
-            local.content = d.getContent() != null ? d.getContent() : "";
-            local.baseUpdatedAt = d.getUpdatedAt();
+            local.title = title != null ? title : "";
+            local.content = content != null ? content : "";
+            local.baseUpdatedAt = updatedAt;
             local.updatedAt = System.currentTimeMillis();
             local.conflict = false;
             dao.update(local);
         }
-        cacheMedia(context, client, d.getContent());
     }
 
-    /** 缓存正文中的服务端媒体到本地（离线可读），失败不影响笔记同步 */
+    /** 批量媒体一次最多拉取数（对齐服务端 BATCH_MAX_IDS=10） */
+    private static final int MEDIA_BATCH_SIZE = 10;
+
+    /** 批量媒体下载并发池（有界 3、daemon 线程、进程内复用） */
+    private static final java.util.concurrent.ExecutorService MEDIA_POOL =
+            java.util.concurrent.Executors.newFixedThreadPool(3, r -> {
+                Thread t = new Thread(r, "media-cache");
+                t.setDaemon(true);
+                return t;
+            });
+
+    /**
+     * 缓存正文中的服务端媒体到本地（离线可读），失败不影响笔记同步。
+     * 批量 + 有界并发：一次同步从 N 次串行下载降到 ⌈N/10⌉ 次批量请求（最多 3 批并行）；
+     * 服务端跳过的大文件/失败项回退单个流式下载。
+     */
     private static void cacheMedia(Context context, ApiClient client, String content) {
         if (content == null) return;
         Matcher m = SERVER_MEDIA.matcher(content);
+        List<String> ids = new java.util.ArrayList<>();
         while (m.find()) {
             String mediaId = m.group(1);
             File f = MediaFiles.cachedMediaFile(context, mediaId);
             if (f == null || f.exists()) continue;
+            if (!ids.contains(mediaId)) ids.add(mediaId);
+        }
+        if (ids.isEmpty()) return;
+
+        List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+        for (int i = 0; i < ids.size(); i += MEDIA_BATCH_SIZE) {
+            List<String> chunk = ids.subList(i, Math.min(i + MEDIA_BATCH_SIZE, ids.size()));
+            futures.add(MEDIA_POOL.submit(() -> fetchMediaBatch(context, client, chunk)));
+        }
+        for (java.util.concurrent.Future<?> fut : futures) {
             try {
-                Response<ResponseBody> resp = client.getNoteMedia(mediaId).execute();
-                if (resp.isSuccessful() && resp.body() != null) {
-                    try (ResponseBody body = resp.body();
-                         java.io.InputStream in = body.byteStream();
-                         FileOutputStream out = new FileOutputStream(f)) {
-                        byte[] buf = new byte[8192];
-                        int len;
-                        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-                    }
-                }
-            } catch (IOException ignored) {
+                fut.get();
+            } catch (Exception ignored) {
             }
+        }
+    }
+
+    /** 批量拉取一批媒体并写缓存；响应缺失的 id（大文件/失败）回退单个下载 */
+    private static void fetchMediaBatch(Context context, ApiClient client, List<String> ids) {
+        try {
+            Response<ApiResponse<java.util.Map<String, String>>> resp = client.batchMedia(ids).execute();
+            java.util.Map<String, String> map = resp.isSuccessful() && resp.body() != null && resp.body().isOk()
+                    ? resp.body().getData() : null;
+            if (map == null) {
+                for (String id : ids) downloadSingleMedia(context, client, id);
+                return;
+            }
+            for (java.util.Map.Entry<String, String> e : map.entrySet()) {
+                writeMediaCache(context, e.getKey(), e.getValue());
+            }
+            for (String id : ids) {
+                if (!map.containsKey(id)) downloadSingleMedia(context, client, id);
+            }
+        } catch (IOException e) {
+            for (String id : ids) downloadSingleMedia(context, client, id);
+        }
+    }
+
+    /** 单个媒体流式下载写缓存（批量回退用） */
+    private static void downloadSingleMedia(Context context, ApiClient client, String mediaId) {
+        File f = MediaFiles.cachedMediaFile(context, mediaId);
+        if (f == null || f.exists()) return;
+        try {
+            Response<ResponseBody> resp = client.getNoteMedia(mediaId).execute();
+            if (resp.isSuccessful() && resp.body() != null) {
+                try (ResponseBody body = resp.body();
+                     java.io.InputStream in = body.byteStream();
+                     FileOutputStream out = new FileOutputStream(f)) {
+                    byte[] buf = new byte[8192];
+                    int len;
+                    while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    /** base64 批量响应写缓存 */
+    private static void writeMediaCache(Context context, String mediaId, String base64) {
+        if (mediaId == null || base64 == null || base64.isEmpty()) return;
+        File f = MediaFiles.cachedMediaFile(context, mediaId);
+        if (f == null) return;
+        try {
+            byte[] bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+            try (FileOutputStream out = new FileOutputStream(f)) {
+                out.write(bytes);
+            }
+        } catch (Exception ignored) {
         }
     }
 

@@ -1,83 +1,42 @@
 # BaiFlow
 
-BaiFlow（小白流转）是一个个人服务器上的下载与文件协同中心，包含 Spring Boot 后端、Vue 3 Web 管理台和 Android 客户端。
+BaiFlow（小白流转）——个人服务器上的下载与文件协同中心（Spring Boot + Vue 3 + Android）。
 
-主要功能：文件中心（多存储根/隐私文件夹/分享/下载）、随手记（**所见即所得块编辑器**：文本/标题块 + 图片/录音/画画媒体，Web/Android 双向 Markdown 互认）、**浏览进度跨端同步**（视频/音频续播 + 文本/Markdown/笔记续读，Web/Android 共用同一份数据）、登录会话持久化与设备管理、传输中心、**Android 离线模式**（随手记本地可用 + outbox 同步）、中英双语界面（Web/Android 界面与服务端错误消息按 `Accept-Language` 切换）。
+## 功能
+
+- **文件中心**：多存储根、隐私文件夹、分享、下载
+- **随手记**：所见即所得块编辑器（文本/标题 + 图片/录音/画画），Web/Android 双向 Markdown 互认
+- **浏览进度跨端同步**：视频/音频续播、文本/笔记续读，Web/Android 共用一份数据
+- 登录会话持久化与设备管理、传输中心、Android 离线模式（本地缓存 + outbox 同步）、中英双语
 
 ## 模块
-- `baiflow-server`: Spring Boot API 服务端
-- `baiflow-web`: Vue 3 Web 管理台
-- `baiflow-android`: Android 客户端
-- `deploy`: Docker Compose 部署配置
 
-## 环境要求
-
-| 组件 | 版本 |
+| 模块 | 说明 |
 |---|---|
-| JDK | 17+ |
-| Maven | 3.8+ |
-| Node.js | 18+（推荐 22 LTS） |
-| MySQL | 8.0+ |
-| Redis | 7.0+ |
+| `baiflow-server` | Spring Boot API 服务端 |
+| `baiflow-web` | Vue 3 Web 管理台 |
+| `baiflow-android` | Android 客户端 |
+| `deploy` | Docker Compose 部署配置 |
 
 ## 快速启动
 
-### 1. 数据库
-确保 MySQL 8 已运行，创建数据库：
-```sql
-CREATE DATABASE IF NOT EXISTS baiflow_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-```
+环境要求：JDK 17+ / Maven 3.8+ / Node 18+ / MySQL 8+ / Redis 7+。
 
-### 2. 后端
-```powershell
-cd baiflow-server
+```bash
+# 后端（默认端口 8080；先复制 application-dev.example.yml 为 application-dev.yml 填数据库连接）
+cd baiflow-server && mvn spring-boot:run -Dspring-boot.run.profiles=dev
 
-# 复制并编辑本地开发配置
-copy src\main\resources\application-dev.example.yml src\main\resources\application-dev.yml
-# 编辑 application-dev.yml 填入实际的数据库连接信息
+# 前端（默认端口 5173，/api 自动代理到后端）
+cd baiflow-web && npm install && npm run dev
 
-# 运行测试
-mvn test
-
-# 启动服务（默认端口 8080）
-mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
-```
-
-### 3. 前端
-```powershell
-cd baiflow-web
-
-# 安装依赖（首次运行，后续无需重复）
-npm install
-
-# 启动开发服务器（默认端口 5173，/api 请求自动代理到后端 8080）
-npm run dev
-
-# 构建生产包
-npm run build
-```
-
-### 4. Docker Compose（部署 server + web，MySQL/Redis 复用已有容器）
-```powershell
-cd deploy
-copy .env.example .env
-# 编辑 .env 填入 MySQL/Redis 连接信息与管理员密码
-docker compose up -d --build
-# 重启 server/web：docker compose restart（MySQL/Redis 独立管理）
+# 部署 server + web（MySQL/Redis 复用已有容器；先复制 deploy/.env.example 为 .env）
+cd deploy && docker compose up -d --build
 ```
 
 ## 项目阶段
 
-| 阶段 | 状态 | 交付物 |
-|---|---|---|
-| Phase 0: 文档与边界 | ✅ | `docs/` 文档体系：需求、架构、API、数据库、安全、路线图 |
-| Phase 1: 项目骨架 | ✅ | Spring Boot 骨架、Vue 3 骨架、`/api/health`、Docker Compose |
-| Phase 2: 认证、用户与权限 | ✅ | 会话 token 登录（吊销驱动）、ADMIN/USER/GUEST 角色模型、接口鉴权、登录设备管理 |
-| Phase 3: 文件根据地 MVP | ✅ | Storage Root、文件浏览/上传/下载/移动/删除 |
-| Phase 3.5: 隐私文件夹 | ✅ | 文件夹隐私密码、访问验证、短期会话 |
-| Phase 4: 下载中心 MVP | ~~已移除~~ | aria2 URL 下载功能已按需求下线（2026-08-09），改为文件下载记录 + 次数统计 |
-| Phase 5: 传输中心与通知 | ✅ | 统一任务中心、进度展示、通知中心 |
-| Phase 6: Android Java MVP | ✅ | 登录、文件列表、上传/下载、任务状态、前台通知 |
-| Phase 7: NAS 接入 | ✅ | NAS 挂载目录作为 Storage Root |
-| Phase 8: 分享 URL 与访问控制 | ✅ | 文件/文件夹分享链接、过期时间、提取码、访问控制 |
-| Phase 9: 安全与部署加固 | ✅ | HTTPS、审计日志、登录失败限制（Redis 滑动窗口：15 分钟内连续 5 次失败锁定 15 分钟）、生产部署配置 |
+10 个阶段（Phase 0–9）全部完成：文档体系、项目骨架、认证与权限、文件中心、隐私文件夹、传输与通知、Android MVP、NAS 接入、分享与访问控制、安全与部署加固（详见 `docs/`）。
+
+## 文档
+
+索引见 [`docs/README.md`](docs/README.md)。

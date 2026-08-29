@@ -20,7 +20,7 @@ baiflow-android/app/src/main/java/
   model/       # API 数据模型
   network/     # Retrofit + OkHttp
   transfer/    # 上传/下载前台服务（设备 ↔ 服务器文件传输）
-  ui/activity/ # 独立页面 Activity（登录/服务器配置/预览/资料/密码/语言/笔记编辑/画画）
+  ui/activity/ # 独立页面 Activity（登录/预览/资料/密码/语言/笔记编辑/画画）
   ui/fragment/ # 主界面 Fragment（Files / Notes / Mine）
   widget/      # 自定义控件（按压渐变 AnimatedTextButton / AnimatedTextLabel / AnimatedTintImageView）
   util/        # 通用工具
@@ -28,7 +28,7 @@ baiflow-android/app/src/main/java/
 
 ## 登录态
 
-SharedPreferences 保存会话 token（长期保持）与服务器地址。登录带 `X-Device-Type` / `X-Device-Name` 头，服务端据此建会话（ANDROID 长期、180 天不活跃兜底）；被强制下线/过期后 401 清会话回登录。详见 `docs/02-database.md`「auth_session」。
+SharedPreferences 保存会话 token（长期保持）。**服务器地址固定由构建类型决定，不再手动配置**：从 `baiflow-android/local.properties` 读取 `BAIFLOW_RELEASE_SERVER_URL`（release 打包连线上）/ `BAIFLOW_DEBUG_SERVER_URL`（debug 调试），经 `BuildConfig.SERVER_URL` 供 `SessionManager.getServerUrl()` 直接返回。`local.properties` 被 git 忽略、真实地址不提交，模板见 `baiflow-android/local.properties.example`；未配置时回落占位默认值。**换后端 = 改本地 `local.properties` 重新打包**，App 内无服务器配置界面。登录带 `X-Device-Type` / `X-Device-Name` 头，服务端据此建会话（ANDROID 长期、180 天不活跃兜底）；被强制下线/过期后 401 清会话回登录。详见 `docs/02-database.md`「auth_session」。
 
 ## 上传下载
 
@@ -46,7 +46,7 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 
 ## 页面
 
-- 登录 / 服务器配置（连通性检测）→ **MainActivity**（底部三栏，`ViewPager2` 滑动 + 底部导航双向同步）
+- 登录 → **MainActivity**（底部三栏，`ViewPager2` 滑动 + 底部导航双向同步）；首启未登录直接进登录页（服务器已固定，无引导页/服务器配置）
   - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「三点」菜单（下拉：新建文件夹 / 上传文件）；长按文件/文件夹弹操作菜单（重命名 / 下载 / 删除，重命名走 `PATCH /api/files/{id}/rename`）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等）；不支持预览的文件点按弹下载确认框。**隐私空间**：主目录下「隐私空间」文件夹，首次进入弹「设置密码」（`POST privacy`，40107），之后进入弹「输入密码」（`verifyPrivacy` 换令牌）；令牌仅存内存（`privacyTokens`），重进需重输；管理员访问后端直接放行
   - **随手记** `NotesFragment`：列表/搜索/删除 → `NoteEditActivity`（**所见即所得块编辑器**：RecyclerView 每块一个真实 View，文本 EditText 经 `BlockRichText` 渲染行内 markdown 的格式效果、编辑即预览，图片 ImageView，音频 `NoteAudioPlayerView`；加载 Markdown→`NoteBlocks.fromDoc`、保存 `NoteBlocks.toDoc`→Markdown，落库仍是 Markdown）→ `NoteDrawActivity`（画画）
   - **我的** `MineFragment`：分组（账号/通用/同步）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认 + `doLogout()` 幂等守卫（`logoutStarted` 标志）防连点。头像展示：有 `avatarUrl` 时 OkHttp 拉取圆形展示（`AvatarLoader`），无则浅灰底 + 展示名首字；修改资料页（`ProfileActivity`）支持**更换头像**（96dp 圆形 + 贴底「编辑」带，选图即上传，`ImageUtil` 缩放/EXIF 校正/压缩 ≤1MB → `POST /api/auth/avatar`），实现细节见 `docs/07-ios-design-system.md`；Android 端不提供删除头像（服务端与 Web 端入口保留）。进入「我的」页时（`onResume`）在线模式调 `/auth/me` 刷新本地用户信息（头像/展示名可能在其他端修改）
@@ -61,7 +61,7 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
   - 交互请求（UiCallback）：收到任何 HTTP 响应视为成功联系并清除断连标记；IOException 按 `classify()` 分类（设备无网→「无网络连接」，有网但请求失败→「无法连接服务器」）；HTTP 5xx 全局兜底「服务器异常」。
   - 全局统一 Toast + **时段内去重**（同一断连时段只提示一次，任一次响应成功即清除），断连结束后弹一次「网络已恢复」。
   - 断网由 `MainActivity` 注册 `ConnectivityManager` NetworkCallback 即时提示（onLost→「无网络连接」 / onAvailable→恢复），onDestroy 注销；覆盖文件/笔记/我的三个 Tab。
-  - 登录页/服务器配置页：onFailure 用 `classify()` 友好文案**内联**提示，不触发全局 Toast（避免双弹）。
+  - 登录页：onFailure 用 `classify()` 友好文案**内联**提示，不触发全局 Toast（避免双弹）。
   - 不再向用户展示 `t.getMessage()` 异常原文/服务器 IP/技术细节。
   - 后台上传/下载前台服务、WorkManager 后台同步**不弹 UI**，保持各自失败机制。
   - 超时：仅 connect 30s→10s（连不上更快反馈），read/write 保持 60s（下载/大响应需要长读）。
@@ -81,18 +81,19 @@ SharedPreferences 保存会话 token（长期保持）与服务器地址。登�
 - **按压渐变**：`widget/` 的 `AnimatedTextButton` / `AnimatedTextLabel` / `AnimatedTintImageView`，文字/图标按压「蓝→浅蓝」平滑过渡（`text_accent_selector`）；返回/刷新/上一级用单色 PNG + tint 参与渐变
 - 文件类型图标：彩色 PNG（`res/drawable/ic_type_*`，含 md；Web 端复用同一批 PNG 展示）
 
-## 随手记（在线编辑器 + 离线三态）
+## 随手记（在线编辑器）
 
 ### 编辑器取舍
 - Android 行内强调嵌套可能摊平为相邻 run、有序列表总是从 1 开始、块间空行归一化——**代码块内容/标题标记/媒体 URL/任何文本绝不丢失**（透传保证）
 - 引用块已移除：旧引用内容映射为普通文本块（保留内容，丢弃 `>` 前缀）；下划线用 `<u>` 表示
 
-### 离线三态（Room + outbox）
-- **本地模式**（未配服务器，免登录）：随手记全本地，文件中心/下载/传输禁用
-- **在线模式**（已配服务器 + token）：全功能，笔记同步
-- **离线模式**（已配服务器但主动离线）：进离线**清 token**（本地笔记免登录），随手记用 Room 本地镜像 + outbox，文件中心/下载/传输禁用；重连**必重新登录**再立即同步
-- Room 表 `bf_local_note` 按 `server_url` 分区（**缓存绑定服务器**）：切换服务器/登出清空对应分区防串号；本地模式数据（LOCAL 键）独立保留，配服务器后**上传前询问**（「有 N 条本地笔记，是否上传」）
-- 同步：outbox（`dirty` + tombstone）先推 create/update（带 `baseUpdatedAt`）/delete，再 `GET /api/notes?updatedAfter=` 增量拉取合并；冲突对齐 NOTE_CONFLICT（覆盖/重载）；WorkManager 后台周期 + 网络恢复触发 + 手动「同步」按钮
-- 媒体：离线上传的媒体先传回填服务端 URL；服务器媒体按需下载缓存本地文件
-- 安全边界：本地笔记明文存设备（不加密，设备级信任）；进离线清 token，拿到设备即可读
-- 边界：管理员移动端按用户切换笔记视图不支持（离线优先分区 = 本人笔记）；Web/iOS 不做离线模式
+### 在线同步（Room + outbox）
+> 仅在线模式（已登录即在线）；本地模式与离线模式均已移除。
+- 全功能，笔记同步
+- Room 表 `bf_local_note` 按 `server_url` 分区（**缓存绑定服务器**）：登出清空对应分区防串号；升级前遗留的本地分区数据（LOCAL 键）独立保留，首次登录后**上传前询问**（「有 N 条本地笔记，是否上传」）
+- 同步：outbox（`dirty` + tombstone）先推 create/update（带 `baseUpdatedAt`）/delete，再 `GET /api/notes?updatedAfter=` 增量拉取合并（增量模式列表携带正文，直接合并，无 N+1）；**另有 SSE 长连接**（`NoteSseClient`，手写解析 `/api/events`，收到 `NOTE_UPDATED` 立即触发一次增量同步）——实时 + 周期兜底；WorkManager 后台周期 + 网络恢复触发 + 手动「同步」按钮
+- **冲突**：乐观并发（`baseUpdatedAt` 必传，缺失 40001 / 早于服务端 40901）；冲突弹窗**先拉服务端版本做块级差异预览**（本地改动 N 块 / 服务端改动 M 块 + 前 3 块预览），用户再选「覆盖」（以服务端最新 updatedAt 为基准重推）或「重新加载」
+- **同步状态可见性**：笔记列表项右侧**徽标**（冲突=红 / 待推=灰，`LocalNote.dirty/conflict`）；「我的」页同步区显示「待同步 N 条 · 冲突 M 条」（`LocalNoteDao.countDirty/countConflict`，有未同步改动时显示）
+- 媒体：本地新建媒体先上传回填服务端 URL；服务器媒体按需下载缓存到 `filesDir/note_media_cache/<id>`（**批量接口 + 有界并发**：`POST /api/notes/media/batch` 每批 ≤10、3 批并行；服务端跳过的大文件/失败项回退单个流式下载）。**缓存管理**：「我的」页「存储」分组——「清理缓存」行（右侧显示大小，二次确认后清空 `note_media_cache/`，清除后需重新下载）+「缓存上限」行（SeekBar 50–2000MB 默认 300MB）；同步写完媒体后自动按上限 LRU 清理（`MediaFiles.enforceLimit`）。本地新建媒体 `note_media/`（可能未上传）**永不自动清理**。见 `docs/adr/ADR-001-media-cache-management.md`
+- 安全边界：本地笔记明文存设备（不加密，设备级信任）
+- 边界：管理员移动端按用户切换笔记视图不支持（分区 = 本人笔记）

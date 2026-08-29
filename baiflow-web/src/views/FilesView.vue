@@ -202,6 +202,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { notifyRequestError, isNetworkError } from '../utils/notify'
 import { useI18n } from 'vue-i18n'
 import { Upload, FolderAdd, UploadFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
@@ -464,7 +465,7 @@ async function doUpload() {
     uploadFiles.value = []
     loadFiles()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || t('files.uploadFailed'))
+    notifyRequestError(e, t('files.uploadFailed'))
   } finally {
     uploading.value = false
   }
@@ -483,7 +484,7 @@ async function doDownload(row) {
       URL.revokeObjectURL(url)
     })
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || e.message || t('files.operationFailed'))
+    notifyRequestError(e, t('files.operationFailed'))
   }
 }
 
@@ -505,7 +506,7 @@ async function showDownloadDetails(row) {
     downloadRecords.value = res.data.data?.records || []
     downloadDetailsTotal.value = res.data.data?.total ?? downloadDetailsTotal.value
   } catch (e) {
-    ElMessage.error(t('files.downloadDetailsLoadFailed'))
+    notifyRequestError(e, t('files.downloadDetailsLoadFailed'))
   } finally {
     downloadDetailsLoading.value = false
   }
@@ -532,7 +533,7 @@ async function doCreateFolder() {
       ElMessage.error(data.message || t('files.createFailed'))
     }
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || t('files.createFailed'))
+    notifyRequestError(e, t('files.createFailed'))
   } finally {
     creating.value = false
   }
@@ -555,7 +556,7 @@ async function doRename() {
     showRenameDialog.value = false
     loadFiles()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || t('files.renameFailed'))
+    notifyRequestError(e, t('files.renameFailed'))
   } finally {
     renaming.value = false
   }
@@ -575,7 +576,7 @@ async function doDelete(row) {
     ElMessage.success(t('files.deleted'))
     loadFiles()
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('files.deleteFailed'))
+    if (e !== 'cancel') notifyRequestError(e, t('files.deleteFailed'))
   }
 }
 
@@ -612,7 +613,7 @@ async function doSetupPrivacy() {
       privacySetupError.value = data.message || t('files.privacySetFailed')
     }
   } catch (e) {
-    privacySetupError.value = e.response?.data?.message || t('files.privacySetFailed')
+    privacySetupError.value = isNetworkError(e) ? t('common.cannotReachServer') : (e.response?.data?.message || t('files.privacySetFailed'))
   } finally {
     settingPrivacy.value = false
   }
@@ -638,12 +639,12 @@ async function checkParentPrivacy(fileItemId, currentToken, callback) {
       privacyPendingCallback.value = () => {
         const newToken = fileStore.getPrivacyToken(privacyPendingFolderId.value)
         callback(newToken).catch(err => {
-          ElMessage.error(err.response?.data?.message || t('files.operationFailed'))
+          notifyRequestError(err, t('files.operationFailed'))
         })
       }
       showPrivacyDialog(code, e.response?.data?.message || '')
     } else {
-      ElMessage.error(e.response?.data?.message || '操作失败')
+      notifyRequestError(e, t('files.operationFailed'))
     }
   }
 }
@@ -669,7 +670,7 @@ async function doVerifyPrivacy() {
       privacyError.value = data.message || '验证失败'
     }
   } catch (e) {
-    privacyError.value = e.response?.data?.message || '验证失败'
+    privacyError.value = isNetworkError(e) ? t('common.cannotReachServer') : (e.response?.data?.message || t('files.verifyFailed'))
   } finally {
     privacyVerifying.value = false
   }
@@ -719,7 +720,7 @@ function handleHttpError(e) {
   if (isPrivacyCode(code)) {
     openPrivacyDialog(code, e.response?.data?.message || '')
   } else {
-    ElMessage.error(e.response?.data?.message || t('files.requestFailed'))
+    notifyRequestError(e, t('files.requestFailed'))
   }
 }
 

@@ -66,7 +66,8 @@ public class NoteServiceImpl implements NoteService {
         wrapper.orderByDesc(Note::getCreatedAt);
 
         IPage<Note> pageResult = noteMapper.selectPage(new Page<>(page, size), wrapper);
-        return pageResult.convert(NoteSummary::from);
+        // 增量同步模式带正文（客户端据此直接合并，省去逐条拉详情）；普通列表保持轻量
+        return pageResult.convert(incremental ? NoteSummary::fromWithContent : NoteSummary::from);
     }
 
     @Override
@@ -97,12 +98,17 @@ public class NoteServiceImpl implements NoteService {
                                  String title, String content, String baseUpdatedAt) {
         Note note = requireNote(id);
         checkAccess(note, userId, isAdmin);
-        // 乐观并发：客户端基于的 updatedAt 早于服务端当前值 → 说明被其他设备改过，返回冲突
-        if (baseUpdatedAt != null && !baseUpdatedAt.isBlank()) {
-            LocalDateTime base = parseBaseTimestamp(baseUpdatedAt);
-            if (base != null && note.getUpdatedAt() != null && note.getUpdatedAt().isAfter(base)) {
-                throw new BusinessException(ErrorCode.NOTE_CONFLICT, "笔记已在其他设备被修改");
-            }
+        // 乐观并发（强制）：baseUpdatedAt 必传且可解析；早于服务端当前值 → 被其他设备改过，返回冲突。
+        // 缺失/格式非法直接拒绝，避免静默后写覆盖丢数据（旧客户端升级后需传，否则 40001）
+        if (baseUpdatedAt == null || baseUpdatedAt.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "更新笔记必须携带 baseUpdatedAt");
+        }
+        LocalDateTime base = parseBaseTimestamp(baseUpdatedAt);
+        if (base == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "baseUpdatedAt 格式非法");
+        }
+        if (note.getUpdatedAt() != null && note.getUpdatedAt().isAfter(base)) {
+            throw new BusinessException(ErrorCode.NOTE_CONFLICT, "笔记已在其他设备被修改");
         }
         if (title != null) note.setTitle(title);
         if (content != null) note.setContent(content);

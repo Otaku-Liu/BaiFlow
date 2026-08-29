@@ -99,9 +99,7 @@ public class PasswordActivity extends BaseActivity {
     private void doLogout() {
         String partition = session.getDataPartition();
         session.clearSession();
-        if (!SessionManager.PARTITION_LOCAL.equals(partition)) {
-            AppDatabase.get(this).noteDao().clearByServer(partition);
-        }
+        AppDatabase.get(this).noteDao().clearByServer(partition);
         SyncWorker.cancel(this);
         Intent intent = new Intent(this, LoginActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);

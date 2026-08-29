@@ -51,7 +51,7 @@ Apple 色板：#007AFF 主色、#1D1D1F 主文字、#F5F5F7 背景、#86868B 次
 已落地：
 
 - `res/values/styles_ios.xml`：`Ios` 基样式 + 按钮（`Ios.Button` / `.Primary` / `.Text` / `.Danger`）、输入框 `Ios.TextInput`、标题栏 `Ios.Header`（`.Title` 居中 / `.BackLabel` 上一级名）、编辑器工具栏（`Ios.ToolbarButton` / `Ios.ToolbarRow`）
-- 应用到现有界面：服务器配置、传输任务、预览、文件、我的、**登录**（输入框/按钮）、**随手记编辑器**（工具栏）
+- 应用到现有界面：传输任务、预览、文件、我的、**登录**（输入框/按钮）、**随手记编辑器**（工具栏）
 - 返回按钮 = chevron + 上一级名，无按压反馈；标题栏无阴影
 
 待后续按需补充：开关 `Ios.Switch`、分段控件 `Ios.Segmented`（`ui/widget/SegmentedControl`）。

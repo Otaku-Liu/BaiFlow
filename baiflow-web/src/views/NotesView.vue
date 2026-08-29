@@ -48,7 +48,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
@@ -59,7 +59,7 @@ import { useSse } from '../composables/useSse'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useNoteProgress } from '../composables/useNoteProgress'
 import { markdownToBlocks, blocksToMarkdown } from '../utils/noteBlocks'
-import { notifyError, notifySuccess } from '../utils/notify'
+import { notifyError, notifySuccess, notifyRequestError } from '../utils/notify'
 import { formatDateTime } from '../utils/format'
 
 const { t } = useI18n()
@@ -159,15 +159,26 @@ async function saveNow() {
     notifySuccess(t('notes.saved'))
     loadList()
   } catch (e) {
-    notifyError(e.response?.data?.message || t('notes.saveFailed'))
+    notifyRequestError(e, t('notes.saveFailed'))
   }
 }
 
-/** 乐观并发冲突：让用户选择「覆盖」（丢对方的改动）还是「重新加载」（丢本地改动） */
+/** 乐观并发冲突：先展示双方差异，再让用户选「覆盖」或「重新加载」 */
 async function handleConflict() {
+  // 差异预览：对比本地未保存内容与服务端内容（拉取失败回落默认文案）
+  let message = t('notes.conflictMessage')
+  try {
+    const { data } = await getNote(currentId.value)
+    const detail = data?.data
+    if (detail?.content != null) {
+      message = buildConflictDiffMessage(blocksToMarkdown(blocks.value), detail.content)
+    }
+  } catch { /* 拉取失败用默认文案 */ }
+
   let overwrite = false
   try {
-    await ElMessageBox.confirm(t('notes.conflictMessage'), t('notes.conflictTitle'), {
+    // 消息含多行差异预览：用 VNode + pre-line 渲染，避免 dangerouslyUseHTMLString 引入 XSS
+    await ElMessageBox.confirm(h('div', { style: 'white-space: pre-line' }, message), t('notes.conflictTitle'), {
       confirmButtonText: t('notes.conflictOverwrite'),
       cancelButtonText: t('notes.conflictReload'),
       distinguishCancelAndClose: true,
@@ -182,8 +193,56 @@ async function handleConflict() {
     }
     return
   }
-  noteUpdatedAt = null
+  // 覆盖 = 以服务端最新 updatedAt 为基准再保存本地改动（服务端强制 baseUpdatedAt，置 null 会被 40001 拒）
+  try {
+    const { data } = await getNote(currentId.value)
+    const detail = data?.data
+    if (!detail?.updatedAt) {
+      notifyError(t('notes.saveFailed'))
+      return
+    }
+    noteUpdatedAt = detail.updatedAt
+  } catch (e) {
+    notifyRequestError(e, t('notes.saveFailed'))
+    return
+  }
   await saveNow()
+}
+
+/** 块级差异预览：对比本地与服务端内容的块（经 markdownToBlocks），统计并预览前几块 */
+function buildConflictDiffMessage(localContent, serverContent) {
+  const local = markdownToBlocks(localContent)
+  const server = markdownToBlocks(serverContent)
+  const localKeys = new Set(local.map(blockKey))
+  const serverKeys = new Set(server.map(blockKey))
+  const localOnly = local.filter((b) => !serverKeys.has(blockKey(b))).map(blockPreview)
+  const serverOnly = server.filter((b) => !localKeys.has(blockKey(b))).map(blockPreview)
+  const lines = [t('notes.conflictDiffHead')]
+  lines.push(t('notes.conflictDiffLocal', { n: localOnly.length }))
+  localOnly.slice(0, 3).forEach((l, i) => lines.push(`${i + 1}. ${l}`))
+  lines.push(t('notes.conflictDiffServer', { n: serverOnly.length }))
+  serverOnly.slice(0, 3).forEach((l, i) => lines.push(`${i + 1}. ${l}`))
+  lines.push(t('notes.conflictDiffTail'))
+  return lines.join('\n')
+}
+
+/** 块唯一键（文本/标题级别/列表项/代码/媒体 URL 参与比对） */
+function blockKey(blk) {
+  switch (blk.type) {
+    case 'h': return 'H' + blk.level + ' ' + (blk.text || '')
+    case 'bullet':
+    case 'ordered': return (blk.items || []).join('\n')
+    case 'code': return 'CODE\n' + (blk.language || '') + '\n' + (blk.code || '')
+    case 'image': return 'IMG ' + (blk.url || '') + ' ' + (blk.alt || '')
+    case 'audio': return 'AUDIO ' + (blk.url || '')
+    default: return blk.text || ''
+  }
+}
+
+/** 块预览文本（单行 + 截断，防弹窗过长） */
+function blockPreview(blk) {
+  const s = blockKey(blk).replace(/\n/g, ' ')
+  return s.length > 40 ? s.slice(0, 40) + '…' : s
 }
 
 /** 重新加载当前打开的笔记（放弃本地未保存改动） */
@@ -198,7 +257,7 @@ async function reloadOpenNote() {
     noteUpdatedAt = detail.updatedAt
     dirty = false
   } catch (e) {
-    notifyError(e.response?.data?.message || t('notes.loadFailed'))
+    notifyRequestError(e, t('notes.loadFailed'))
   }
 }
 
@@ -228,7 +287,7 @@ async function openNote(note) {
     noteUpdatedAt = detail.updatedAt
     await maybeResume(getScrollEl)
   } catch (e) {
-    notifyError(e.response?.data?.message || t('notes.loadFailed'))
+    notifyRequestError(e, t('notes.loadFailed'))
   }
 }
 
@@ -251,12 +310,14 @@ async function onDelete() {
     noteUpdatedAt = null
     loadList()
   } catch (e) {
-    notifyError(e.response?.data?.message || t('notes.deleteFailed'))
+    notifyRequestError(e, t('notes.deleteFailed'))
   }
 }
 
 // ---- SSE 同步：设备/其他端保存时通知本浏览器 ----
 useSse({
+  // 连接/重连成功即刷新列表：断线期间错过的 NOTE_UPDATED 不会重放，靠这里补拉
+  __onOpen: () => loadList(),
   NOTE_UPDATED: (e) => {
     let payload = {}
     try { payload = JSON.parse(e.data || '{}') } catch { /* ignore */ }

@@ -16,6 +16,8 @@
 - 密码/提取码/token 只存 hash
 - 注释：**所有表与字段必须带 `COMMENT` 注释**，说明其含义，便于管理与理解
 
+**时间约定**：时间列统一用 **`DATETIME`**（毫秒精度的同步游标用 `DATETIME(3)`），**存 UTC+8 墙钟**（与应用 JVM/连接时区 `Asia/Shanghai` 一致，`LocalDateTime.now()` 写入即 +8 字面值，读取/比较零转换）。**约束：JVM 必须运行在 Asia/Shanghai**（`baiflow-server/Dockerfile` 已设 `ENV TZ=Asia/Shanghai`；非 Docker 启动需 `-Duser.timezone=Asia/Shanghai`，否则 `LocalDateTime.now()` 写入非 +8）。不用 `TIMESTAMP`——它内部按 UTC 存取，多一层隐藏转换易偏移（历史 bug），且上限 2038。
+
 ## 核心表
 
 ### user — 系统用户
@@ -76,9 +78,9 @@
 每个用户对每个文件只存一条记录。`position_type` 区分视频秒数、PDF 页码、文本滚动百分比，支持跨设备断点续看。**删除文件时级联删除该文件的全部进度行**。
 
 ### note — 随手记笔记
-`id, user_id, title, content(LONGTEXT, 块结构序列化的 Markdown), status(ACTIVE/DELETED 软删除), created_at, updated_at, deleted_at`
+`id, user_id, title, content(LONGTEXT, 块结构序列化的 Markdown), status(ACTIVE/DELETED 软删除), created_at, updated_at(DATETIME(3) 毫秒), deleted_at`
 
-笔记独立于文件系统，正文直接落库。编辑器改为**块结构**（文本/标题/列表/引用/代码/图片/音频块，每块一个真实组件），落库格式仍为 **Markdown**（块↔Markdown 转换，服务端不解析，纯客户端契约）。`updated_at` 由服务端显式刷新，作为乐观并发（保存携带 `baseUpdatedAt` 比对）的时间基准。`status` 软删除标记随增量拉取同步。
+笔记独立于文件系统，正文直接落库。编辑器改为**块结构**（文本/标题/列表/引用/代码/图片/音频块，每块一个真实组件），落库格式仍为 **Markdown**（块↔Markdown 转换，服务端不解析，纯客户端契约）。`updated_at` 为 **DATETIME(3) 毫秒精度**（范围 1000-9999，**无 MySQL TIMESTAMP 的 2038 上限**），由服务端显式刷新，作为乐观并发（保存携带 `baseUpdatedAt` **必传**比对，缺失/格式非法 40001、早于当前值 40901）与增量同步（`updatedAfter`）的时间基准；毫秒精度避免同秒内二次保存时 `updated_at` 不变导致增量 `gt(游标)` 漏拉。`status` 软删除标记随增量拉取同步。增量模式列表项携带 `content` 正文，离线端直接合并。
 
 ### note_progress — 笔记阅读进度
 `id, user_id, note_id, position_type(SCROLL_PERCENT), position_value, created_at, updated_at`

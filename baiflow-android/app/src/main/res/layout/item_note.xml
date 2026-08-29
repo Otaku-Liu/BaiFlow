@@ -36,4 +36,20 @@
             android:layout_marginTop="3dp" />
     </LinearLayout>
 
+    <!-- 同步状态徽标：冲突（红）/ 待推（灰），仅列表项有未同步改动时显示 -->
+    <TextView
+        android:id="@+id/tvBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="16dp"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
+        android:textSize="10sp"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_badge"
+        android:visibility="gone" />
+
 </FrameLayout>

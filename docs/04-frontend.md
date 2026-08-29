@@ -15,7 +15,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | 分享管理 | `/` 内 | 分享链接创建/查看/撤销、访问日志（管理员） |
 | 用户管理 | `/` 内 | 管理员可见：用户列表（**头像列** `el-avatar`：`avatarUrl` 有则图、无则取 `displayName`/`username` 首字回退，样式与 `HomeView` 一致——透明底图 + 浅灰 `#c0c4cc` 首字）、创建/编辑、批量删除、重置密码 |
 | 操作日志 | `/` 内 | 管理员可见：`el-sub-menu` 子菜单入口 |
-| 登录日志 | `/` 内 | 管理员可见：分页表格，用户名模糊搜索、日期时间范围、登录结果筛选 |
+| 登录日志 | `/` 内 | 管理员可见：分页表格，用户名模糊搜索、日期时间范围（**默认当天，按 UTC+8 计算**，日期框可清空看全部历史）、登录结果筛选 |
 | 个人资料 | 弹窗 | 展示名、更换/删除头像、修改密码、登录设备管理（强制下线） |
 | 预览抽屉 | Drawer | 按 MIME 路由：图片(`<img>`)、视频(`<video>`+进度)、音频(`<audio>`+进度)、PDF(`<iframe>`)、Markdown(showdown→HTML)、文本/代码(`<pre>`)、其他(降级下载；Office 文档归为此类) |
 
@@ -23,7 +23,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 
 - **vue-i18n**：所有 UI 文本通过 `t('namespace.key')` 引用，语言包位于 `src/locales/`
 - **Element Plus**：通过 `el-config-provider` 响应式切换组件语言
-- **顶部语言切换**：右上角下拉框（中文 / English），写入 `localStorage.baiflow_locale`
+- **语言切换**：右上角下拉框（中文 / English），写入 `localStorage.baiflow_locale`；主界面与**登录页**均提供（登录页切换器在页面右上角），登录页文案亦走 i18n
 - **Axios**：请求头自动带 `Accept-Language`，后端错误消息同步切换
 - 数据库数据（文件名、用户名等）不翻译，仅翻译列名、按钮、提示等 UI 文案
 
@@ -117,15 +117,6 @@ Finder 列表视图风格：无斑马纹、hover 行浅蓝底、行高 `44px`。
 ### 图标
 
 当前使用 Element Plus Icons，后续可换 `lucide-vue-next`。
-
-## Apple 风格设计摘要
-
-| 项 | 说明 |
-|---|---|
-| 技术路径 | 深度定制 Element Plus |
-| 设计语言 | iOS 11-14（卡片化、简约、触控友好） |
-| 字体 | Inter |
-| 侧边栏 | 浅灰无边框（iPad 分栏） |
 
 ## 弹窗组件统一
 

@@ -4,12 +4,12 @@ import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
 /**
- * 本地笔记（Room 单表，离线模式三态共用）。
+ * 本地笔记（Room 单表，按服务器地址分区缓存）。
  * <p>
- * - {@link #serverUrl} 为缓存分区键：本地模式 = {@link SessionManager#PARTITION_LOCAL}，否则 = 服务器地址；
+ * - {@link #serverUrl} 为缓存分区键 = 服务器地址；
  * - {@link #source} 区分 LOCAL_ONLY（从未上传）/ SYNCED（服务端镜像）/ TOMBSTONE（离线删除待同步）；
  * - {@link #dirty} 为 outbox 标记；{@link #conflict} 为同步冲突标记（打开时弹「覆盖/重载」）。
- * 见 docs/05-android.md「离线三态」。
+ * 见 docs/05-android.md「离线两态」。
  */
 @Entity(tableName = "bf_local_note")
 public class LocalNote {

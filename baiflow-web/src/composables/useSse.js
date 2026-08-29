@@ -18,14 +18,19 @@ export function useSse(handlers = {}) {
     if (!authStore.token) return
     es = new EventSource(`/api/events?token=${encodeURIComponent(authStore.token)}`)
     for (const name of Object.keys(handlers)) {
-      es.addEventListener(name, handlers[name])
+      if (name === '__onOpen') {
+        // 首次连接 / 断线重连成功：断线期间错过的事件不会重放，主动补刷新（如刷新列表）
+        es.addEventListener('open', handlers[name])
+      } else {
+        es.addEventListener(name, handlers[name])
+      }
     }
   }
 
   function close() {
     if (!es) return
     for (const name of Object.keys(handlers)) {
-      es.removeEventListener(name, handlers[name])
+      if (name !== '__onOpen') es.removeEventListener(name, handlers[name])
     }
     es.close()
     es = null

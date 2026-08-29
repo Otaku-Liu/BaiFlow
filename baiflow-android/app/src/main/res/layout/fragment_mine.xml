@@ -181,7 +181,7 @@
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
-                android:foreground="@drawable/bg_ripple_top">
+                android:foreground="@drawable/bg_ripple_bottom">
 
                 <TextView
                     android:layout_width="0dp"
@@ -198,6 +198,45 @@
                     android:textSize="25sp"
                     android:textColor="@color/text_secondary" />
             </LinearLayout>
+        </LinearLayout>
+
+        <!-- ==================== 存储 ==================== -->
+        <TextView
+            style="@style/Ios.SectionTitle"
+            android:text="@string/mine_section_storage" />
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card">
+
+            <LinearLayout
+                android:id="@+id/rowClearCache"
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:gravity="center_vertical"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:foreground="@drawable/bg_ripple_top">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/mine_clear_cache"
+                    android:textSize="15sp"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/tvCacheSize"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:text="0 B" />
+            </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
@@ -206,7 +245,7 @@
                 android:background="@color/divider" />
 
             <LinearLayout
-                android:id="@+id/rowServer"
+                android:id="@+id/rowCacheLimit"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
@@ -219,15 +258,15 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/server_config_title"
+                    android:text="@string/mine_cache_limit"
                     android:textSize="15sp"
                     android:textColor="@color/text_primary" />
 
                 <TextView
+                    android:id="@+id/tvCacheLimit"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="›"
-                    android:textSize="25sp"
+                    android:textSize="13sp"
                     android:textColor="@color/text_secondary" />
             </LinearLayout>
         </LinearLayout>
@@ -244,59 +283,7 @@
             android:background="@drawable/bg_card">
 
             <LinearLayout
-                android:id="@+id/rowOffline"
-                android:orientation="horizontal"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:gravity="center_vertical"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
-                android:foreground="@drawable/bg_ripple_top">
-
-                <TextView
-                    android:id="@+id/tvOffline"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/mine_offline_toggle_on"
-                    android:textSize="15sp"
-                    android:textColor="@color/text_primary" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="›"
-                    android:textSize="25sp"
-                    android:textColor="@color/text_secondary" />
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="20dp"
-                android:background="@color/divider" />
-
-            <LinearLayout
                 android:id="@+id/rowSync"
-                android:orientation="horizontal"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:gravity="center_vertical"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
-                android:foreground="@drawable/bg_ripple_middle">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/mine_sync"
-                    android:textSize="15sp"
-                    android:textColor="@color/text_primary" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/rowReconnect"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
@@ -309,11 +296,22 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/mine_reconnect"
+                    android:text="@string/mine_sync"
                     android:textSize="15sp"
                     android:textColor="@color/text_primary" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- 同步状态（在线模式有未同步改动时显示待推/冲突数） -->
+        <TextView
+            android:id="@+id/tvSyncStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="6dp"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
         <!-- 退出 -->
         <com.google.android.material.button.MaterialButton

@@ -15,28 +15,26 @@
     <string name="cannot_reach_server">Cannot reach the server. Check the network and retry later.</string>
     <string name="server_error">Server error. Please retry later.</string>
     <string name="network_recovered">Network recovered. Please continue.</string>
-    <!-- ==================== Offline mode ==================== -->
-    <string name="login_offline_mode">Use offline mode (local notes)</string>
-    <string name="guide_title">Welcome to BaiFlow</string>
-    <string name="guide_desc">Quick notes work offline. Set up a server to sync across devices and use the file center.</string>
-    <string name="guide_btn_server">Set up server</string>
-    <string name="guide_btn_local">Not now, use locally</string>
+    <!-- ==================== Legacy LOCAL note upload ==================== -->
     <string name="offline_upload_prompt_title">Upload local notes</string>
     <string name="offline_upload_prompt_message">You have %1$s local notes. Upload them to the server?</string>
     <string name="offline_upload_yes">Upload</string>
     <string name="offline_upload_no">Not now</string>
     <string name="note_edit_image_save_failed">Failed to save image</string>
-    <string name="mine_offline_toggle_on">Enter offline mode</string>
-    <string name="mine_offline_toggle_off">Exit offline mode (log in again)</string>
     <string name="mine_sync">Sync now</string>
     <string name="mine_sync_done">Synced</string>
     <string name="mine_sync_pending">Syncing…</string>
     <string name="mine_sync_failed">Sync failed. Please retry later.</string>
-    <string name="mine_reconnect">Reconnect to server</string>
-    <string name="mine_mode_local">Local mode</string>
+    <string name="mine_sync_status">Pending sync: %1$d · Conflicts: %2$d</string>
+    <string name="mine_section_storage">Storage</string>
+    <string name="mine_clear_cache">Clear cache</string>
+    <string name="mine_cache_limit">Cache limit</string>
+    <string name="mine_cache_limit_value">%1$d MB</string>
+    <string name="mine_clear_cache_confirm_title">Clear cache</string>
+    <string name="mine_clear_cache_confirm_msg">This will clear downloaded note media (images/audio). After clearing, opening the note or media offline will require re-download. This cannot be undone. Continue?</string>
+    <string name="mine_clear_cache_confirm">Clear</string>
+    <string name="mine_clear_cache_done">Cache cleared</string>
     <string name="mine_mode_online">Online mode</string>
-    <string name="mine_mode_offline">Offline mode</string>
-    <string name="files_offline_unavailable">Offline / no server configured. File center unavailable.</string>
 
     <!-- ==================== Bottom navigation ==================== -->
     <string name="nav_files">Files</string>
@@ -48,20 +46,11 @@
     <string name="login_password_hint">Password</string>
     <string name="login_button">Log In</string>
     <string name="login_logging_in">Logging in...</string>
-    <string name="login_change_server">Change Server</string>
     <string name="login_server_prefix">Server: %1$s</string>
     <string name="login_input_required">Enter username and password</string>
     <string name="login_failed">Login failed</string>
     <string name="login_success">Logged in</string>
     <string name="login_fetch_user_failed">Failed to fetch user info</string>
-
-    <!-- ==================== Server config ==================== -->
-    <string name="server_config_title">Server Settings</string>
-    <string name="server_url_hint">Server URL</string>
-    <string name="server_connect">Connect</string>
-    <string name="server_checking">Checking…</string>
-    <string name="server_url_required">Enter a server address</string>
-    <string name="server_connect_success">Connected, server address saved</string>
 
     <!-- ==================== Files ==================== -->
     <string name="files_title">File Center</string>
@@ -122,6 +111,8 @@
     <string name="notes_search_hint">Search notes</string>
     <string name="notes_empty">No notes yet. Tap New to create one.</string>
     <string name="notes_untitled">Untitled</string>
+    <string name="notes_badge_pending">Pending</string>
+    <string name="notes_badge_conflict">Conflict</string>
 
     <!-- ==================== Note editor ==================== -->
     <string name="note_edit_title_hint">Title</string>
@@ -140,6 +131,11 @@
     <string name="note_edit_overwrite">Overwrite</string>
     <string name="note_edit_reload">Reload</string>
     <string name="note_edit_reloaded">Reloaded</string>
+    <string name="note_edit_conflict_fetch_failed">Failed to fetch latest version. Check the network and retry.</string>
+    <string name="note_edit_conflict_diff_head">This note was modified on another device. Differences:\n</string>
+    <string name="note_edit_conflict_diff_local">\nLocal changes (%1$d blocks):</string>
+    <string name="note_edit_conflict_diff_server">\nServer changes (%1$d blocks):</string>
+    <string name="note_edit_conflict_diff_tail">\n\nOverwrite = keep local (discard server changes); Reload = keep server (discard local changes).</string>
     <string name="note_edit_mic_permission_required">Microphone permission is required to record audio</string>
     <string name="note_edit_image_title">Image</string>
     <string name="note_edit_image_decode_failed">Failed to decode image</string>
@@ -178,8 +174,6 @@
     <string name="mine_section_account">Account</string>
     <string name="mine_section_general">General</string>
     <string name="mine_section_sync">Sync</string>
-    <string name="mine_offline_confirm_title">Enter Offline Mode</string>
-    <string name="mine_offline_confirm_msg">Offline mode keeps local notes but clears the current login; going back online requires logging in again. Enter offline mode?</string>
     <string name="mine_not_logged_in">Not logged in</string>
     <string name="mine_display_name_hint">Display name</string>
     <string name="mine_profile_updated">Profile updated</string>

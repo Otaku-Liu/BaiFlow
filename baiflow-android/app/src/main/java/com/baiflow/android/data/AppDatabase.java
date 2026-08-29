@@ -6,7 +6,7 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
-/** 本地 Room 数据库 — 离线模式三态共用的笔记存储。 */
+/** 本地 Room 数据库 — 笔记存储（在线同步的本地镜像）。 */
 @Database(entities = {LocalNote.class}, version = 1, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 

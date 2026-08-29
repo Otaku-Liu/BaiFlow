@@ -76,7 +76,7 @@ public final class NetworkFeedback {
         serverErrorShown = false;
     }
 
-    /** 分类：网络失败时的友好文案资源 id（供登录/服务器配置页内联提示） */
+    /** 分类：网络失败时的友好文案资源 id（供登录页内联提示） */
     public static int classify(Context context) {
         return hasNetwork(context) ? R.string.cannot_reach_server : R.string.network_no_connection;
     }

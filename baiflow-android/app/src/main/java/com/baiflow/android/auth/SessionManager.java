@@ -6,17 +6,17 @@ import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.baiflow.android.BuildConfig;
 import com.baiflow.android.ui.activity.LoginActivity;
 
 /**
- * 会话管理器 — 使用 SharedPreferences 存储 token、服务器地址和用户信息。
+ * 会话管理器 — 使用 SharedPreferences 存储 token 和用户信息；服务器地址由构建类型固定。
  * <p>
  * 负责登录态维护：token 存取、登录状态判断、清除会话；会话被吊销（401）时跳登录页。
  */
 public class SessionManager {
     private static final String PREF_NAME = "baiflow_session";
     private static final String KEY_TOKEN = "token";
-    private static final String KEY_SERVER_URL = "server_url";
     private static final String KEY_USER_ID = "user_id";
     private static final String KEY_USERNAME = "username";
     private static final String KEY_DISPLAY_NAME = "display_name";
@@ -43,21 +43,25 @@ public class SessionManager {
     public String getToken() { return prefs.getString(KEY_TOKEN, null); }
     public boolean isLoggedIn() { return getToken() != null && !getToken().isEmpty(); }
 
-    // ---- Server URL ----
-    public void saveServerUrl(String url) {
-        // 规范化：去掉尾部斜杠
-        String normalized = url != null ? url.replaceAll("/+$", "") : "";
-        prefs.edit().putString(KEY_SERVER_URL, normalized).apply();
+    // ---- Server URL（固定由构建类型决定，不再手动配置）----
+    // 真实地址在本地 local.properties（git 忽略），见 ../local.properties.example
+    public String getServerUrl() {
+        // 去尾部斜杠（local.properties 里配 http://host:port/ 也能归一），避免拼出 //api/
+        String url = BuildConfig.SERVER_URL;
+        return url != null ? url.replaceAll("/+$", "") : "";
     }
-    public String getServerUrl() { return prefs.getString(KEY_SERVER_URL, null); }
-    public String getApiBaseUrl() {
-        String server = getServerUrl();
-        return server != null ? server + "/api/" : null;
-    }
+    public String getApiBaseUrl() { return getServerUrl() + "/api/"; }
 
     // ---- Language（应用语言，BaseActivity 应用；替代 AppCompatDelegate.setApplicationLocales） ----
     public void saveLanguage(String lang) { prefs.edit().putString(KEY_LANGUAGE, lang).apply(); }
     public String getLanguage() { return prefs.getString(KEY_LANGUAGE, ""); }
+
+    // ---- 缓存上限（MB）：媒体缓存超限后自动 LRU 清理 ----
+    private static final String KEY_CACHE_LIMIT_MB = "cache_limit_mb";
+    private static final int DEFAULT_CACHE_LIMIT_MB = 300;
+
+    public int getCacheLimitMb() { return prefs.getInt(KEY_CACHE_LIMIT_MB, DEFAULT_CACHE_LIMIT_MB); }
+    public void saveCacheLimitMb(int mb) { prefs.edit().putInt(KEY_CACHE_LIMIT_MB, mb).apply(); }
 
     // ---- User ----
     public void saveUser(String id, String username, String displayName, String avatarUrl, String role) {
@@ -85,44 +89,8 @@ public class SessionManager {
     public String getAvatarUrl() { return prefs.getString(KEY_AVATAR_URL, null); }
     public String getRole() { return prefs.getString(KEY_ROLE, null); }
 
-    // ---- 离线模式（三态）----
-
-    /** 本地模式分区键（未配服务器） */
-    public static final String PARTITION_LOCAL = "LOCAL";
-
-    private static final String KEY_OFFLINE = "offline";
+    // ---- 增量同步游标 ----
     private static final String KEY_LAST_SYNC_AT = "last_sync_at";
-    private static final String KEY_GUIDE_SHOWN = "guide_shown";
-
-    /** 首次启动引导页是否已展示（设置服务器 / 先本地用 二选一） */
-    public boolean isGuideShown() {
-        return prefs.getBoolean(KEY_GUIDE_SHOWN, false);
-    }
-
-    public void saveGuideShown() {
-        prefs.edit().putBoolean(KEY_GUIDE_SHOWN, true).apply();
-    }
-
-    /** 进离线：清 token + 用户，但保留服务器地址与离线标记（本地笔记可继续用） */
-    public void enterOfflineMode() {
-        prefs.edit()
-                .remove(KEY_TOKEN)
-                .remove(KEY_USER_ID)
-                .remove(KEY_USERNAME)
-                .remove(KEY_DISPLAY_NAME)
-                .remove(KEY_AVATAR_URL)
-                .remove(KEY_ROLE)
-                .putBoolean(KEY_OFFLINE, true)
-                .apply();
-    }
-
-    public void saveOffline(boolean offline) {
-        prefs.edit().putBoolean(KEY_OFFLINE, offline).apply();
-    }
-
-    public boolean isOffline() {
-        return prefs.getBoolean(KEY_OFFLINE, false);
-    }
 
     public String getLastSyncAt() {
         return prefs.getString(KEY_LAST_SYNC_AT, null);
@@ -132,36 +100,22 @@ public class SessionManager {
         prefs.edit().putString(KEY_LAST_SYNC_AT, iso != null ? iso : "").apply();
     }
 
-    // ---- 三态判断（见 docs/05-android.md「离线三态」）----
+    // ---- 模式判断（仅在线模式；离线/本地模式已移除）----
 
-    /** 本地模式：未配服务器，免登录纯本地 */
-    public boolean isLocalMode() {
-        return getServerUrl() == null;
-    }
-
-    /** 在线模式：服务器 + token + 非离线 */
+    /** 在线模式：已登录即在线 */
     public boolean isOnlineMode() {
-        return getServerUrl() != null && isLoggedIn() && !isOffline();
+        return isLoggedIn();
     }
 
-    /**
-     * 离线模式：已配服务器且主动离线标记。
-     * 注意：已配服务器但未登录且未离线 ≠ 离线模式——那是登录门槛（进登录页）。
-     * 成功登录会复位离线标记（见 LoginActivity）。
-     */
-    public boolean isOfflineMode() {
-        return getServerUrl() != null && isOffline();
-    }
-
-    /** 本地笔记数据分区键：本地模式 = LOCAL；否则 = 服务器地址（缓存绑定服务器） */
+    /** 本地笔记数据分区键 = 服务器地址（缓存绑定服务器） */
     public String getDataPartition() {
-        return isLocalMode() ? PARTITION_LOCAL : getServerUrl();
+        return getServerUrl();
     }
 
     // ---- Clear ----
 
     /**
-     * 登出/401：清 token + 用户，保留服务器地址并复位离线标记（停在登录页）。
+     * 登出/401：清 token + 用户，保留服务器地址（停在登录页）。
      * 同时清增量同步游标 lastSyncAt —— 登出等流程会清 Room 分区缓存，若保留旧游标，
      * 重登后增量拉取 updatedAfter=旧时间 会漏掉所有更早的笔记（Room 永远为空）。
      */
@@ -174,11 +128,10 @@ public class SessionManager {
                 .remove(KEY_AVATAR_URL)
                 .remove(KEY_ROLE)
                 .remove(KEY_LAST_SYNC_AT)
-                .putBoolean(KEY_OFFLINE, false)
                 .apply();
     }
 
-    /** 彻底清除（换服务器为本地模式 / 清除应用数据语义）：清全部 */
+    /** 彻底清除（清除应用数据语义）：清全部 */
     public void clearAll() {
         prefs.edit().clear().apply();
     }

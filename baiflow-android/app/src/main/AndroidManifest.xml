@@ -33,15 +33,11 @@
 
         <activity android:name=".ui.activity.LoginActivity"
             android:exported="false" />
-        <activity android:name=".ui.activity.ServerConfigActivity"
-            android:exported="false" />
         <activity android:name=".ui.activity.ProfileActivity"
             android:exported="false" />
         <activity android:name=".ui.activity.PasswordActivity"
             android:exported="false" />
         <activity android:name=".ui.activity.LanguageActivity"
-            android:exported="false" />
-        <activity android:name=".ui.activity.GuideActivity"
             android:exported="false" />
         <activity android:name=".ui.activity.PreviewActivity"
             android:exported="false"

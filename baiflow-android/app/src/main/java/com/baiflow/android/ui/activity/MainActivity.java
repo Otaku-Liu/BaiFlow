@@ -25,7 +25,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
  * 主 Activity — 底部三栏（文件 / 随手记 / 我的）的容器壳。
  * <p>
  * 用 {@link ViewPager2} 承载三个 Fragment，支持左右滑动切换，与底部导航双向同步。
- * 应用入口：未登录时先引导到服务器配置/登录；已登录直接进入三栏界面。
+ * 应用入口：未登录时进登录页；已登录直接进入三栏界面。
  * 注册设备网络监听：断网即时提示「无网络连接」，恢复时提示「网络已恢复」（见 docs/05-android.md「失败处理」）。
  */
 public class MainActivity extends BaseActivity {
@@ -40,17 +40,8 @@ public class MainActivity extends BaseActivity {
 
         SessionManager session = SessionManager.getInstance(this);
 
-        // 首次启动（未配服务器）：引导页「设置服务器 / 先本地用」
-        if (!session.isGuideShown() && session.getServerUrl() == null) {
-            startActivity(new Intent(this, GuideActivity.class));
-            finish();
-            return;
-        }
-        session.saveGuideShown();
-
-        // 三态分发（见 docs/05-android.md「离线三态」）：
-        // 本地模式 / 在线模式 / 离线模式 → 主界面；服务器已设但未登录且未离线 → 登录页（登录门槛）
-        if (!session.isLocalMode() && !session.isOnlineMode() && !session.isOfflineMode()) {
+        // 仅在线模式：已登录 → 主界面；未登录 → 登录页（登录门槛）
+        if (!session.isOnlineMode()) {
             startActivity(new Intent(this, LoginActivity.class));
             finish();
             return;
@@ -60,12 +51,9 @@ public class MainActivity extends BaseActivity {
 
         registerNetworkListener();
 
-        // 在线模式：周期后台同步；离线/本地模式暂停
-        if (session.isOnlineMode()) {
-            com.baiflow.android.sync.SyncWorker.schedule(this);
-        } else {
-            com.baiflow.android.sync.SyncWorker.cancel(this);
-        }
+        // 周期后台同步 + 实时 SSE 长连接（收到 NOTE_UPDATED 立即同步）
+        com.baiflow.android.sync.SyncWorker.schedule(this);
+        com.baiflow.android.sync.NoteSseClient.getInstance().start(this);
 
         viewPager = findViewById(R.id.viewPager);
         bottomNav = findViewById(R.id.bottomNav);
@@ -143,5 +131,7 @@ public class MainActivity extends BaseActivity {
             }
             networkCallback = null;
         }
+        // 页面销毁（登出/离线等）停掉实时长连接
+        com.baiflow.android.sync.NoteSseClient.getInstance().stop();
     }
 }

@@ -25,6 +25,7 @@ import com.baiflow.android.data.AppDatabase;
 import com.baiflow.android.data.LocalNote;
 import com.baiflow.android.data.LocalNoteDao;
 import com.baiflow.android.data.SyncService;
+import com.baiflow.android.sync.NoteSseClient;
 import com.baiflow.android.sync.SyncWorker;
 import com.baiflow.android.ui.activity.NoteEditActivity;
 
@@ -34,9 +35,9 @@ import java.util.List;
 /**
  * 随手记列表页（底部「随手记」栏）— 列表 / 搜索 / 新建 / 删除。
  * <p>
- * 离线模式三态共用：数据一律读本地 Room（分区键 = 服务器地址 或 LOCAL）；在线模式
- * resume/下拉时后台同步并刷新。管理员用户切换仅在线模式显示。
- * 见 docs/05-android.md「离线三态」。
+ * 在线模式：数据一律读本地 Room（分区键 = 服务器地址，遗留 LOCAL 数据除外）；
+ * resume/下拉时后台同步并刷新。管理员用户切换仅管理员显示。
+ * 见 docs/05-android.md「在线同步」。
  */
 public class NotesFragment extends Fragment {
 
@@ -114,9 +115,22 @@ public class NotesFragment extends Fragment {
         // 从编辑器返回刷新；在线模式触发一次后台同步后刷新
         reload();
         syncAndReload();
+        // SSE 实时同步完成后刷新列表（其他端保存时本页即时更新；主线程回调；守卫销毁后不碰视图）
+        NoteSseClient.setSyncListener(() -> {
+            if (isAdded() && getActivity() != null) {
+                reload();
+            }
+        });
     }
 
-    /** 读本地 Room 渲染列表（三态通用） */
+    @Override
+    public void onPause() {
+        super.onPause();
+        // 页面不可见时不再接收同步完成回调
+        NoteSseClient.clearSyncListener();
+    }
+
+    /** 读本地 Room 渲染列表（在线/离线通用） */
     private void reload() {
         String partition = session.getDataPartition();
         List<LocalNote> items = searchKeyword.isEmpty()
@@ -177,6 +191,7 @@ public class NotesFragment extends Fragment {
             holder.tvTitle.setText(note.title != null && !note.title.isEmpty()
                     ? note.title : getString(R.string.notes_untitled));
             holder.tvTime.setText(formatTime(note.updatedAt));
+            bindBadge(holder, note);
 
             holder.itemView.setOnClickListener(v -> openEditor(note));
             holder.itemView.setOnLongClickListener(v -> {
@@ -185,15 +200,33 @@ public class NotesFragment extends Fragment {
             });
         }
 
+        /** 同步状态徽标：冲突（红）/ 待推（灰）；无未同步改动不显示 */
+        private void bindBadge(ViewHolder holder, LocalNote note) {
+            if (note.conflict) {
+                holder.tvBadge.setText(R.string.notes_badge_conflict);
+                holder.tvBadge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                        holder.tvBadge.getContext().getColor(R.color.badge_conflict)));
+                holder.tvBadge.setVisibility(View.VISIBLE);
+            } else if (note.dirty) {
+                holder.tvBadge.setText(R.string.notes_badge_pending);
+                holder.tvBadge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                        holder.tvBadge.getContext().getColor(R.color.badge_pending)));
+                holder.tvBadge.setVisibility(View.VISIBLE);
+            } else {
+                holder.tvBadge.setVisibility(View.GONE);
+            }
+        }
+
         @Override
         public int getItemCount() { return items.size(); }
 
         class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvTitle, tvTime;
+            TextView tvTitle, tvTime, tvBadge;
             ViewHolder(View v) {
                 super(v);
                 tvTitle = v.findViewById(R.id.tvTitle);
                 tvTime = v.findViewById(R.id.tvTime);
+                tvBadge = v.findViewById(R.id.tvBadge);
             }
         }
     }

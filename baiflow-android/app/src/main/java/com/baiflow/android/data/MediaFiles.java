@@ -49,6 +49,67 @@ public final class MediaFiles {
         return new File(cacheDir(context), mediaId);
     }
 
+    /** 服务端媒体缓存总大小（字节，递归统计） */
+    public static long cacheDirSize(Context context) {
+        return dirSize(cacheDir(context));
+    }
+
+    private static long dirSize(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return 0;
+        }
+        long sum = 0;
+        for (File f : files) {
+            sum += f.isDirectory() ? dirSize(f) : f.length();
+        }
+        return sum;
+    }
+
+    /** 清空服务端媒体缓存（仅 note_media_cache/；离线新建媒体 note_media/ 不动） */
+    public static void clearCacheDir(Context context) {
+        File[] files = cacheDir(context).listFiles();
+        if (files != null) {
+            for (File f : files) {
+                deleteRecursive(f);
+            }
+        }
+    }
+
+    private static void deleteRecursive(File f) {
+        if (f.isDirectory()) {
+            File[] children = f.listFiles();
+            if (children != null) {
+                for (File c : children) {
+                    deleteRecursive(c);
+                }
+            }
+        }
+        f.delete();
+    }
+
+    /** 自动清理：总大小超过上限（MB）时按最后修改时间删最旧，直到 ≤ 上限（LRU） */
+    public static void enforceLimit(Context context, int limitMb) {
+        long limit = limitMb * 1024L * 1024L;
+        long size = cacheDirSize(context);
+        if (size <= limit) {
+            return;
+        }
+        File[] files = cacheDir(context).listFiles();
+        if (files == null || files.length == 0) {
+            return;
+        }
+        java.util.Arrays.sort(files, java.util.Comparator.comparingLong(File::lastModified));
+        for (File f : files) {
+            if (size <= limit) {
+                break;
+            }
+            if (f.isFile() && f.delete()) {
+                size -= f.length();
+            }
+        }
+    }
+
     /**
      * 把正文里的媒体 URL 解析成本地可读文件（若存在）：
      * local:// → 离线新建文件；/api/notes/media/{id} → 同步时缓存的文件；否则 null。

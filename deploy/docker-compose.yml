@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      BAIFLOW_DB_URL: jdbc:mysql://${MYSQL_HOST:-127.0.0.1}:${MYSQL_PORT:-3306}/${MYSQL_DATABASE:-baiflow}?connectionTimeZone=Asia/Shanghai
+      BAIFLOW_DB_URL: jdbc:mysql://${MYSQL_HOST:-127.0.0.1}:${MYSQL_PORT:-3306}/${MYSQL_DATABASE:-baiflow}?connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true
       BAIFLOW_DB_USERNAME: ${MYSQL_USER:-root}
       BAIFLOW_DB_PASSWORD: ${MYSQL_PASSWORD:?请在 deploy/.env 设置 MYSQL_PASSWORD}
       BAIFLOW_REDIS_HOST: ${REDIS_HOST:-127.0.0.1}

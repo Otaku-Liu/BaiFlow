@@ -43,7 +43,31 @@ export default {
     pleaseInput: 'Please enter',
     pleaseSelect: 'Please select',
     logout: 'Logout',
-    resumed: 'Restored to last position'
+    resumed: 'Restored to last position',
+    cannotReachServer: 'Cannot reach the server. Check the network and retry.',
+    operationFailed: 'Operation failed',
+    saveFailed: 'Save failed',
+    deleteFailed: 'Delete failed',
+    avatarUploadFailed: 'Avatar upload failed',
+    passwordChangeFailed: 'Password change failed'
+  },
+  login: {
+    subtitle: 'Sign in to your account',
+    cannotReach: 'Cannot reach the server. Check your network.',
+    username: 'Username',
+    usernamePlaceholder: 'Enter username',
+    usernameRequired: 'Enter username',
+    password: 'Password',
+    passwordPlaceholder: 'Enter password',
+    passwordRequired: 'Enter password',
+    loggingIn: 'Logging in...',
+    button: 'Log In',
+    reconnect: 'Reconnect',
+    failed: 'Login failed',
+    requestFailed: 'Login request failed',
+    serverNotReady: 'Server not ready. Retry later.',
+    sessionExpired: 'Session expired. Please log in again.',
+    stillCannotReach: 'Still cannot reach the server. Retry later.'
   },
   loginLog: {
     title: 'Login & Session Logs',
@@ -281,6 +305,10 @@ export default {
     conflictTitle: 'Conflict detected',
     conflictMessage: 'This note was modified on another device. Overwriting will discard the other changes; reloading will discard your unsaved edits.',
     conflictOverwrite: 'Overwrite',
-    conflictReload: 'Reload'
+    conflictReload: 'Reload',
+    conflictDiffHead: 'This note was modified on another device. Differences:',
+    conflictDiffLocal: 'Local changes ({n} blocks):',
+    conflictDiffServer: 'Server changes ({n} blocks):',
+    conflictDiffTail: 'Overwrite = keep local (discard server changes); Reload = keep server (discard local changes).'
   }
 }

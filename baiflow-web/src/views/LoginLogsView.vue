@@ -13,6 +13,7 @@
           format="YYYY-MM-DD HH:mm:ss"
           value-format="YYYY-MM-DD HH:mm:ss"
           :default-time="[new Date(2000, 0, 1, 0, 0, 0), new Date(2000, 0, 1, 23, 59, 59)]"
+          clearable
           style="width: 380px"
         />
         <el-select v-model="filterStatus" :placeholder="t('loginLog.filterStatus')" clearable style="width: 150px">
@@ -62,10 +63,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { getLoginLogs } from '../api/logs'
 import { formatDateTime } from '../utils/format'
+import { notifyRequestError } from '../utils/notify'
 
 const { t } = useI18n()
 
@@ -117,11 +118,11 @@ const searchUsername = ref('')
 const filterStatus = ref('')
 const dateRange = ref(null)
 
-/** 返回今日的日期时间范围（yyyy-MM-dd HH:mm:ss），00:00:00 ~ 23:59:59 */
+/** 返回今天的日期时间范围（yyyy-MM-dd HH:mm:ss），固定按 UTC+8（Asia/Shanghai）计算，与服务端时区一致 */
 function todayRange() {
-  const now = new Date()
   const pad = (n) => String(n).padStart(2, '0')
-  const d = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  const cn = new Date(Date.now() + 8 * 3600 * 1000) // 转到 UTC+8 再取 UTC 分量拼日期
+  const d = `${cn.getUTCFullYear()}-${pad(cn.getUTCMonth() + 1)}-${pad(cn.getUTCDate())}`
   return [`${d} 00:00:00`, `${d} 23:59:59`]
 }
 
@@ -140,7 +141,7 @@ async function fetchLogs() {
     logs.value = res.data.data?.records || []
     total.value = res.data.data?.total || 0
   } catch (e) {
-    ElMessage.error(t('loginLog.loadFailed'))
+    notifyRequestError(e, t('loginLog.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -165,6 +166,7 @@ function handleSizeChange() {
 }
 
 onMounted(() => {
+  // 默认查当天（UTC+8）；日期框可清空查看全部历史
   dateRange.value = todayRange()
   fetchLogs()
 })

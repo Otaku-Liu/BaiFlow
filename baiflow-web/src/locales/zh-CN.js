@@ -43,7 +43,31 @@ export default {
     pleaseInput: '请输入',
     pleaseSelect: '请选择',
     logout: '退出',
-    resumed: '已恢复到上次观看位置'
+    resumed: '已恢复到上次观看位置',
+    cannotReachServer: '无法连接服务器，请检查网络或稍后重试',
+    operationFailed: '操作失败',
+    saveFailed: '保存失败',
+    deleteFailed: '删除失败',
+    avatarUploadFailed: '头像上传失败',
+    passwordChangeFailed: '密码修改失败'
+  },
+  login: {
+    subtitle: '登录到你的账户',
+    cannotReach: '无法连接服务器，请检查网络连接',
+    username: '用户名',
+    usernamePlaceholder: '请输入用户名',
+    usernameRequired: '请输入用户名',
+    password: '密码',
+    passwordPlaceholder: '请输入密码',
+    passwordRequired: '请输入密码',
+    loggingIn: '登录中...',
+    button: '登 录',
+    reconnect: '重新连接',
+    failed: '登录失败',
+    requestFailed: '登录请求失败',
+    serverNotReady: '服务器未就绪，请稍后重试',
+    sessionExpired: '登录已过期，请重新登录',
+    stillCannotReach: '仍无法连接服务器，请稍后重试'
   },
   loginLog: {
     title: '登录与会话日志',
@@ -281,6 +305,10 @@ export default {
     conflictTitle: '检测到冲突',
     conflictMessage: '这篇笔记已在其他设备被修改。覆盖会丢失对方的改动，重新加载会丢失你本次未保存的改动。',
     conflictOverwrite: '覆盖',
-    conflictReload: '重新加载'
+    conflictReload: '重新加载',
+    conflictDiffHead: '这篇笔记已在其他设备被修改，双方差异如下：',
+    conflictDiffLocal: '本地改动（{n} 块）：',
+    conflictDiffServer: '服务端改动（{n} 块）：',
+    conflictDiffTail: '「覆盖」以本地为准（丢服务端改动）；「重新加载」以服务端为准（丢本地改动）。'
   }
 }

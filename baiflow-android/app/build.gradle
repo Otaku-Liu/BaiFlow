@@ -14,8 +14,28 @@ android {
         versionName "0.1.0"
     }
 
+    // 服务器地址按构建类型固定（不再手动配置），从本地 local.properties 读取：
+    // BAIFLOW_RELEASE_SERVER_URL（release 打包连线上）/ BAIFLOW_DEBUG_SERVER_URL（debug 调试）。
+    // local.properties 被 git 忽略（真实地址不提交），模板见 ../local.properties.example；
+    // 未配置时回落下列占位默认值。换后端 = 改本地 local.properties 重新打包。
+    def serverProps = new Properties()
+    def localPropsFile = rootProject.file('local.properties')
+    if (localPropsFile.exists()) {
+        localPropsFile.withInputStream { serverProps.load(it) }
+    }
+    def debugServerUrl = serverProps.getProperty('BAIFLOW_DEBUG_SERVER_URL', 'http://10.0.2.2:8080')
+    def releaseServerUrl = serverProps.getProperty('BAIFLOW_RELEASE_SERVER_URL', 'http://YOUR_SERVER_HOST:PORT')
+
+    buildFeatures {
+        buildConfig true
+    }
+
     buildTypes {
+        debug {
+            buildConfigField "String", "SERVER_URL", "\"${debugServerUrl}\""
+        }
         release {
+            buildConfigField "String", "SERVER_URL", "\"${releaseServerUrl}\""
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

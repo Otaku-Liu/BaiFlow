@@ -157,6 +157,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { notifyRequestError } from '../utils/notify'
 import { Share, Folder, Document } from '@element-plus/icons-vue'
 import { createShare, listShares, updateShare, revokeShare, buildShareUrl, getShareAnalytics } from '../api/shares'
 import { listFiles, listStorageRoots } from '../api/files'
@@ -215,7 +216,7 @@ async function openTargetPicker() {
         return
       }
     } catch (e) {
-      ElMessage.error(t('shares.loadFolderFailed'))
+      notifyRequestError(e, t('shares.loadFolderFailed'))
       showTargetPicker.value = false
       return
     }
@@ -253,7 +254,7 @@ async function loadPickItems() {
     if (data.code !== 0) ElMessage.error(data.message || t('shares.loadFolderFailed'))
   } catch (e) {
     pickItems.value = []
-    ElMessage.error(t('shares.loadFolderFailed'))
+    notifyRequestError(e, t('shares.loadFolderFailed'))
   } finally {
     pickLoading.value = false
   }
@@ -281,7 +282,7 @@ async function loadShares() {
   try {
     const { data } = await listShares({ status: filterStatus.value||undefined, page: page.value, size: size.value })
     if (data.code === 0) { shares.value = data.data.records||[]; total.value = data.data.total||0 }
-  } catch(e) { ElMessage.error(t('shares.loadFailed')) } finally { loading.value = false }
+  } catch(e) { notifyRequestError(e, t('shares.loadFailed')) } finally { loading.value = false }
 }
 
 async function doCreateShare() {
@@ -302,7 +303,7 @@ async function doCreateShare() {
     } else {
       ElMessage.error(data.message||t('shares.createFailed'))
     }
-  } catch(e) { ElMessage.error(t('shares.createFailed')) } finally { creating.value = false }
+  } catch(e) { notifyRequestError(e, t('shares.createFailed')) } finally { creating.value = false }
 }
 
 async function doRevoke(row) {
@@ -310,7 +311,7 @@ async function doRevoke(row) {
     await confirm({ title: t('shares.revokeConfirmTitle'), message: t('shares.revokeConfirmMsg'), confirmText: t('common.revoke'), type: 'warning' })
     await revokeShare(row.id)
     ElMessage.success(t('shares.revoked')); loadShares()
-  } catch(e) { if(e!=='cancel') ElMessage.error(t('shares.revokeFailed')) }
+  } catch(e) { if(e!=='cancel') notifyRequestError(e, t('shares.revokeFailed')) }
 }
 
 function copyShareUrl() {
@@ -332,7 +333,7 @@ async function showAnalytics(row) {
       analyticsLogs.value = data.data?.records || []
     }
   } catch (e) {
-    ElMessage.error(t('shares.analyticsFailed'))
+    notifyRequestError(e, t('shares.analyticsFailed'))
   } finally {
     analyticsLoading.value = false
   }

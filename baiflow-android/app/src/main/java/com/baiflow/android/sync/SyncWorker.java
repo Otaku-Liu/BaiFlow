@@ -18,8 +18,8 @@ import com.baiflow.android.data.SyncService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 笔记后台同步 Worker — 网络恢复/周期触发；离线/本地模式不执行（SyncService 内判断）。
- * 见 docs/05-android.md「离线三态」。
+ * 笔记后台同步 Worker — 网络恢复/周期触发（仅在线模式执行，SyncService 内判断）。
+ * 见 docs/05-android.md「在线同步」。
  */
 public class SyncWorker extends Worker {
 
@@ -37,7 +37,7 @@ public class SyncWorker extends Worker {
         return ok ? Result.success() : Result.retry();
     }
 
-    /** 登录/重连后调度周期同步（在线模式）；离线/登出后调用 {@link #cancel} */
+    /** 登录/重连后调度周期同步（在线模式）；登出后调用 {@link #cancel} */
     public static void schedule(Context context) {
         Constraints constraints = new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)

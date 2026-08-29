@@ -153,6 +153,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { notifyRequestError } from '../utils/notify'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { listUsers, createUser, updateUser, batchDeleteUsers, batchUpdateUsersStatus, resetPassword } from '../api/users'
@@ -261,7 +262,7 @@ async function fetchUsers() {
     users.value = res.data.data?.records || []
     total.value = res.data.data?.total || 0
   } catch (e) {
-    ElMessage.error(t('users.loadFailed'))
+    notifyRequestError(e, t('users.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -303,7 +304,7 @@ async function handleCreate() {
     createDialogVisible.value = false
     fetchUsers()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || t('users.createFailed'))
+    notifyRequestError(e, t('users.createFailed'))
   } finally {
     creating.value = false
   }
@@ -368,7 +369,7 @@ async function handleDelete(row) {
     ElMessage.success(t('users.deleted'))
     fetchUsers()
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.response?.data?.message || t('users.deleteFailed'))
+    if (e !== 'cancel') notifyRequestError(e, t('users.deleteFailed'))
   }
 }
 

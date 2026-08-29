@@ -6,6 +6,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -17,6 +18,7 @@ import androidx.fragment.app.Fragment;
 import com.baiflow.android.R;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.data.AppDatabase;
+import com.baiflow.android.data.MediaFiles;
 import com.baiflow.android.data.SyncService;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.UserInfo;
@@ -27,7 +29,6 @@ import com.baiflow.android.ui.activity.LanguageActivity;
 import com.baiflow.android.ui.activity.LoginActivity;
 import com.baiflow.android.ui.activity.PasswordActivity;
 import com.baiflow.android.ui.activity.ProfileActivity;
-import com.baiflow.android.ui.activity.ServerConfigActivity;
 import com.baiflow.android.util.AvatarLoader;
 import com.baiflow.android.util.FormatUtil;
 
@@ -35,11 +36,12 @@ import retrofit2.Call;
 import retrofit2.Response;
 
 /**
- * 我的页 — 用户信息、修改资料、修改密码、语言设置、传输任务、服务器配置、退出登录。
+ * 我的页 — 用户信息、修改资料、修改密码、语言设置、传输任务、退出登录。
  */
 public class MineFragment extends Fragment {
 
     private SessionManager session;
+    private com.baiflow.android.data.LocalNoteDao dao;
     private TextView tvAvatar, tvDisplayName;
     private ImageView ivAvatar;
     /** 上次已加载的头像 URL，避免 onResume 重复下载同一张 */
@@ -58,6 +60,7 @@ public class MineFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         session = SessionManager.getInstance(requireContext());
+        dao = com.baiflow.android.data.AppDatabase.get(requireContext()).noteDao();
 
         tvAvatar = view.findViewById(R.id.tvAvatar);
         tvDisplayName = view.findViewById(R.id.tvDisplayName);
@@ -77,16 +80,15 @@ public class MineFragment extends Fragment {
                 startActivity(new Intent(requireContext(), PasswordActivity.class)));
         view.findViewById(R.id.rowLanguage).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), LanguageActivity.class)));
-        view.findViewById(R.id.rowServer).setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), ServerConfigActivity.class)));
-        view.findViewById(R.id.rowOffline).setOnClickListener(v -> handleOfflineToggle());
+        view.findViewById(R.id.rowClearCache).setOnClickListener(v -> confirmClearCache());
+        view.findViewById(R.id.rowCacheLimit).setOnClickListener(v -> showCacheLimitDialog());
+        ((TextView) view.findViewById(R.id.tvCacheLimit))
+                .setText(getString(R.string.mine_cache_limit_value, session.getCacheLimitMb()));
         view.findViewById(R.id.rowSync).setOnClickListener(v -> handleSync());
-        view.findViewById(R.id.rowReconnect).setOnClickListener(v -> {
-            startActivity(new Intent(requireContext(), LoginActivity.class));
-        });
         view.findViewById(R.id.btnLogout).setOnClickListener(v -> confirmLogout());
 
         updateModeRows(view);
+        updateSyncStatus(view);
     }
 
     @Override
@@ -96,6 +98,12 @@ public class MineFragment extends Fragment {
         refreshUserCard();
         // 头像/展示名可能在其他端（Web）改过：仅登录时缓存的本地态是旧的，进本页时从服务端拉最新
         refreshUserFromServer();
+        // 同步后待推/冲突数会变，回到本页刷新；缓存大小也重算（可能被自动 LRU 清理）
+        View root = getView();
+        if (root != null) {
+            updateSyncStatus(root);
+            refreshCacheSize(root);
+        }
     }
 
     /** 在线模式下从服务端拉取当前用户信息并刷新本地缓存（头像/展示名可能在其他端修改） */
@@ -125,51 +133,93 @@ public class MineFragment extends Fragment {
         });
     }
 
-    /** 刷新模式指示与离线/同步/重连行的可见性 */
-    private void updateModeRows(View root) {
-        TextView tvMode = root.findViewById(R.id.tvMode);
-        View rowOffline = root.findViewById(R.id.rowOffline);
-        View rowSync = root.findViewById(R.id.rowSync);
-        View rowReconnect = root.findViewById(R.id.rowReconnect);
-
-        if (session.isLocalMode()) {
-            tvMode.setText(getString(R.string.mine_mode_local));
-            rowOffline.setVisibility(View.GONE);
-            rowSync.setVisibility(View.GONE);
-            rowReconnect.setVisibility(View.GONE);
-        } else if (session.isOnlineMode()) {
-            tvMode.setText(getString(R.string.mine_mode_online));
-            rowOffline.setVisibility(View.VISIBLE);
-            ((TextView) rowOffline.findViewById(R.id.tvOffline)).setText(getString(R.string.mine_offline_toggle_on));
-            rowSync.setVisibility(View.VISIBLE);
-            rowReconnect.setVisibility(View.GONE);
-        } else {
-            tvMode.setText(getString(R.string.mine_mode_offline));
-            rowOffline.setVisibility(View.VISIBLE);
-            ((TextView) rowOffline.findViewById(R.id.tvOffline)).setText(getString(R.string.mine_offline_toggle_off));
-            rowSync.setVisibility(View.GONE);
-            rowReconnect.setVisibility(View.VISIBLE);
+    /** 在线模式：显示待推/冲突笔记数（读 Room，主线程允许）；无未同步改动或非在线模式隐藏 */
+    private void updateSyncStatus(View root) {
+        TextView tvStatus = root.findViewById(R.id.tvSyncStatus);
+        if (!session.isOnlineMode()) {
+            tvStatus.setVisibility(View.GONE);
+            return;
         }
+        String partition = session.getDataPartition();
+        int conflict = dao.countConflict(partition);
+        int pending = dao.countDirty(partition) - conflict;
+        if (pending <= 0 && conflict <= 0) {
+            tvStatus.setVisibility(View.GONE);
+            return;
+        }
+        tvStatus.setText(getString(R.string.mine_sync_status, pending, conflict));
+        tvStatus.setVisibility(View.VISIBLE);
     }
 
-    /** 离线模式开关：进入离线二次确认（清 token 留本地缓存）；退出离线 → 重新登录 */
-    private void handleOfflineToggle() {
-        if (session.isOfflineMode()) {
-            session.saveOffline(false);
-            startActivity(new Intent(requireContext(), LoginActivity.class));
-        } else {
-            new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(getString(R.string.mine_offline_confirm_title))
-                    .setMessage(getString(R.string.mine_offline_confirm_msg))
-                    .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
-                        session.enterOfflineMode();
-                        SyncWorker.cancel(requireContext());
-                        Toast.makeText(requireContext(), getString(R.string.mine_offline_toggle_on), Toast.LENGTH_SHORT).show();
-                        requireActivity().recreate();
-                    })
-                    .setNegativeButton(getString(R.string.common_cancel), null)
-                    .show();
-        }
+    /** 后台统计缓存大小刷新到「清理缓存」行右侧（onResume / 清缓存后调用） */
+    private void refreshCacheSize(View root) {
+        final TextView tv = root.findViewById(R.id.tvCacheSize);
+        android.content.Context ctx = requireContext();
+        new Thread(() -> {
+            final long bytes = MediaFiles.cacheDirSize(ctx);
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> tv.setText(FormatUtil.formatSize(bytes)));
+            }
+        }).start();
+    }
+
+    /** 清理缓存：二次确认后清空服务端媒体缓存（离线新建媒体不动），刷新大小 */
+    private void confirmClearCache() {
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(getString(R.string.mine_clear_cache_confirm_title))
+                .setMessage(getString(R.string.mine_clear_cache_confirm_msg))
+                .setPositiveButton(getString(R.string.mine_clear_cache_confirm), (d, w) -> {
+                    MediaFiles.clearCacheDir(requireContext());
+                    View root = getView();
+                    if (root != null) {
+                        refreshCacheSize(root);
+                    }
+                    Toast.makeText(requireContext(), getString(R.string.mine_clear_cache_done), Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .show();
+    }
+
+    /** 缓存上限：弹窗内 SeekBar 拖动（50–2000MB，步进 50），确定保存 */
+    private void showCacheLimitDialog() {
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cache_limit, null);
+        final TextView tvValue = dialogView.findViewById(R.id.tvCacheLimitValue);
+        SeekBar sb = dialogView.findViewById(R.id.sbCacheLimit);
+        final int current = session.getCacheLimitMb();
+        sb.setProgress((Math.max(50, Math.min(current, 2000)) - 50) / 50);
+        tvValue.setText(getString(R.string.mine_cache_limit_value, 50 + sb.getProgress() * 50));
+        sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvValue.setText(getString(R.string.mine_cache_limit_value, 50 + progress * 50));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) { }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) { }
+        });
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(getString(R.string.mine_cache_limit))
+                .setView(dialogView)
+                .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
+                    session.saveCacheLimitMb(50 + sb.getProgress() * 50);
+                    View root = getView();
+                    if (root != null) {
+                        ((TextView) root.findViewById(R.id.tvCacheLimit))
+                                .setText(getString(R.string.mine_cache_limit_value, session.getCacheLimitMb()));
+                    }
+                })
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .show();
+    }
+
+    /** 刷新模式指示（仅在线模式，无离线状态） */
+    private void updateModeRows(View root) {
+        TextView tvMode = root.findViewById(R.id.tvMode);
+        tvMode.setText(getString(R.string.mine_mode_online));
+        root.findViewById(R.id.rowSync).setVisibility(View.VISIBLE);
     }
 
     /** 手动同步：后台同步一次（仅在线模式有意义） */
@@ -234,9 +284,7 @@ public class MineFragment extends Fragment {
         logoutStarted = true;
         String partition = session.getDataPartition();
         session.clearSession();
-        if (!SessionManager.PARTITION_LOCAL.equals(partition)) {
-            AppDatabase.get(requireContext()).noteDao().clearByServer(partition);
-        }
+        AppDatabase.get(requireContext()).noteDao().clearByServer(partition);
         SyncWorker.cancel(requireContext());
         Intent intent = new Intent(requireContext(), LoginActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);

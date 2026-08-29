@@ -181,6 +181,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { updateProfile, uploadAvatar, deleteAvatar, changePassword, listDevices, revokeSession, deleteDevice } from '../api/auth'
 import { formatDateTime } from '../utils/format'
+import { notifyRequestError } from '../utils/notify'
 import FilesView from './FilesView.vue'
 import NotesView from './NotesView.vue'
 import SharesView from './SharesView.vue'
@@ -268,7 +269,7 @@ async function handleRevokeDevice(d) {
     ElMessage.success('已强制下线')
     loadDevices()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '操作失败')
+    notifyRequestError(e, t('common.operationFailed'))
   }
 }
 
@@ -288,7 +289,7 @@ async function handleDeleteDevice(d) {
     ElMessage.success('已删除登录设备')
     loadDevices()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '操作失败')
+    notifyRequestError(e, t('common.operationFailed'))
   }
 }
 
@@ -321,7 +322,7 @@ async function handleSaveProfile() {
     // 更新内存态并同步 localStorage，避免刷新后展示名还原
     authStore.updateUser({ displayName: res.data?.data?.displayName || profileDisplayName.value })
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '保存失败')
+    notifyRequestError(e, t('common.saveFailed'))
   }
 }
 
@@ -336,7 +337,7 @@ async function handleAvatarUpload(file) {
     // 更新内存态并同步 localStorage，避免刷新后头像还原
     authStore.updateUser({ avatarUrl: res.data?.data?.avatarUrl || '' })
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '头像上传失败')
+    notifyRequestError(e, t('common.avatarUploadFailed'))
   }
   return false
 }
@@ -357,7 +358,7 @@ async function handleDeleteAvatar() {
     // 更新内存态并同步 localStorage，头像回到首字占位
     authStore.updateUser({ avatarUrl: '' })
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '删除失败')
+    notifyRequestError(e, t('common.deleteFailed'))
   }
 }
 
@@ -378,7 +379,7 @@ async function handleChangePassword() {
     authStore.clearSession()
     router.push('/login')
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '密码修改失败')
+    notifyRequestError(e, t('common.passwordChangeFailed'))
   }
 }
 </script>
@@ -471,6 +472,15 @@ async function handleChangePassword() {
 .locale-trigger:hover {
   background: rgba(0, 0, 0, 0.04);
   color: var(--el-text-color-primary);
+}
+
+/* 悬浮/聚焦不显示默认黑色轮廓框 */
+.locale-trigger,
+.locale-trigger:hover,
+.locale-trigger:focus,
+.locale-trigger:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .locale-arrow {

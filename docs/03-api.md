@@ -120,10 +120,10 @@
 **Office 文档**（doc/docx/xls/xlsx/ppt/pptx/odt/ods/odp）**暂不支持在线预览**：前端将其归为不支持类型，预览抽屉降级为「下载查看」。后端 `FileConvertService`（LibreOffice 转 PDF）为遗留代码，依赖未安装且前端不再触发。
 
 ### 随手记（笔记）
-- `GET /api/notes?page=&size=&keyword=&viewUserId=` — 分页列出笔记（不含正文，按更新时间倒序）；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换
+- `GET /api/notes?page=&size=&keyword=&viewUserId=&updatedAfter=` — 分页列出笔记，按更新时间倒序；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换。**普通列表不含正文**；传 `updatedAfter` 为增量同步模式（返回 `updated_at` 之后更新，含软删除，且列表项**携带 `content` 正文**，供离线客户端直接合并，避免逐条拉详情）
 - `POST /api/notes` — 新建 `{ title, content }`（content 为 Markdown）
 - `GET /api/notes/{id}` — 详情（含 Markdown 正文）
-- `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt? }`，服务端刷新 `updated_at`；`baseUpdatedAt` 为乐观并发依据，早于服务端当前 `updated_at` 时返回业务码 `40901`（NOTE_CONFLICT，客户端可选覆盖/重新加载）；同秒内（TIMESTAMP 秒级精度）并发写仍后写覆盖
+- `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt }`，服务端刷新 `updated_at`（**毫秒精度** DATETIME(3)，无 2038 限制）。`baseUpdatedAt` **必传且可解析**（乐观并发）：缺失/格式非法返回 `40001`，早于服务端当前 `updated_at` 返回 `40901`（NOTE_CONFLICT，客户端可选覆盖/重新加载）。客户端「覆盖」须以服务端最新 `updatedAt` 为基准再保存
 - `DELETE /api/notes/{id}` — 软删除（status=DELETED；**级联删除该笔记的阅读进度行**）
 - `GET /api/notes/{id}/progress` — 查询当前用户对笔记的阅读进度 `{ positionType, positionValue, updatedAt }`
 - `PUT /api/notes/{id}/progress` — 保存阅读进度 `{ positionValue }`（滚动百分比 0~1）
@@ -131,6 +131,7 @@
 **笔记媒体**：
 - `POST /api/notes/media` — multipart `file` + 可选 `mediaType`（IMAGE/AUDIO/DRAWING）；MIME 白名单 + ≤20MB；返回 `{ id, mediaType, url, mimeType, sizeBytes, createdAt }`
 - `GET /api/notes/media/{id}` — 读取媒体内容（inline）；鉴权 Bearer 头或 `?token=`（供 Web `<img>/<audio>` 渲染）；所有者或管理员
+- `POST /api/notes/media/batch` — 批量读取媒体 `{ ids: [≤10] }` → `{ id: base64 }`；不存在/越权/大文件（>4MB）项跳过（客户端回退单个下载），供 Android 离线缓存减少 N 次单个请求
 - 正文引用约定：图片/画画 `![名称](/api/notes/media/{mediaId})`；录音 `[录音](/api/notes/media/{mediaId}?mediaType=audio)`（`mediaType=audio` 供渲染器识别音频）
 
 笔记独立于文件系统，不受存储根目录/隐私文件夹约束。Android 离线增量同步（`updatedAfter`）已落地。笔记媒体独立存储，不进文件中心列表；孤儿媒体不清理（笔记软删除不影响媒体）。

@@ -92,7 +92,7 @@ import { useI18n } from 'vue-i18n'
 import { Picture, Microphone } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { uploadNoteMedia } from '../api/notes'
-import { notifyError } from '../utils/notify'
+import { notifyError, notifyRequestError } from '../utils/notify'
 import { htmlToMarkdown } from '../utils/noteBlocks'
 import EditableBlock from './EditableBlock.vue'
 
@@ -461,14 +461,14 @@ async function onImageSelected(e) {
     const { data } = await uploadNoteMedia(file, 'IMAGE')
     if (data?.code !== 0 || !data?.data?.url) {
       console.error('[note-media] upload failed:', data)
-      notifyError(data?.message || '上传失败')
+      notifyError(data?.message || t('files.uploadFailed'))
       return
     }
     const block = { type: 'image', url: data.data.url, alt: file.name }
     insertOrAppend(block)
   } catch (err) {
     console.error('[note-media] upload exception:', err)
-    notifyError(err.response?.data?.message || '上传失败')
+    notifyRequestError(err, t('files.uploadFailed'))
   }
 }
 
@@ -480,14 +480,14 @@ async function onAudioSelected(e) {
     const { data } = await uploadNoteMedia(file, 'AUDIO')
     if (data?.code !== 0 || !data?.data?.url) {
       console.error('[note-media] upload failed:', data)
-      notifyError(data?.message || '上传失败')
+      notifyError(data?.message || t('files.uploadFailed'))
       return
     }
     const url = data.data.url + (data.data.url.includes('?') ? '&' : '?') + 'mediaType=audio'
     insertOrAppend({ type: 'audio', url, duration: 0 })
   } catch (err) {
     console.error('[note-media] upload exception:', err)
-    notifyError(err.response?.data?.message || '上传失败')
+    notifyRequestError(err, t('files.uploadFailed'))
   }
 }
 

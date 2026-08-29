@@ -5,7 +5,6 @@ import android.util.Log;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.model.*;
 import okhttp3.*;
-import org.json.JSONObject;
 import retrofit2.Call;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -27,18 +26,6 @@ public class ApiClient {
     private static ApiClient instance;
     private final SessionManager session;
     private ApiService apiService;
-    private String currentBaseUrl;
-
-    /** 连通性探测专用客户端（短超时），供服务器配置页检测 /api/health；带日志便于排查连不上服务器 */
-    private final OkHttpClient healthClient = new OkHttpClient.Builder()
-            .addInterceptor(chain -> {
-                Log.i(TAG, "--> GET " + chain.request().url());
-                return chain.proceed(chain.request());
-            })
-            .addInterceptor(new LoggingInterceptor())
-            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-            .build();
 
     private ApiClient(SessionManager session) {
         this.session = session;
@@ -50,10 +37,8 @@ public class ApiClient {
     }
 
     private ApiService getService() {
-        String baseUrl = session.getApiBaseUrl();
-        if (apiService == null || !baseUrl.equals(currentBaseUrl)) {
-            currentBaseUrl = baseUrl;
-
+        // 服务器地址由构建类型固定（不再切换），Retrofit 实例一次性构建
+        if (apiService == null) {
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(new AuthInterceptor(session))
                     .addInterceptor(new LoggingInterceptor())
@@ -64,7 +49,7 @@ public class ApiClient {
                     .build();
 
             Retrofit retrofit = new Retrofit.Builder()
-                    .baseUrl(baseUrl)
+                    .baseUrl(session.getApiBaseUrl())
                     .client(client)
                     .addConverterFactory(GsonConverterFactory.create())
                     .build();
@@ -309,6 +294,10 @@ public class ApiClient {
         @GET("notes/media/{id}")
         Call<ResponseBody> getNoteMedia(@Path("id") String id);
 
+        /** 批量读取媒体（base64，≤10 个；服务端跳过不存在/越权/大文件项） */
+        @POST("notes/media/batch")
+        Call<ApiResponse<Map<String, String>>> batchMedia(@Body Map<String, Object> body);
+
         // --- 笔记阅读进度（SCROLL_PERCENT，0~1）---
         @GET("notes/{id}/progress")
         Call<ApiResponse<NoteProgress>> getNoteProgress(@Path("id") String id);
@@ -355,37 +344,6 @@ public class ApiClient {
     /** 管理员：分页列出用户（用于切换 viewUserId 查看用户文件） */
     public Call<ApiResponse<PagedResult<UserInfo>>> listUsers(int page, int size) {
         return getService().listUsers(page, size);
-    }
-
-    /**
-     * 探测服务器连通性（同步阻塞）：请求 GET /api/health，返回是否可用。
-     * 供服务器配置页在后台线程调用；短超时快速反馈。
-     */
-    public boolean checkHealth(String baseUrl) {
-        String url = baseUrl + "/api/health";
-        Log.i(TAG, "checkHealth url=" + url);
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-        try (Response response = healthClient.newCall(request).execute()) {
-            Log.d(TAG, "checkHealth response code=" + response.code());
-            if (!response.isSuccessful()) return false;
-            String body = response.body() != null ? response.body().string() : "";
-            Log.d(TAG, "checkHealth body=" + body);
-            try {
-                return new JSONObject(body).optInt("code") == 0;
-            } catch (org.json.JSONException e) {
-                Log.w(TAG, "checkHealth body not json", e);
-                return false;
-            }
-        } catch (IOException e) {
-            Log.w(TAG, "checkHealth io failed: " + url, e);
-            return false;
-        } catch (Exception e) {
-            Log.w(TAG, "checkHealth failed: " + url, e);
-            return false;
-        }
     }
 
     public Call<ApiResponse<FileItem>> createFolder(String storageRootId, String parentId,
@@ -509,6 +467,13 @@ public class ApiClient {
     /** 获取笔记媒体字节流（带鉴权，供编辑器回读图片/录音） */
     public Call<ResponseBody> getNoteMedia(String mediaId) {
         return getService().getNoteMedia(mediaId);
+    }
+
+    /** 批量读取媒体（base64，≤10 个）：离线缓存一次拉多个，减少 N 次单个下载 */
+    public Call<ApiResponse<Map<String, String>>> batchMedia(List<String> ids) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("ids", ids);
+        return getService().batchMedia(body);
     }
 
     // ==================== 浏览进度 ====================

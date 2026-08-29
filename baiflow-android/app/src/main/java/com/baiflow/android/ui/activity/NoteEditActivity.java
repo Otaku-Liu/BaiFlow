@@ -44,6 +44,7 @@ import com.baiflow.android.editor.EditorStyle;
 import com.baiflow.android.editor.MarkdownEmitter;
 import com.baiflow.android.editor.MarkdownParser;
 import com.baiflow.android.editor.NoteBlocks;
+import com.baiflow.android.editor.NoteDiff;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.sync.SyncWorker;
 import com.baiflow.android.ui.adapter.NoteBlockAdapter;
@@ -751,21 +752,91 @@ public class NoteEditActivity extends BaseActivity {
         }
     }
 
-    /** 乐观并发冲突弹窗：覆盖 / 重新加载 */
+    /** 乐观并发冲突弹窗：先拉服务端版本展示块级差异，再让用户选覆盖 / 重新加载 */
     private void showConflictDialog(final boolean finishAfter) {
+        if (currentNote == null || currentNote.serverId == null) {
+            showConflictDialogWithDiff(finishAfter, null, null);
+            return;
+        }
+        client.getNote(currentNote.serverId).enqueue(new com.baiflow.android.network.UiCallback<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>>(this) {
+            @Override
+            protected void onUiResponse(retrofit2.Call<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> call,
+                                        retrofit2.Response<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> response) {
+                String server = (response.isSuccessful() && response.body() != null && response.body().isOk()
+                        && response.body().getData() != null)
+                        ? response.body().getData().getContent() : null;
+                showConflictDialogWithDiff(finishAfter, currentNote.content, server);
+            }
+
+            @Override
+            protected void onUiFailure(retrofit2.Call<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> call, Throwable t) {
+                showConflictDialogWithDiff(finishAfter, currentNote.content, null);
+            }
+        });
+    }
+
+    /** 展示冲突弹窗；有服务端内容时附带块级差异预览 */
+    private void showConflictDialogWithDiff(boolean finishAfter, String localContent, String serverContent) {
+        String message = (localContent != null && serverContent != null)
+                ? buildConflictDiffMessage(localContent, serverContent)
+                : getString(R.string.note_edit_conflict_message);
         new MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.note_edit_conflict_title))
-                .setMessage(getString(R.string.note_edit_conflict_message))
-                .setPositiveButton(getString(R.string.note_edit_overwrite), (d, w) -> {
-                    if (currentNote != null) {
-                        currentNote.baseUpdatedAt = null;
-                        currentNote.conflict = false;
-                    }
-                    save(finishAfter);
-                })
+                .setMessage(message)
+                .setPositiveButton(getString(R.string.note_edit_overwrite), (d, w) -> overwriteSave(finishAfter))
                 .setNegativeButton(getString(R.string.note_edit_reload), (d, w) -> reloadNote(finishAfter))
                 .setCancelable(false)
                 .show();
+    }
+
+    /** 块级差异预览：对比本地未保存内容与服务端内容，统计双方改动块并预览前几块 */
+    private String buildConflictDiffMessage(String localContent, String serverContent) {
+        NoteDiff.DiffResult r = NoteDiff.diff(localContent, serverContent);
+        StringBuilder sb = new StringBuilder();
+        sb.append(getString(R.string.note_edit_conflict_diff_head));
+        sb.append(getString(R.string.note_edit_conflict_diff_local, r.localOnly().size()));
+        appendDiffPreview(sb, r.localOnly());
+        sb.append(getString(R.string.note_edit_conflict_diff_server, r.serverOnly().size()));
+        appendDiffPreview(sb, r.serverOnly());
+        sb.append(getString(R.string.note_edit_conflict_diff_tail));
+        return sb.toString();
+    }
+
+    private void appendDiffPreview(StringBuilder sb, List<String> blocks) {
+        int n = Math.min(3, blocks.size());
+        for (int i = 0; i < n; i++) {
+            sb.append('\n').append(i + 1).append(". ").append(blocks.get(i));
+        }
+    }
+
+    /**
+     * 乐观并发冲突「覆盖」：以服务端最新 updatedAt 为基准再保存本地改动。
+     * 等价 last-write-wins，但走完整乐观校验——服务端强制 baseUpdatedAt 后，直接置 null 会被 40001 拒绝。
+     */
+    private void overwriteSave(final boolean finishAfter) {
+        if (currentNote == null || currentNote.serverId == null) {
+            save(finishAfter);
+            return;
+        }
+        client.getNote(currentNote.serverId).enqueue(new com.baiflow.android.network.UiCallback<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>>(this) {
+            @Override
+            protected void onUiResponse(retrofit2.Call<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> call,
+                                        retrofit2.Response<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isOk()
+                        && response.body().getData() != null) {
+                    currentNote.baseUpdatedAt = response.body().getData().getUpdatedAt();
+                    currentNote.conflict = false;
+                    save(finishAfter);
+                } else {
+                    Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_conflict_fetch_failed), Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            protected void onUiFailure(retrofit2.Call<com.baiflow.android.model.ApiResponse<com.baiflow.android.model.NoteDetail>> call, Throwable t) {
+                Toast.makeText(NoteEditActivity.this, getString(R.string.note_edit_conflict_fetch_failed), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     /** 重新加载服务端最新内容（冲突「重载」） */

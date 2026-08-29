@@ -34,7 +34,7 @@ Vue 3 Web 管理台          Android Java App
 - **baiflow-server**：核心业务、权限、数据库、文件操作、下载任务、随手记笔记、SSE 事件、对外 API。文件路径只在服务端存在。
 - **数据访问层**：实体 Service（IService）承载单表查询（`lambdaQuery()` 等），Mapper 保持纯 `BaseMapper`；仅多表 JOIN / 特殊 SQL 留在 XML Mapper（见 `docs/06-coding-standards.md`）
 - **baiflow-web**：Web 管理台，只通过 REST API 通信。
-- **baiflow-android**：移动端文件查看、上传、下载、随手记（在线 + 离线三态）。
+- **baiflow-android**：移动端文件查看、上传、下载、随手记（仅在线模式；服务器地址按构建类型固定，不手动配置）。
 - **deploy**：Docker Compose、Nginx、环境变量。
 
 ### SSE 事件（`com.baiflow.event`）

@@ -172,18 +172,6 @@ public class FilesFragment extends Fragment {
                     }
                 });
 
-        // 本地/离线模式：文件中心不可用（离线模式，见 docs/12 §4）
-        if (!session.isOnlineMode()) {
-            tvEmpty.setVisibility(View.VISIBLE);
-            tvEmpty.setText(getString(R.string.files_offline_unavailable));
-            recyclerView.setVisibility(View.GONE);
-            swipeRefresh.setEnabled(false);
-            adminRow.setVisibility(View.GONE);
-            btnNew.setEnabled(false);
-            view.findViewById(R.id.btnRefresh).setEnabled(false);
-            return;
-        }
-
         // 管理员显示用户切换
         if ("ADMIN".equals(session.getRole())) {
             adminRow.setVisibility(View.VISIBLE);

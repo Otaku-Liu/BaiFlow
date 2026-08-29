@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="4dp">
+
+    <TextView
+        android:id="@+id/tvCacheLimitValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="20sp"
+        android:textColor="@color/text_primary"
+        android:gravity="center"
+        android:text="300 MB" />
+
+    <SeekBar
+        android:id="@+id/sbCacheLimit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="39" />
+</LinearLayout>

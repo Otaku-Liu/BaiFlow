@@ -19,6 +19,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,6 +38,12 @@ public class NoteMediaServiceImpl implements NoteMediaService {
 
     /** 媒体文件大小上限：20MB（图片/短录音/画画均远小于此） */
     private static final long MAX_SIZE_BYTES = 20L * 1024 * 1024;
+
+    /** 批量接口单次最多媒体数 */
+    private static final int BATCH_MAX_IDS = 10;
+
+    /** 批量接口跳过的大文件阈值（base64 会膨胀内存与响应，大文件客户端回退单个流式下载） */
+    private static final long BATCH_MAX_BYTES = 4L * 1024 * 1024;
 
     /** 允许的 MIME 白名单 */
     private static final Set<String> ALLOWED_MIME = Set.of(
@@ -113,6 +122,43 @@ public class NoteMediaServiceImpl implements NoteMediaService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "媒体文件不存在");
         }
         return new MediaResource(media, target.toFile());
+    }
+
+    @Override
+    public Map<String, String> batchBase64(String userId, boolean isAdmin, List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        if (ids.size() > BATCH_MAX_IDS) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "单次批量最多 " + BATCH_MAX_IDS + " 个媒体");
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (String id : ids) {
+            if (id == null || id.isBlank()) {
+                continue;
+            }
+            NoteMedia media = mediaMapper.selectById(id);
+            // 不存在/越权跳过：客户端对该 id 回退单个下载（单个接口会返回 404/403 明确错误）
+            if (media == null || (!isAdmin && !userId.equals(media.getUserId()))) {
+                continue;
+            }
+            Path dir = Path.of(properties.getStorage().getNoteMediaPath());
+            Path target = dir.resolve(media.getId() + "." + extensionFor(media.getMimeType())).normalize();
+            if (!target.startsWith(dir.toAbsolutePath().normalize()) || !Files.exists(target)) {
+                continue;
+            }
+            // 大文件不批量（base64 内存/响应膨胀），回退单个流式下载
+            try {
+                if (Files.size(target) > BATCH_MAX_BYTES) {
+                    continue;
+                }
+                byte[] bytes = Files.readAllBytes(target);
+                result.put(id, Base64.getEncoder().encodeToString(bytes));
+            } catch (IOException e) {
+                log.warn("批量媒体读取失败: mediaId={}", id, e);
+            }
+        }
+        return result;
     }
 
     // ---- 私有辅助 ----

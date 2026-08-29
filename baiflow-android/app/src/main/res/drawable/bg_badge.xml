@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 列表徽标（待推/冲突）圆角底；颜色由代码 setBackgroundTintList 决定（默认=待推灰） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="999dp" />
+    <solid android:color="@color/badge_pending" />
+</shape>

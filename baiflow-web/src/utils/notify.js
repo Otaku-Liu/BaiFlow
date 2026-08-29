@@ -1,4 +1,5 @@
 import { ElMessage } from 'element-plus'
+import i18n from '../locales'
 
 let activeMsg = null
 
@@ -22,4 +23,20 @@ export function notifyError(msg) {
 /** 顶替式成功消息 */
 export function notifySuccess(msg) {
   return notify({ message: msg, type: 'success', duration: 1500 })
+}
+
+/** 网络级失败（连不上服务器/超时/断网，无 HTTP 响应）判定 */
+export function isNetworkError(e) {
+  return !e?.response
+}
+
+/**
+ * 请求错误统一提示：网络级失败 → 统一「无法连接服务器」；否则显示服务端消息或业务兜底文案。
+ * 视图 catch 里用它替代「e.response?.data?.message || t('xxx.failed')」，保证后端没跑时提示一致。
+ */
+export function notifyRequestError(e, fallbackMsg) {
+  if (isNetworkError(e)) {
+    return notifyError(i18n.global.t('common.cannotReachServer'))
+  }
+  return notifyError(e?.response?.data?.message || fallbackMsg)
 }

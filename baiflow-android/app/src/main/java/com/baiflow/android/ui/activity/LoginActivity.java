@@ -32,7 +32,7 @@ import retrofit2.Response;
 public class LoginActivity extends BaseActivity {
 
     private EditText etUsername, etPassword;
-    private Button btnLogin, btnChangeServer;
+    private Button btnLogin;
     private TextView tvError, tvServerUrl;
     private SessionManager session;
 
@@ -45,24 +45,12 @@ public class LoginActivity extends BaseActivity {
         etUsername = findViewById(R.id.etUsername);
         etPassword = findViewById(R.id.etPassword);
         btnLogin = findViewById(R.id.btnLogin);
-        btnChangeServer = findViewById(R.id.btnChangeServer);
         tvError = findViewById(R.id.tvError);
         tvServerUrl = findViewById(R.id.tvServerUrl);
 
         tvServerUrl.setText(getString(R.string.login_server_prefix, session.getServerUrl()));
 
         btnLogin.setOnClickListener(v -> doLogin());
-        btnChangeServer.setOnClickListener(v -> {
-            Intent intent = new Intent(this, ServerConfigActivity.class);
-            startActivity(intent);
-            finish();
-        });
-        // 登录页逃生口：服务器不可达/忘密码时进离线模式（本地笔记可用，见 docs/12 §4）
-        findViewById(R.id.btnOfflineMode).setOnClickListener(v -> {
-            session.enterOfflineMode();
-            startActivity(new Intent(this, MainActivity.class));
-            finish();
-        });
     }
 
     /** 点击空白区域（非输入框）收起键盘并让当前输入框失焦 */
@@ -116,10 +104,8 @@ public class LoginActivity extends BaseActivity {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
                     UserInfo user = response.body().getData();
                     session.saveUser(user.getId(), user.getUsername(), user.getDisplayName(), user.getAvatarUrl(), user.getRole());
-                    // 登录成功：复位离线标记（重连后回到在线模式）
-                    session.saveOffline(false);
                     Toast.makeText(LoginActivity.this, getString(R.string.login_success), Toast.LENGTH_SHORT).show();
-                    // 登录成功：调度同步 + 本地模式笔记上传询问
+                    // 登录成功：调度同步 + 遗留本地笔记上传询问
                     SyncWorker.schedule(LoginActivity.this);
                     SyncWorker.requestNow(LoginActivity.this);
                     maybePromptUploadLocal();
@@ -138,7 +124,7 @@ public class LoginActivity extends BaseActivity {
         });
     }
 
-    /** 本地模式创建的笔记 → 首次登录「上传前询问」 */
+    /** 遗留本地分区笔记 → 首次登录「上传前询问」 */
     private void maybePromptUploadLocal() {
         int count = AppDatabase.get(this).noteDao().countLocalOnly();
         if (count == 0) return;

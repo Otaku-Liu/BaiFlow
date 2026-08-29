@@ -8,7 +8,7 @@ import androidx.room.Update;
 
 import java.util.List;
 
-/** 本地笔记 DAO — 分区读写、outbox（dirty）、tombstone、本地模式查询。 */
+/** 本地笔记 DAO — 分区读写、outbox（dirty）、tombstone、遗留本地分区查询。 */
 @Dao
 public interface LocalNoteDao {
 
@@ -35,7 +35,7 @@ public interface LocalNoteDao {
     @Query("SELECT * FROM bf_local_note WHERE serverUrl = :serverUrl AND source = 'TOMBSTONE'")
     List<LocalNote> listTombstones(String serverUrl);
 
-    /** 本地模式（未配服务器）创建的本地笔记数量 */
+    /** 遗留本地分区（未关联服务器）创建的本地笔记数量 */
     @Query("SELECT COUNT(*) FROM bf_local_note WHERE serverUrl = 'LOCAL' AND source = 'LOCAL_ONLY'")
     int countLocalOnly();
 
@@ -43,7 +43,15 @@ public interface LocalNoteDao {
     @Query("SELECT COUNT(*) FROM bf_local_note WHERE serverUrl = :serverUrl AND source = 'SYNCED'")
     int countSynced(String serverUrl);
 
-    /** 本地模式笔记（首次配服务器登录时「上传前询问」用） */
+    /** 某分区待推笔记数（dirty，含冲突与 tombstone），供「我的」页同步状态展示 */
+    @Query("SELECT COUNT(*) FROM bf_local_note WHERE serverUrl = :serverUrl AND dirty = 1")
+    int countDirty(String serverUrl);
+
+    /** 某分区冲突笔记数（dirty + conflict 标记） */
+    @Query("SELECT COUNT(*) FROM bf_local_note WHERE serverUrl = :serverUrl AND dirty = 1 AND conflict = 1")
+    int countConflict(String serverUrl);
+
+    /** 遗留本地分区笔记（首次登录「上传前询问」用） */
     @Query("SELECT * FROM bf_local_note WHERE serverUrl = 'LOCAL' AND source = 'LOCAL_ONLY'")
     List<LocalNote> listLocalOnly();
 

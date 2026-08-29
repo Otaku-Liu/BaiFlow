@@ -1,8 +1,10 @@
 package com.baiflow.note.controller;
 
 import com.baiflow.common.entity.ApiResponse;
+import com.baiflow.note.dto.request.BatchMediaRequest;
 import com.baiflow.note.dto.response.NoteMediaInfo;
 import com.baiflow.note.service.NoteMediaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -13,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 /**
  * 笔记媒体接口控制器 — 上传 / 读取。
@@ -47,6 +51,14 @@ public class NoteMediaController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename=\"" + sanitizeFilename(res.media().getFileName()) + "\"")
                 .body(new FileSystemResource(res.file()));
+    }
+
+    /** 批量读取媒体（base64，≤10 个；供 Android 离线缓存，减少 N 次单个下载） */
+    @PostMapping("/batch")
+    public ApiResponse<Map<String, String>> batch(@Valid @RequestBody BatchMediaRequest req,
+                                                  Authentication auth) {
+        return ApiResponse.success(
+                noteMediaService.batchBase64(auth.getPrincipal().toString(), isAdmin(auth), req.ids()));
     }
 
     /** 文件名写入 Content-Disposition 前剔除引号/控制字符，避免破坏 quoted-string */
