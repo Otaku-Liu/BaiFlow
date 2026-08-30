@@ -66,7 +66,7 @@ Apple 色板：#007AFF 主色、#1D1D1F 主文字、#F5F5F7 背景、#86868B 次
 - **交互**：整圆（含色带）是**单一点击入口**，点击后**直接拉起系统图片选择器**（`ActivityResultContracts.GetContent`，无需运行时权限），不弹中间层菜单。
 - **上传中反馈**：色带兼作状态位，上传期间文案换 `mine_avatar_uploading`「上传中…」并 `setEnabled(false)` 禁用整圆，**压缩失败 / 接口失败 / 网络失败三条分支都必须还原**。
 - **提交语义**：头像为**即时上传**（选图即传，Toast 反馈），展示名称走「保存」按钮——两者语义不同是有意为之，未统一。
-- **Android 端不提供删除头像**：`ProfileActivity.deleteAvatar()`、`ApiClient.deleteAvatar()` 与 `mine_delete_avatar` / `mine_avatar_deleted` / `mine_avatar_delete_failed` 三条中英文案均已移除。服务端 `DELETE /api/auth/avatar` 与 Web 端入口保留不变。
+- **Android 端不提供删除头像**：`ProfileActivity.deleteAvatar()`、`ApiClient.deleteAvatar()` 与 `mine_delete_avatar` / `mine_avatar_deleted` / `mine_avatar_delete_failed` 三条中英文案均已移除。服务端 `DELETE /api/users/me/avatar`（自服务接口，见 `docs/adr/ADR-002-bf-prefix-naming.md`）与 Web 端入口保留。
 - 「我的」页 56dp 头像为纯展示，**不加编辑带**，入口是整行 `rowProfile`。
 - 原右下角圆形徽标方案（`bg_edit_badge`）已废弃删除。
 

@@ -4,7 +4,7 @@ import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.share.dto.request.VerifyCodeRequest;
 import com.baiflow.share.dto.response.ShareLinkInfo;
-import com.baiflow.share.service.ShareService;
+import com.baiflow.share.service.BfShareLinkService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -18,7 +18,7 @@ import java.util.Map;
 @RequestMapping("/api/public/shares")
 public class PublicShareController {
     @Autowired
-    private ShareService shareService;
+    private BfShareLinkService shareService;
 
     /** 查看分享元信息 */
     @GetMapping("/{token}")

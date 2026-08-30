@@ -1,9 +1,9 @@
 package com.baiflow.auth.service.impl;
 
 import com.baiflow.auth.config.BaiflowProperties;
-import com.baiflow.auth.entity.AuthSession;
+import com.baiflow.auth.entity.BfAuthSession;
 import com.baiflow.auth.service.SessionTokenService;
-import com.baiflow.auth.service.AuthSessionService;
+import com.baiflow.auth.service.BfAuthSessionService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,7 +29,7 @@ public class SessionTokenServiceImpl implements SessionTokenService {
     private static final Duration TOUCH_INTERVAL = Duration.ofHours(1);
 
     @Autowired
-    private AuthSessionService authSessionService;
+    private BfAuthSessionService authSessionService;
     @Autowired
     private BaiflowProperties properties;
 
@@ -37,7 +37,7 @@ public class SessionTokenServiceImpl implements SessionTokenService {
     public CreatedSession create(String userId, String deviceType, String deviceName,
                                  String ip, String userAgent) {
         String token = generateToken();
-        AuthSession session = new AuthSession();
+        BfAuthSession session = new BfAuthSession();
         session.setUserId(userId);
         session.setDeviceType("ANDROID".equals(deviceType) ? "ANDROID" : "WEB");
         session.setDeviceName(deviceName != null ? deviceName : "");
@@ -49,35 +49,35 @@ public class SessionTokenServiceImpl implements SessionTokenService {
         session.setLastUsedAt(now);
         session.setExpiresAt(now.plus(expiryFor(session.getDeviceType())));
         // 登录即清理该用户已过期的历史会话，控制表体积（走 idx_user 索引，无需定时任务）
-        authSessionService.remove(new LambdaQueryWrapper<AuthSession>()
-                .eq(AuthSession::getUserId, userId)
-                .lt(AuthSession::getExpiresAt, now));
+        authSessionService.remove(new LambdaQueryWrapper<BfAuthSession>()
+                .eq(BfAuthSession::getUserId, userId)
+                .lt(BfAuthSession::getExpiresAt, now));
         authSessionService.save(session);
         return new CreatedSession(token, session.getId(), session.getExpiresAt());
     }
 
     @Override
-    public AuthSession findByToken(String token) {
+    public BfAuthSession findByToken(String token) {
         if (token == null || token.isEmpty()) {
             return null;
         }
-        return authSessionService.getOne(new LambdaQueryWrapper<AuthSession>()
-                .eq(AuthSession::getTokenHash, sha256Hex(token))
+        return authSessionService.getOne(new LambdaQueryWrapper<BfAuthSession>()
+                .eq(BfAuthSession::getTokenHash, sha256Hex(token))
                 .last("LIMIT 1"));
     }
 
     @Override
     public void revokeAllExcept(String userId, String keepSessionId) {
-        LambdaQueryWrapper<AuthSession> wrapper = new LambdaQueryWrapper<AuthSession>()
-                .eq(AuthSession::getUserId, userId);
+        LambdaQueryWrapper<BfAuthSession> wrapper = new LambdaQueryWrapper<BfAuthSession>()
+                .eq(BfAuthSession::getUserId, userId);
         if (keepSessionId != null && !keepSessionId.isEmpty()) {
-            wrapper.ne(AuthSession::getId, keepSessionId);
+            wrapper.ne(BfAuthSession::getId, keepSessionId);
         }
         authSessionService.remove(wrapper);
     }
 
     @Override
-    public void touch(AuthSession session) {
+    public void touch(BfAuthSession session) {
         LocalDateTime now = LocalDateTime.now();
         session.setLastUsedAt(now);
         session.setExpiresAt(now.plus(expiryFor(session.getDeviceType())));

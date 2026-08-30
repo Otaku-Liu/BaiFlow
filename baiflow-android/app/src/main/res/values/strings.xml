@@ -71,6 +71,7 @@
     <string name="files_rename_failed">重命名失败</string>
     <string name="files_view_user">查看用户</string>
     <string name="files_empty">此目录为空</string>
+    <string name="files_uploading">上传中 %1$d%%</string>
     <string name="files_folder">文件夹</string>
     <string name="files_privacy_tag">隐私</string>
     <string name="files_type_icon_desc">文件类型图标</string>
@@ -171,6 +172,18 @@
     <string name="mine_profile">修改资料</string>
     <string name="mine_password">修改密码</string>
     <string name="mine_language">语言</string>
+    <string name="mine_records">传输记录</string>
+    <string name="mine_section_records">传输记录</string>
+    <string name="mine_upload_records">上传记录</string>
+    <string name="mine_download_records">下载记录</string>
+    <string name="records_upload_tab">上传记录</string>
+    <string name="records_download_tab">下载记录</string>
+    <string name="records_file_name_hint">文件名</string>
+    <string name="records_search">查询</string>
+    <string name="records_all_time">全部时间</string>
+    <string name="records_empty">暂无记录</string>
+    <string name="records_source_all">全部来源</string>
+    <string name="records_all_users">全部用户</string>
     <string name="mine_logout">退出登录</string>
     <string name="mine_logout_confirm_title">退出登录</string>
     <string name="mine_logout_confirm_msg">确定要退出当前账号吗？本地笔记将保留。</string>
@@ -199,6 +212,9 @@
     <!-- ==================== 传输 ==================== -->
     <string name="transfer_upload_preparing">准备上传...</string>
     <string name="transfer_upload_uploading">上传中...</string>
+    <string name="transfer_upload_progress">上传中...%1$d%%</string>
+    <string name="transfer_upload_cancel">取消</string>
+    <string name="transfer_upload_cancelled">上传已取消</string>
     <string name="transfer_upload_completed">上传完成</string>
     <string name="transfer_upload_failed">上传失败</string>
     <string name="transfer_upload_failed_detail">上传失败：%1$s</string>

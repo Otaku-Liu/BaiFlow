@@ -8,26 +8,26 @@ export function login(username, password) {
 }
 
 export function getCurrentUser() {
-  return http.get('/auth/me')
+  return http.get('/users/me')
 }
 
 /** 更新当前用户的展示名称 */
 export function updateProfile(displayName) {
-  return http.patch('/auth/profile', { displayName })
+  return http.patch('/users/me/profile', { displayName })
 }
 
 /** 上传头像（multipart/form-data） */
 export function uploadAvatar(file) {
   const formData = new FormData()
   formData.append('file', file)
-  return http.post('/auth/avatar', formData, {
+  return http.post('/users/me/avatar', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
 
 /** 删除当前用户头像 */
 export function deleteAvatar() {
-  return http.delete('/auth/avatar')
+  return http.delete('/users/me/avatar')
 }
 
 /** 修改密码（需提供旧密码验证） */

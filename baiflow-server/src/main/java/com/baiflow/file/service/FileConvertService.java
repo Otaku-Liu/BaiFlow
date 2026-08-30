@@ -1,8 +1,8 @@
 package com.baiflow.file.service;
 
-import com.baiflow.file.entity.FileItem;
-import com.baiflow.storage.entity.StorageRoot;
-import com.baiflow.storage.service.StorageService;
+import com.baiflow.file.entity.BfFileItem;
+import com.baiflow.storage.entity.BfStorageRoot;
+import com.baiflow.storage.service.BfStorageRootService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -38,10 +38,10 @@ public class FileConvertService {
     );
 
     @Autowired
-    private StorageService storageService;
+    private BfStorageRootService storageService;
 
     /** 判断文件是否需要转换为 PDF */
-    public boolean needsConversion(FileItem file) {
+    public boolean needsConversion(BfFileItem file) {
         return file.getMimeType() != null && OFFICE_MIMES.contains(file.getMimeType());
     }
 
@@ -51,8 +51,8 @@ public class FileConvertService {
      *
      * @return PDF 文件的 Path，转换失败返回 null
      */
-    public Path convertToPdf(FileItem file) {
-        StorageRoot root = storageService.getByIdOrThrow(file.getStorageRootId());
+    public Path convertToPdf(BfFileItem file) {
+        BfStorageRoot root = storageService.getByIdOrThrow(file.getStorageRootId());
         Path srcPath = storageService.resolveRootPath(root)
                 .resolve(file.getRelativePath()).normalize();
         storageService.verifyPathInRoot(root, srcPath);

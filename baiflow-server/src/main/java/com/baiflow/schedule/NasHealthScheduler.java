@@ -1,6 +1,6 @@
 package com.baiflow.schedule;
 
-import com.baiflow.storage.service.StorageService;
+import com.baiflow.storage.service.BfStorageRootService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 public class NasHealthScheduler {
 
     @Autowired
-    private StorageService storageService;
+    private BfStorageRootService storageService;
 
     /**
      * 每 60 秒执行一次 NAS 健康检查。

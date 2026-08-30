@@ -66,6 +66,8 @@ public class SecurityConfig {
                         .requestMatchers("/avatars/**").permitAll()
                         // 仅 ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // 当前用户自服务（个人资料/头像）— 任何登录用户，须先于 /api/users/** ADMIN 门禁匹配
+                        .requestMatchers("/api/users/me/**").authenticated()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/storage-roots/active").authenticated()
                         .requestMatchers("/api/storage-roots/**").hasRole("ADMIN")

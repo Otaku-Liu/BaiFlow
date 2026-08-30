@@ -1,6 +1,6 @@
 package com.baiflow.auth.service;
 
-import com.baiflow.auth.entity.AuthSession;
+import com.baiflow.auth.entity.BfAuthSession;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -33,7 +33,7 @@ public interface SessionTokenService {
     /**
      * 按明文 token 查会话（内部先哈希）。
      */
-    AuthSession findByToken(String token);
+    BfAuthSession findByToken(String token);
 
     /**
      * 吊销某用户全部会话，保留指定会话 — 硬删记录。
@@ -46,7 +46,7 @@ public interface SessionTokenService {
     /**
      * 滑动续期：更新 last_used_at 并把 expires_at 顺延到 now + 对应设备类型时长（ANDROID 180 天 / WEB webHours）。
      */
-    void touch(AuthSession session);
+    void touch(BfAuthSession session);
 
     /** 滑动续期写库节流间隔 */
     Duration touchInterval();

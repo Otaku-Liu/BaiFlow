@@ -16,6 +16,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 | 用户管理 | `/` 内 | 管理员可见：用户列表（**头像列** `el-avatar`：`avatarUrl` 有则图、无则取 `displayName`/`username` 首字回退，样式与 `HomeView` 一致——透明底图 + 浅灰 `#c0c4cc` 首字）、创建/编辑、批量删除、重置密码 |
 | 操作日志 | `/` 内 | 管理员可见：`el-sub-menu` 子菜单入口 |
 | 登录日志 | `/` 内 | 管理员可见：分页表格，用户名模糊搜索、日期时间范围（**默认当天，按 UTC+8 计算**，日期框可清空看全部历史）、登录结果筛选 |
+| 上传记录 / 下载记录 | `/` 内 | 两个独立菜单入口（`RecordsView` type=upload/download）：分页表格 + 时间范围（**默认当天**）/文件名/来源过滤；admin 可切用户看全部 |
 | 个人资料 | 弹窗 | 展示名、更换/删除头像、修改密码、登录设备管理（强制下线） |
 | 预览抽屉 | Drawer | 按 MIME 路由：图片(`<img>`)、视频(`<video>`+进度)、音频(`<audio>`+进度)、PDF(`<iframe>`)、Markdown(showdown→HTML)、文本/代码(`<pre>`)、其他(降级下载；Office 文档归为此类) |
 
@@ -66,7 +67,7 @@ Vue 3 + Vite + Vue Router + Pinia + Axios + Element Plus
 - **401**：`http.js` 收到 401 → `clearSession()` 清会话 → 提示「登录已过期」→ 整页跳转登录页。
 - **连接超时**（`utils/connectionMonitor.js` + `api/http.js`）：仅依赖实际请求失败，不做心跳轮询。登录态请求发生网络级失败（`error.response` 为空：连不上/超时/断网）且距上次成功联系 ≥30s 判定超时；阈值前的单次失败**静默**（避免笔记自动保存等高频请求刷屏），`timeoutFired` 去重。
   - **处理**：置 `authStore.connectionTimeout=true` → `App.vue` 约 1.5s 后 `router.push('/login')` **客户端路由跳转**（不整页刷新，**保留 token**；超时≠会话失效）。
-  - **登录页超时态**：「无法连接服务器」提示条 + 登录表单仍可用 + 「重新连接」按钮（重连先 `GET /api/health` 再 `/auth/me`：有效则回主界面，401 转正常登录表单）。
+  - **登录页超时态**：「无法连接服务器」提示条 + 登录表单仍可用 + 「重新连接」按钮（重连先 `GET /api/health` 再 `/users/me`：有效则回主界面，401 转正常登录表单）。
   - **边界**：仅 Web 管理台；GUEST 公共分享页无会话不适用；仅请求驱动，用户闲置无请求时无法即时发现断连。
 
 ## 视觉风格 · Apple 风格 (iOS 11-14)

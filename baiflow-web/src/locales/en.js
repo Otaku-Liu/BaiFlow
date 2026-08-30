@@ -278,7 +278,21 @@ export default {
     files: 'Files',
     notes: 'Notes',
     shares: 'Shares',
+    uploadRecords: 'Uploads',
+    downloadRecords: 'Downloads',
     users: 'Users'
+  },
+  records: {
+    upload: 'Uploads',
+    download: 'Downloads',
+    fileName: 'File',
+    source: 'Source',
+    ip: 'IP',
+    time: 'Time',
+    user: 'User',
+    startDate: 'Start date',
+    endDate: 'End date',
+    allUsers: 'All users'
   },
   notes: {
     searchPlaceholder: 'Search notes',

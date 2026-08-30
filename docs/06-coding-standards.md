@@ -7,6 +7,7 @@
 - Service → 业务逻辑、权限校验、事务边界、文件操作
 - Mapper → 纯 `BaseMapper`，不写自定义查询方法（单表查询在 Service 层 IService 完成）
 - DTO / VO / Entity / Request 分离
+- **命名规则**：绑定 `bf_*` 表的类统一 `Bf` 前缀、**按表名命名**（Entity / Mapper / Service(+Impl) / Controller 四层，如 `bf_share_link` → `BfShareLink` / `BfShareLinkMapper` / `BfShareLinkService`）；无单一主表的业务类（`AuthService`、`PublicShareController`、`HealthService`）不带 `Bf`；DTO / VO / Request / enum 保持原名。见 `docs/adr/ADR-002-bf-prefix-naming.md`
 - 统一返回 `{ code, message, data, traceId }`
 - 异常通过全局异常处理器转换
 - 文件路径必须 `Path.normalize()` + Storage Root 校验

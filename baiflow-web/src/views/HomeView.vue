@@ -54,6 +54,14 @@
               <el-icon><Share /></el-icon>
               <span>{{ t('menu.shares') }}</span>
             </el-menu-item>
+            <el-menu-item index="records-upload">
+              <el-icon><Upload /></el-icon>
+              <span>{{ t('menu.uploadRecords') }}</span>
+            </el-menu-item>
+            <el-menu-item index="records-download">
+              <el-icon><Download /></el-icon>
+              <span>{{ t('menu.downloadRecords') }}</span>
+            </el-menu-item>
             <el-menu-item v-if="authStore.isAdmin" index="users">
               <el-icon><User /></el-icon>
               <span>{{ t('menu.users') }}</span>
@@ -76,6 +84,8 @@
             <FilesView v-if="activeMenu === 'files'" key="files" />
             <NotesView v-else-if="activeMenu === 'notes'" key="notes" />
             <SharesView v-else-if="activeMenu === 'shares'" key="shares" />
+            <RecordsView v-else-if="activeMenu === 'records-upload'" type="upload" key="records-upload" />
+            <RecordsView v-else-if="activeMenu === 'records-download'" type="download" key="records-download" />
             <UsersView v-else-if="activeMenu === 'users'" key="users" />
             <LoginLogsView v-else-if="activeMenu === 'login-logs'" key="login-logs" />
           </transition>
@@ -176,7 +186,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { FolderOpened, Share, User, Fold, Expand, Document, ArrowDown, Memo } from '@element-plus/icons-vue'
+import { FolderOpened, Share, User, Fold, Expand, Document, ArrowDown, Memo, Upload, Download } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { updateProfile, uploadAvatar, deleteAvatar, changePassword, listDevices, revokeSession, deleteDevice } from '../api/auth'
@@ -187,6 +197,7 @@ import NotesView from './NotesView.vue'
 import SharesView from './SharesView.vue'
 import UsersView from './UsersView.vue'
 import LoginLogsView from './LoginLogsView.vue'
+import RecordsView from './RecordsView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

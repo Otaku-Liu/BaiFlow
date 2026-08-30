@@ -39,6 +39,8 @@
             android:exported="false" />
         <activity android:name=".ui.activity.LanguageActivity"
             android:exported="false" />
+        <activity android:name=".ui.activity.RecordsActivity"
+            android:exported="false" />
         <activity android:name=".ui.activity.PreviewActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize" />

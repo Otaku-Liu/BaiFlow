@@ -21,6 +21,8 @@ BaiFlow 涉及的关键术语速查。按字母序。
   随手记笔记表：`id` / `user_id` / `title` / `content`（Markdown 源）/ `status`（ACTIVE / DELETED 软删除）/ 时间戳。
 - **bf_note_progress**
   笔记阅读进度表：`(user_id, note_id)` 唯一，`position_type` + `position_value`，本期只有 `SCROLL_PERCENT`。
+- **Bf 类名前缀（Bf Naming Prefix）**
+  绑定 `bf_*` 表的后端类统一加 `Bf` 前缀、按表名命名（Entity / Mapper / Service(+Impl) / Controller），如 `bf_share_link` → `BfShareLink` / `BfShareLinkMapper` / `BfShareLinkService`；无单一主表的业务类（`AuthService`、`PublicShareController`、`HealthService` 等）不带 `Bf`；DTO / VO / Request / enum 保持原名。见 `docs/adr/ADR-002-bf-prefix-naming.md`、`docs/06-coding-standards.md`。
 
 ## C
 

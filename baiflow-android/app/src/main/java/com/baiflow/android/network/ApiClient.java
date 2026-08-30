@@ -157,14 +157,14 @@ public class ApiClient {
         @POST("auth/login")
         Call<ApiResponse<LoginData>> login(@Body LoginRequest request);
 
-        @GET("auth/me")
+        @GET("users/me")
         Call<ApiResponse<UserInfo>> getCurrentUser();
 
-        @PATCH("auth/profile")
+        @PATCH("users/me/profile")
         Call<ApiResponse<UserInfo>> updateProfile(@Body Map<String, String> body);
 
         @Multipart
-        @POST("auth/avatar")
+        @POST("users/me/avatar")
         Call<ApiResponse<UserInfo>> uploadAvatar(@Part MultipartBody.Part file);
 
         @POST("auth/change-password")
@@ -189,6 +189,27 @@ public class ApiClient {
                 @Query("page") int page,
                 @Query("size") int size
         );
+
+        // --- 传输记录（上传/下载历史） ---
+        @GET("upload-records")
+        Call<ApiResponse<PagedResult<UploadRecord>>> uploadRecords(
+                @Query("start") String start,
+                @Query("end") String end,
+                @Query("fileName") String fileName,
+                @Query("source") String source,
+                @Query("userId") String userId,
+                @Query("page") int page,
+                @Query("size") int size);
+
+        @GET("download-records")
+        Call<ApiResponse<PagedResult<DownloadRecord>>> downloadRecords(
+                @Query("start") String start,
+                @Query("end") String end,
+                @Query("fileName") String fileName,
+                @Query("source") String source,
+                @Query("userId") String userId,
+                @Query("page") int page,
+                @Query("size") int size);
 
         @POST("files/folders")
         Call<ApiResponse<FileItem>> createFolder(
@@ -346,6 +367,18 @@ public class ApiClient {
         return getService().listUsers(page, size);
     }
 
+    /** 传输记录：上传历史（过滤参数为空传 null） */
+    public Call<ApiResponse<PagedResult<UploadRecord>>> uploadRecords(String start, String end,
+            String fileName, String source, String userId, int page, int size) {
+        return getService().uploadRecords(start, end, fileName, source, userId, page, size);
+    }
+
+    /** 传输记录：下载历史（过滤参数为空传 null） */
+    public Call<ApiResponse<PagedResult<DownloadRecord>>> downloadRecords(String start, String end,
+            String fileName, String source, String userId, int page, int size) {
+        return getService().downloadRecords(start, end, fileName, source, userId, page, size);
+    }
+
     public Call<ApiResponse<FileItem>> createFolder(String storageRootId, String parentId,
                                                       String name, String privacyToken) {
         Map<String, String> body = new java.util.HashMap<>();
@@ -357,10 +390,27 @@ public class ApiClient {
 
     public Call<ApiResponse<FileItem>> uploadFile(String storageRootId, String parentId,
                                                     byte[] fileBytes, String fileName, String viewUserId,
-                                                    String privacyToken) {
+                                                    String privacyToken, java.util.function.IntConsumer progress) {
         RequestBody rootPart = RequestBody.create(storageRootId, MediaType.parse("text/plain"));
         RequestBody parentPart = RequestBody.create(parentId != null ? parentId : "", MediaType.parse("text/plain"));
-        return getService().uploadFile(rootPart, parentPart, buildFilePart(fileBytes, fileName, "application/octet-stream"), viewUserId, privacyToken);
+        // mime 按扩展名解析（硬编码 octet-stream 会让服务端存错类型，文件列表图标/类型判断全失效）
+        return getService().uploadFile(rootPart, parentPart,
+                buildFilePart(fileBytes, fileName, resolveMime(fileName), progress), viewUserId, privacyToken);
+    }
+
+    /** 按扩展名解析 MIME 类型；无法识别时回退通用二进制 */
+    private static String resolveMime(String fileName) {
+        if (fileName != null) {
+            int dot = fileName.lastIndexOf('.');
+            if (dot >= 0 && dot < fileName.length() - 1) {
+                String ext = fileName.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
+                String mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+                if (mime != null) {
+                    return mime;
+                }
+            }
+        }
+        return "application/octet-stream";
     }
 
     public Call<ResponseBody> downloadFile(String fileId, String privacyToken) {
@@ -460,7 +510,38 @@ public class ApiClient {
 
     /** 构造 multipart 文件 Part（"file" 字段），供头像/文件/笔记媒体上传共用 */
     private static MultipartBody.Part buildFilePart(byte[] bytes, String fileName, String mime) {
-        RequestBody fileBody = RequestBody.create(bytes, MediaType.parse(mime));
+        return buildFilePart(bytes, fileName, mime, null);
+    }
+
+    /** 带进度的文件 Part：progress 非空时按已写字节上报百分比（0~100），供上传通知展示 */
+    private static MultipartBody.Part buildFilePart(byte[] bytes, String fileName, String mime,
+                                                    java.util.function.IntConsumer progress) {
+        RequestBody fileBody;
+        if (progress != null) {
+            fileBody = new RequestBody() {
+                @Override
+                public MediaType contentType() {
+                    return MediaType.parse(mime);
+                }
+
+                @Override
+                public void writeTo(okio.BufferedSink sink) throws java.io.IOException {
+                    long total = bytes.length;
+                    long sent = 0;
+                    try (java.io.InputStream in = new java.io.ByteArrayInputStream(bytes)) {
+                        byte[] buf = new byte[8192];
+                        int n;
+                        while ((n = in.read(buf)) != -1) {
+                            sink.write(buf, 0, n);
+                            sent += n;
+                            progress.accept((int) (sent * 100 / Math.max(1, total)));
+                        }
+                    }
+                }
+            };
+        } else {
+            fileBody = RequestBody.create(bytes, MediaType.parse(mime));
+        }
         return MultipartBody.Part.createFormData("file", fileName, fileBody);
     }
 

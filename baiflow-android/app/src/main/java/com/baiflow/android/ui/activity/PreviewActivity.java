@@ -75,6 +75,7 @@ public class PreviewActivity extends BaseActivity {
     private long audioPendingSeekMs;   // 音频续播目标（ms），就绪后消费
     private boolean videoPlayed;       // 视频已开始播放（允许存 0 清除历史）
     private boolean audioPlayed;       // 音频已开始播放（允许存 0 清除历史）
+    private boolean forcedLandscape;   // 是否强制过横屏（离开时恢复传感器方向，避免旋转回传文件列表导致其重建丢目录）
 
     public static Intent newIntent(android.content.Context ctx, String fileId, String fileName,
                                    String mime, String privacyToken, long sizeBytes) {
@@ -282,6 +283,7 @@ public class PreviewActivity extends BaseActivity {
             // 横屏视频（旋转 90/270 或有效宽高为横）自动横屏播放
             if (isLandscapeVideo(f)) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                forcedLandscape = true;
             }
             // 应用内播放器：ExoPlayer + PlayerView（正确处理旋转元数据、宽高比、控制器时长显示）
             PlayerView playerView = new PlayerView(this);
@@ -539,6 +541,11 @@ public class PreviewActivity extends BaseActivity {
         // 离开页面暂停播放（旋转由 configChanges 处理，不触发 onPause）
         if (videoPlayer != null) videoPlayer.pause();
         if (audioPlayer != null) audioPlayer.pause();
+        // 强制过横屏且正在退出：先恢复传感器方向，让旋转发生在预览页自身，
+        // 避免把旋转带回文件列表（MainActivity 被重建会丢失当前目录，Xiaomi 尤甚）
+        if (forcedLandscape && isFinishing()) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        }
     }
 
     @Override

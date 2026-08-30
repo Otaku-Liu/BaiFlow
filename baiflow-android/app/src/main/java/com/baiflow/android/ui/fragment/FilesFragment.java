@@ -1,10 +1,16 @@
 package com.baiflow.android.ui.fragment;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.OpenableColumns;
+import android.util.Base64;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -45,6 +51,10 @@ import com.baiflow.android.util.DownloadUtil;
 import com.baiflow.android.util.FormatUtil;
 import com.baiflow.android.widget.DropdownMenu;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,6 +109,24 @@ public class FilesFragment extends Fragment {
     /** 排序按钮（打开排序菜单；方向用菜单内「>」图标指示） */
     private View btnSort;
 
+    // 上传占位进度：轮询 UploadService 当前任务，仅当前目录匹配时展示，完成时刷新一次
+    private View uploadProgressRow;
+    private TextView tvUploadProgress;
+    private ProgressBar uploadProgressBar;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private UploadService.UploadTask handledTask;
+    private boolean polling;
+
+    private final Runnable uploadPoller = new Runnable() {
+        @Override
+        public void run() {
+            pollUpload();
+            if (polling) {
+                mainHandler.postDelayed(this, 800);
+            }
+        }
+    };
+
     // 隐私文件夹映射: folderId -> accessToken
     private final Map<String, String> privacyTokens = new java.util.HashMap<>();
 
@@ -138,6 +166,9 @@ public class FilesFragment extends Fragment {
         tvEmpty = view.findViewById(R.id.tvEmpty);
         progressBar = view.findViewById(R.id.progressBar);
         adminRow = view.findViewById(R.id.adminRow);
+        uploadProgressRow = view.findViewById(R.id.uploadProgressRow);
+        tvUploadProgress = view.findViewById(R.id.tvUploadProgress);
+        uploadProgressBar = view.findViewById(R.id.uploadProgressBar);
         spinnerUser = view.findViewById(R.id.spinnerUser);
         View btnNew = view.findViewById(R.id.btnNew);
         btnUp = view.findViewById(R.id.btnUp);
@@ -192,12 +223,19 @@ public class FilesFragment extends Fragment {
                         folderStack.addLast((FileItem) o);
                     }
                 }
-                currentParentId = folderStack.isEmpty() ? null : folderStack.peek().getId();
-                rebuildPath();
             }
-            if (currentRootId != null) {
-                loadFiles();
-            }
+        }
+        // 兜底：savedInstanceState 未携带目录状态（后台重建丢状态/进程回收/冷启动）时，从本地持久化恢复，
+        // 保证从预览（尤其强制横屏的视频）返回后仍停在当前目录而非回根
+        if (currentRootId == null && folderStack.isEmpty()) {
+            restoreNavState();
+        }
+        if (!folderStack.isEmpty()) {
+            currentParentId = folderStack.peek().getId();
+            rebuildPath();
+        }
+        if (currentRootId != null) {
+            loadFiles();
         }
 
         loadStorageRoots();
@@ -213,6 +251,55 @@ public class FilesFragment extends Fragment {
         if (!folderStack.isEmpty()) {
             // ArrayList 迭代序 = ArrayDeque 头到尾 = 当前目录..根目录
             outState.putSerializable("state_folder_stack", new ArrayList<>(folderStack));
+        }
+        saveNavState();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        polling = true;
+        mainHandler.removeCallbacks(uploadPoller);
+        mainHandler.post(uploadPoller);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        polling = false;
+        mainHandler.removeCallbacks(uploadPoller);
+    }
+
+    /** 轮询当前上传任务：匹配当前目录显示占位进度；完成时隐藏并刷新一次 */
+    private void pollUpload() {
+        UploadService.UploadTask t = UploadService.getCurrentTask();
+        if (t != null && currentRootId != null && currentRootId.equals(t.rootId)
+                && java.util.Objects.equals(currentParentId, t.parentId)) {
+            if (t.finished) {
+                if (handledTask != t) {
+                    handledTask = t;
+                    hideUploadProgress();
+                    loadFiles();
+                }
+            } else {
+                showUploadProgress(t.fileName, t.percent);
+            }
+        } else {
+            hideUploadProgress();
+        }
+    }
+
+    private void showUploadProgress(String fileName, int percent) {
+        if (uploadProgressRow.getVisibility() != View.VISIBLE) {
+            uploadProgressRow.setVisibility(View.VISIBLE);
+        }
+        tvUploadProgress.setText(getString(R.string.files_uploading, percent) + " " + fileName);
+        uploadProgressBar.setProgress(percent);
+    }
+
+    private void hideUploadProgress() {
+        if (uploadProgressRow.getVisibility() != View.GONE) {
+            uploadProgressRow.setVisibility(View.GONE);
         }
     }
 
@@ -557,6 +644,7 @@ public class FilesFragment extends Fragment {
         folderStack.push(folder);
         currentParentId = folder.getId();
         rebuildPath();
+        saveNavState();
         loadFiles();
     }
 
@@ -566,7 +654,69 @@ public class FilesFragment extends Fragment {
         folderStack.pop();
         currentParentId = folderStack.isEmpty() ? null : folderStack.peek().getId();
         rebuildPath();
+        saveNavState();
         loadFiles();
+    }
+
+    // ==================== 目录导航栈持久化（重建/进程回收/冷启动兜底恢复当前目录） ====================
+
+    private static final String NAV_PREFS = SessionManager.PREFS_FILES_NAV;
+    private static final String NAV_ROOT_ID = "root_id";
+    private static final String NAV_ROOT_NAME = "root_name";
+    private static final String NAV_PARENT_ID = "parent_id";
+    private static final String NAV_VIEW_USER = "view_user";
+    private static final String NAV_STACK = "stack";
+
+    /** 保存当前目录导航状态（每次导航/状态保存时写入；登出时由 SessionManager 清除） */
+    private void saveNavState() {
+        SharedPreferences sp = requireContext().getSharedPreferences(NAV_PREFS, Context.MODE_PRIVATE);
+        SharedPreferences.Editor ed = sp.edit();
+        ed.putString(NAV_ROOT_ID, currentRootId);
+        ed.putString(NAV_ROOT_NAME, currentRootName);
+        ed.putString(NAV_PARENT_ID, currentParentId);
+        ed.putString(NAV_VIEW_USER, currentViewUserId);
+        if (!folderStack.isEmpty()) {
+            try {
+                // 序列化 ArrayList<FileItem>（当前..根）→ Base64 存储
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                ObjectOutputStream oos = new ObjectOutputStream(bos);
+                oos.writeObject(new ArrayList<>(folderStack));
+                oos.close();
+                ed.putString(NAV_STACK, Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP));
+            } catch (Exception e) {
+                Log.w("FilesFragment", "保存目录导航状态失败", e);
+            }
+        } else {
+            ed.remove(NAV_STACK);
+        }
+        ed.apply();
+    }
+
+    /** 从本地持久化恢复目录导航状态（savedInstanceState 缺失时的兜底） */
+    private void restoreNavState() {
+        SharedPreferences sp = requireContext().getSharedPreferences(NAV_PREFS, Context.MODE_PRIVATE);
+        currentRootId = sp.getString(NAV_ROOT_ID, null);
+        currentRootName = sp.getString(NAV_ROOT_NAME, null);
+        currentParentId = sp.getString(NAV_PARENT_ID, null);
+        currentViewUserId = sp.getString(NAV_VIEW_USER, null);
+        String stackB64 = sp.getString(NAV_STACK, null);
+        if (stackB64 != null) {
+            try {
+                byte[] bytes = Base64.decode(stackB64, Base64.NO_WRAP);
+                ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
+                Object obj = ois.readObject();
+                ois.close();
+                if (obj instanceof ArrayList<?>) {
+                    for (Object o : (ArrayList<?>) obj) {
+                        if (o instanceof FileItem) {
+                            folderStack.addLast((FileItem) o);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.w("FilesFragment", "恢复目录导航状态失败", e);
+            }
+        }
     }
 
     /** 重建路径文案（始终显示，含根目录显示根名），并维护「上一级」按钮可用态 */
@@ -666,20 +816,47 @@ public class FilesFragment extends Fragment {
             // md 优先按扩展名识别：服务端存的 mime 是上传方 Content-Type，.md 可能不是 text/markdown
             if (isMarkdown(item)) return R.drawable.ic_type_md;
             String mime = item.getMimeType();
-            if (mime == null) return R.drawable.ic_type_file;
-            if (mime.startsWith("image/")) return R.drawable.ic_type_image;
-            if (mime.startsWith("video/")) return R.drawable.ic_type_video;
-            if (mime.startsWith("audio/")) return R.drawable.ic_type_audio;
-            if ("application/pdf".equals(mime)) return R.drawable.ic_type_pdf;
-            if (mime.endsWith("json")) return R.drawable.ic_type_json;
-            if (mime.endsWith("xml")) return R.drawable.ic_type_xml;
-            if (mime.startsWith("text/")) return R.drawable.ic_type_file;
-            if (mime.contains("msword") || mime.contains("wordprocessingml")) return R.drawable.ic_type_word;
-            if (mime.contains("ms-excel") || mime.contains("spreadsheetml")) return R.drawable.ic_type_excel;
-            if (mime.contains("ms-powerpoint") || mime.contains("presentationml")) return R.drawable.ic_type_ppt;
-            if (mime.contains("zip") || mime.contains("compressed") || mime.contains("x-tar")
-                    || mime.contains("gzip")) return R.drawable.ic_type_archive;
+            if (mime != null) {
+                if (mime.startsWith("image/")) return R.drawable.ic_type_image;
+                if (mime.startsWith("video/")) return R.drawable.ic_type_video;
+                if (mime.startsWith("audio/")) return R.drawable.ic_type_audio;
+                if ("application/pdf".equals(mime)) return R.drawable.ic_type_pdf;
+                if (mime.endsWith("json")) return R.drawable.ic_type_json;
+                if (mime.endsWith("xml")) return R.drawable.ic_type_xml;
+                if (mime.startsWith("text/")) return R.drawable.ic_type_file;
+                if (mime.contains("msword") || mime.contains("wordprocessingml")) return R.drawable.ic_type_word;
+                if (mime.contains("ms-excel") || mime.contains("spreadsheetml")) return R.drawable.ic_type_excel;
+                if (mime.contains("ms-powerpoint") || mime.contains("presentationml")) return R.drawable.ic_type_ppt;
+                if (mime.contains("zip") || mime.contains("compressed") || mime.contains("x-tar")
+                        || mime.contains("gzip")) return R.drawable.ic_type_archive;
+            }
+            // 扩展名兜底：服务端 mime 可能被上传方硬编码为 application/octet-stream，按扩展名识别常见类型
+            String ext = extensionOf(item.getName());
+            if (ext != null) {
+                if (VIDEO_EXTS.contains(ext)) return R.drawable.ic_type_video;
+                if (AUDIO_EXTS.contains(ext)) return R.drawable.ic_type_audio;
+                if (IMAGE_EXTS.contains(ext)) return R.drawable.ic_type_image;
+                if ("pdf".equals(ext)) return R.drawable.ic_type_pdf;
+                if (ARCHIVE_EXTS.contains(ext)) return R.drawable.ic_type_archive;
+            }
             return R.drawable.ic_type_file;
+        }
+
+        private static final java.util.Set<String> VIDEO_EXTS =
+                java.util.Set.of("mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v", "3gp", "ts", "mpeg", "mpg");
+        private static final java.util.Set<String> AUDIO_EXTS =
+                java.util.Set.of("mp3", "wav", "aac", "flac", "m4a", "ogg", "opus", "wma", "amr");
+        private static final java.util.Set<String> IMAGE_EXTS =
+                java.util.Set.of("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "svg");
+        private static final java.util.Set<String> ARCHIVE_EXTS =
+                java.util.Set.of("zip", "rar", "7z", "gz", "tar", "bz2", "xz");
+
+        /** 取小写扩展名（不含点）；无扩展名返回 null */
+        private static String extensionOf(String name) {
+            if (name == null) return null;
+            int dot = name.lastIndexOf('.');
+            if (dot < 0 || dot == name.length() - 1) return null;
+            return name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
         }
 
         /** 是否 Markdown 文件：扩展名 .md/.markdown，或 MIME 含 markdown */

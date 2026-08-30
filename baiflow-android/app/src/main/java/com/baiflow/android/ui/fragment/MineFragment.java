@@ -28,6 +28,7 @@ import com.baiflow.android.sync.SyncWorker;
 import com.baiflow.android.ui.activity.LanguageActivity;
 import com.baiflow.android.ui.activity.LoginActivity;
 import com.baiflow.android.ui.activity.PasswordActivity;
+import com.baiflow.android.ui.activity.RecordsActivity;
 import com.baiflow.android.ui.activity.ProfileActivity;
 import com.baiflow.android.util.AvatarLoader;
 import com.baiflow.android.util.FormatUtil;
@@ -78,6 +79,12 @@ public class MineFragment extends Fragment {
                 startActivity(new Intent(requireContext(), ProfileActivity.class)));
         view.findViewById(R.id.rowPassword).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), PasswordActivity.class)));
+        view.findViewById(R.id.rowUploadRecords).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), RecordsActivity.class)
+                        .putExtra(RecordsActivity.EXTRA_UPLOAD, true)));
+        view.findViewById(R.id.rowDownloadRecords).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), RecordsActivity.class)
+                        .putExtra(RecordsActivity.EXTRA_UPLOAD, false)));
         view.findViewById(R.id.rowLanguage).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), LanguageActivity.class)));
         view.findViewById(R.id.rowClearCache).setOnClickListener(v -> confirmClearCache());

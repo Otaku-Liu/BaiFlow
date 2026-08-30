@@ -1,9 +1,9 @@
 package com.baiflow.auth.security;
 
-import com.baiflow.auth.entity.AuthSession;
+import com.baiflow.auth.entity.BfAuthSession;
 import com.baiflow.auth.service.SessionTokenService;
-import com.baiflow.user.entity.User;
-import com.baiflow.user.mapper.UserMapper;
+import com.baiflow.user.entity.BfUser;
+import com.baiflow.user.mapper.BfUserMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,18 +34,18 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private SessionTokenService sessionTokenService;
     @Autowired
-    private UserMapper userMapper;
+    private BfUserMapper userMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String token = AuthTokens.extract(request);
         if (token != null) {
-            AuthSession session = sessionTokenService.findByToken(token);
+            BfAuthSession session = sessionTokenService.findByToken(token);
             LocalDateTime now = LocalDateTime.now();
             if (session != null
                     && session.getExpiresAt() != null && session.getExpiresAt().isAfter(now)) {
-                User user = userMapper.selectById(session.getUserId());
+                BfUser user = userMapper.selectById(session.getUserId());
                 if (user != null) {
                     // 滑动续期：距上次续期超过 1 小时则写库顺延（ANDROID / WEB 通用）
                     if (session.getLastUsedAt() != null

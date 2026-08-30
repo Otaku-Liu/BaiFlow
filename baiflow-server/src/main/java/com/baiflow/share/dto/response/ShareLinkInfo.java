@@ -1,6 +1,6 @@
 package com.baiflow.share.dto.response;
 
-import com.baiflow.share.entity.ShareLink;
+import com.baiflow.share.entity.BfShareLink;
 import com.baiflow.share.enums.ShareStatus;
 import java.time.LocalDateTime;
 
@@ -11,7 +11,7 @@ public record ShareLinkInfo(
         boolean requirePrivatePassword, String status, String createdAt,
         String token, String ownerUsername, String ownerDisplayName
 ) {
-    public static ShareLinkInfo from(ShareLink s) {
+    public static ShareLinkInfo from(BfShareLink s) {
         return new ShareLinkInfo(s.getId(), s.getTargetFileItemId(),
                 s.getShareType().name(), s.getAccessMode().name(),
                 s.getExpiresAt() != null ? s.getExpiresAt().toString() : null,
@@ -21,7 +21,7 @@ public record ShareLinkInfo(
                 null, s.getOwnerUsername(), s.getOwnerDisplayName());
     }
 
-    public static ShareLinkInfo from(ShareLink s, String token) {
+    public static ShareLinkInfo from(BfShareLink s, String token) {
         return new ShareLinkInfo(s.getId(), s.getTargetFileItemId(),
                 s.getShareType().name(), s.getAccessMode().name(),
                 s.getExpiresAt() != null ? s.getExpiresAt().toString() : null,

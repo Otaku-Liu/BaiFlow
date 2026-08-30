@@ -1,27 +1,26 @@
 package com.baiflow.auth.service.impl;
 
 import com.baiflow.auth.constant.LoginLockRedisKeys;
-import com.baiflow.auth.config.BaiflowProperties;
 import com.baiflow.auth.dto.request.LoginRequest;
 import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
 import com.baiflow.auth.dto.response.UserDeviceInfo;
-import com.baiflow.auth.entity.AuthSession;
-import com.baiflow.auth.entity.UserDevice;
-import com.baiflow.auth.mapper.AuthSessionMapper;
+import com.baiflow.auth.entity.BfAuthSession;
+import com.baiflow.auth.entity.BfUserDevice;
+import com.baiflow.auth.mapper.BfAuthSessionMapper;
 import com.baiflow.auth.service.SessionTokenService;
 import com.baiflow.auth.service.AuthService;
-import com.baiflow.auth.service.UserDeviceService;
-import com.baiflow.audit.service.AuditService;
+import com.baiflow.auth.service.BfUserDeviceService;
+import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.common.util.I18nUtil;
 import com.baiflow.common.util.RequestUtil;
 import com.baiflow.user.dto.response.UserInfo;
-import com.baiflow.user.entity.User;
+import com.baiflow.user.entity.BfUser;
 import com.baiflow.user.enums.UserStatus;
-import com.baiflow.user.mapper.UserMapper;
-import com.baiflow.user.service.UserService;
+import com.baiflow.user.mapper.BfUserMapper;
+import com.baiflow.user.service.BfUserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -30,15 +29,10 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -53,34 +47,29 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    private static final Set<String> ALLOWED_AVATAR_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
-    private static final long AVATAR_MAX_SIZE = 1024 * 1024; // 1MB
-
     /** 最大登录失败次数 */
     private static final int MAX_FAILURES = 5;
     /** 锁定时长（分钟）——同时作为失败计数的滑动窗口 */
     private static final int LOCK_MINUTES = 15;
 
     @Autowired
-    private UserMapper userMapper;
+    private BfUserMapper userMapper;
     @Autowired
-    private UserService userService;
+    private BfUserService userService;
     @Autowired
     private SessionTokenService sessionTokenService;
     @Autowired
-    private UserDeviceService userDeviceService;
+    private BfUserDeviceService userDeviceService;
     @Autowired
-    private AuthSessionMapper sessionMapper;
+    private BfAuthSessionMapper sessionMapper;
     @Autowired
     private PasswordEncoder passwordEncoder;
     @Autowired
-    private AuditService auditService;
+    private BfAuditLogService auditService;
     @Autowired
     private I18nUtil i18nUtil;
     @Autowired
     private StringRedisTemplate redisTemplate;
-    @Autowired
-    private BaiflowProperties baiflowProperties;
 
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -94,8 +83,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 1. 根据用户名查找用户
-        User user = userService.getOne(new LambdaQueryWrapper<User>()
-                .eq(User::getUsername, request.username())
+        BfUser user = userService.getOne(new LambdaQueryWrapper<BfUser>()
+                .eq(BfUser::getUsername, request.username())
                 .last("LIMIT 1"));
         if (user == null) {
             recordFailure(request.username(), null);
@@ -142,17 +131,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public UserInfo me(String userId) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
-        }
-        return UserInfo.from(user);
-    }
-
-    @Override
     public void logout(String token) {
-        AuthSession session = sessionTokenService.findByToken(token);
+        BfAuthSession session = sessionTokenService.findByToken(token);
         if (session != null) {
             sessionMapper.deleteById(session.getId());
             auditService.log(session.getUserId(), "LOGOUT", "SESSION", session.getId(),
@@ -163,13 +143,13 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public List<AuthSessionInfo> listSessions(String userId, String currentToken) {
-        AuthSession current = sessionTokenService.findByToken(currentToken);
+        BfAuthSession current = sessionTokenService.findByToken(currentToken);
         String currentId = current != null ? current.getId() : null;
 
-        LambdaQueryWrapper<AuthSession> wrapper = new LambdaQueryWrapper<AuthSession>()
-                .eq(AuthSession::getUserId, userId)
-                .orderByDesc(AuthSession::getLastUsedAt);
-        List<AuthSession> sessions = sessionMapper.selectList(wrapper);
+        LambdaQueryWrapper<BfAuthSession> wrapper = new LambdaQueryWrapper<BfAuthSession>()
+                .eq(BfAuthSession::getUserId, userId)
+                .orderByDesc(BfAuthSession::getLastUsedAt);
+        List<BfAuthSession> sessions = sessionMapper.selectList(wrapper);
         return sessions.stream()
                 .map(s -> AuthSessionInfo.from(s, s.getId().equals(currentId)))
                 .toList();
@@ -177,25 +157,25 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public List<UserDeviceInfo> listDevices(String userId, String currentToken) {
-        AuthSession current = sessionTokenService.findByToken(currentToken);
+        BfAuthSession current = sessionTokenService.findByToken(currentToken);
         String currentDevice = current != null ? current.getDeviceName() : null;
 
         // 登录设备列表：历史设备全展示（含在线/离线状态）。
         // 在线 = 当前存在未过期会话；强制下线（撤销该设备全部会话）后即变为离线，
         // 离线设备可被「删除」（移除登录历史记录）。
-        List<UserDevice> devices = userDeviceService.list(new LambdaQueryWrapper<UserDevice>()
-                .eq(UserDevice::getUserId, userId)
-                .orderByDesc(UserDevice::getLastLoginAt));
+        List<BfUserDevice> devices = userDeviceService.list(new LambdaQueryWrapper<BfUserDevice>()
+                .eq(BfUserDevice::getUserId, userId)
+                .orderByDesc(BfUserDevice::getLastLoginAt));
 
         LocalDateTime now = LocalDateTime.now();
-        List<AuthSession> active = sessionMapper.selectList(new LambdaQueryWrapper<AuthSession>()
-                .eq(AuthSession::getUserId, userId)
-                .gt(AuthSession::getExpiresAt, now));
+        List<BfAuthSession> active = sessionMapper.selectList(new LambdaQueryWrapper<BfAuthSession>()
+                .eq(BfAuthSession::getUserId, userId)
+                .gt(BfAuthSession::getExpiresAt, now));
 
         return devices.stream().map(d -> {
-            AuthSession online = active.stream()
+            BfAuthSession online = active.stream()
                     .filter(s -> d.getDeviceName().equals(s.getDeviceName()))
-                    .max(Comparator.comparing(AuthSession::getLastUsedAt))
+                    .max(Comparator.comparing(BfAuthSession::getLastUsedAt))
                     .orElse(null);
             boolean isOnline = online != null;
             return new UserDeviceInfo(d.getDeviceName(), d.getDeviceType(), d.getFirstLoginAt(),
@@ -208,7 +188,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void revokeSession(String userId, boolean isAdmin, String sessionId, String currentToken) {
-        AuthSession target = sessionMapper.selectById(sessionId);
+        BfAuthSession target = sessionMapper.selectById(sessionId);
         if (target == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "会话不存在");
         }
@@ -217,7 +197,7 @@ public class AuthServiceImpl implements AuthService {
         }
         // 强制下线 = 撤销该设备（deviceName）的全部会话（同一设备可能有多次登录的多条活跃会话），
         // 排除当前会话防止误下线自己
-        AuthSession current = currentToken != null && !currentToken.isBlank()
+        BfAuthSession current = currentToken != null && !currentToken.isBlank()
                 ? sessionTokenService.findByToken(currentToken) : null;
         int deleted = deleteSessionsForDevice(target.getUserId(), target.getDeviceName(), current);
         auditService.log(userId, "FORCE_LOGOUT", "SESSION", sessionId,
@@ -234,18 +214,18 @@ public class AuthServiceImpl implements AuthService {
         }
         // 仅允许删除离线设备：存在未过期会话 → 需先强制下线（在线设备只能强制下线）
         LocalDateTime now = LocalDateTime.now();
-        List<AuthSession> active = sessionMapper.selectList(new LambdaQueryWrapper<AuthSession>()
-                .eq(AuthSession::getUserId, userId)
-                .eq(AuthSession::getDeviceName, deviceName)
-                .gt(AuthSession::getExpiresAt, now));
+        List<BfAuthSession> active = sessionMapper.selectList(new LambdaQueryWrapper<BfAuthSession>()
+                .eq(BfAuthSession::getUserId, userId)
+                .eq(BfAuthSession::getDeviceName, deviceName)
+                .gt(BfAuthSession::getExpiresAt, now));
         if (!active.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "设备仍在线，请先强制下线再删除");
         }
         // 清理该设备全部（已过期）会话记录 + 删除登录历史记录
         deleteSessionsForDevice(userId, deviceName, null);
-        userDeviceService.remove(new LambdaQueryWrapper<UserDevice>()
-                .eq(UserDevice::getUserId, userId)
-                .eq(UserDevice::getDeviceName, deviceName));
+        userDeviceService.remove(new LambdaQueryWrapper<BfUserDevice>()
+                .eq(BfUserDevice::getUserId, userId)
+                .eq(BfUserDevice::getDeviceName, deviceName));
         auditService.log(userId, "DELETE_DEVICE", "DEVICE", deviceName,
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "删除登录设备：" + deviceName);
@@ -253,12 +233,12 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /** 删除某用户指定设备名下的全部会话；excludeCurrent 非空时保留该会话（防误下线自己） */
-    private int deleteSessionsForDevice(String userId, String deviceName, AuthSession excludeCurrent) {
-        LambdaQueryWrapper<AuthSession> w = new LambdaQueryWrapper<AuthSession>()
-                .eq(AuthSession::getUserId, userId)
-                .eq(AuthSession::getDeviceName, deviceName);
+    private int deleteSessionsForDevice(String userId, String deviceName, BfAuthSession excludeCurrent) {
+        LambdaQueryWrapper<BfAuthSession> w = new LambdaQueryWrapper<BfAuthSession>()
+                .eq(BfAuthSession::getUserId, userId)
+                .eq(BfAuthSession::getDeviceName, deviceName);
         if (excludeCurrent != null) {
-            w.ne(AuthSession::getId, excludeCurrent.getId());
+            w.ne(BfAuthSession::getId, excludeCurrent.getId());
         }
         return sessionMapper.delete(w);
     }
@@ -289,147 +269,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public UserInfo updateProfile(String userId, String displayName) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
-        }
-        // 展示名不允许为空
-        if (displayName == null || displayName.isBlank()) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "展示名不能为空");
-        }
-        user.setDisplayName(displayName.trim());
-        userMapper.updateById(user);
-        return UserInfo.from(user);
-    }
-
-    @Override
-    public UserInfo uploadAvatar(String userId, MultipartFile file) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
-        }
-
-        // 校验文件大小
-        if (file.getSize() > AVATAR_MAX_SIZE) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "头像文件大小不能超过 1MB");
-        }
-
-        // 校验文件格式
-        String originalName = file.getOriginalFilename();
-        if (originalName == null || originalName.isBlank()) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "文件名不能为空");
-        }
-        String ext = "";
-        int dotIdx = originalName.lastIndexOf('.');
-        if (dotIdx >= 0) {
-            ext = originalName.substring(dotIdx + 1).toLowerCase();
-        }
-        if (!ALLOWED_AVATAR_EXTENSIONS.contains(ext)) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
-                    i18nUtil.translate("不支持的文件格式，仅允许：") + String.join(", ", ALLOWED_AVATAR_EXTENSIONS));
-        }
-
-        // 保存文件到 avatar 目录（文件名带时间戳版本，URL 每次上传唯一，避免浏览器缓存旧头像）
-        String avatarDir = baiflowProperties.getStorage().getAvatarPath();
-        String oldAvatarUrl = user.getAvatarUrl();
-        String avatarFileName = userId + "." + System.currentTimeMillis() + "." + ext;
-        Path avatarPath = resolveAvatarWithin(avatarDir, avatarFileName);
-        if (avatarPath == null) {
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "非法的头像路径");
-        }
-
-        try {
-            Files.createDirectories(avatarPath.getParent());
-            file.transferTo(avatarPath.toFile());
-        } catch (IOException e) {
-            log.error("头像保存失败: userId={}, path={}", userId, avatarPath, e);
-            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, i18nUtil.translate("头像保存失败：") + e.getMessage());
-        }
-
-        // 构建 nginx 访问 URL 并存储
-        String avatarUrl = "/avatars/" + avatarFileName;
-        user.setAvatarUrl(avatarUrl);
-        userMapper.updateById(user);
-
-        log.info("头像已更新: userId={}, url={}", userId, avatarUrl);
-
-        // 清理旧头像文件（文件名带版本，不覆盖，需删除旧文件避免磁盘残留）
-        deleteOldAvatar(oldAvatarUrl, avatarDir, avatarFileName);
-
-        return UserInfo.from(user);
-    }
-
-    @Override
-    public UserInfo deleteAvatar(String userId) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
-        }
-        String avatarDir = baiflowProperties.getStorage().getAvatarPath();
-        Path avatarPath = resolveAvatarPath(user.getAvatarUrl(), avatarDir);
-        if (avatarPath != null) {
-            try {
-                Files.deleteIfExists(avatarPath);
-                log.info("头像已删除: path={}", avatarPath);
-            } catch (IOException e) {
-                log.warn("头像删除失败: path={}", avatarPath, e);
-            }
-        }
-        // avatar_url 列 NOT NULL（DEFAULT ''），"无头像"约定为空字符串
-        user.setAvatarUrl("");
-        // updateById 默认跳过空值字段，需用 LambdaUpdateWrapper 显式写回空字符串
-        userMapper.update(null, new LambdaUpdateWrapper<User>()
-                .eq(User::getId, userId)
-                .set(User::getAvatarUrl, ""));
-        log.info("头像已清除: userId={}", userId);
-        return UserInfo.from(user);
-    }
-
-    /** 删除指定 URL 对应的旧头像文件；无旧头像/URL 非法/与新文件同名时跳过。 */
-    private void deleteOldAvatar(String oldAvatarUrl, String avatarDir, String newFileName) {
-        Path oldPath = resolveAvatarPath(oldAvatarUrl, avatarDir);
-        if (oldPath == null || oldPath.getFileName().toString().equals(newFileName)) {
-            return;
-        }
-        try {
-            Files.deleteIfExists(oldPath);
-            log.info("旧头像已删除: path={}", oldPath);
-        } catch (IOException e) {
-            log.warn("旧头像删除失败: path={}", oldPath, e);
-        }
-    }
-
-    /** 解析头像 URL 对应的文件路径（归一化 + 目录穿越校验）；非 /avatars/ 前缀或非法返回 null */
-    private Path resolveAvatarPath(String avatarUrl, String avatarDir) {
-        if (avatarUrl == null || avatarUrl.isBlank()) {
-            return null;
-        }
-        String prefix = "/avatars/";
-        if (!avatarUrl.startsWith(prefix)) {
-            return null;
-        }
-        String fileName = avatarUrl.substring(prefix.length());
-        int queryIdx = fileName.indexOf('?');
-        if (queryIdx >= 0) {
-            fileName = fileName.substring(0, queryIdx);
-        }
-        if (fileName.isEmpty()) {
-            return null;
-        }
-        return resolveAvatarWithin(avatarDir, fileName);
-    }
-
-    /** 归一化并校验文件名位于 avatar 目录内，返回安全路径；穿越则返回 null（uploadAvatar 与 deleteAvatar 共用） */
-    private Path resolveAvatarWithin(String avatarDir, String fileName) {
-        Path dir = Path.of(avatarDir).normalize();
-        Path path = Path.of(avatarDir, fileName).normalize();
-        return path.startsWith(dir) ? path : null;
-    }
-
-    @Override
     public void changePassword(String userId, String oldPassword, String newPassword) {
-        User user = userMapper.selectById(userId);
+        BfUser user = userMapper.selectById(userId);
         if (user == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
@@ -471,7 +312,7 @@ public class AuthServiceImpl implements AuthService {
      * <p>达到阈值时，若用户存在，同时将用户状态持久化为 LOCKED；
      * 锁键到期后由 {@link LoginLockScheduler} 定时任务或登录时的兜底判定恢复为 NORMAL。
      */
-    private void recordFailure(String username, User user) {
+    private void recordFailure(String username, BfUser user) {
         try {
             String failKey = LoginLockRedisKeys.FAIL_COUNT + username;
             Long count = redisTemplate.opsForValue().increment(failKey);
@@ -481,9 +322,9 @@ public class AuthServiceImpl implements AuthService {
                 redisTemplate.opsForValue().set(
                         LoginLockRedisKeys.LOCK + username, "1", LOCK_MINUTES, TimeUnit.MINUTES);
                 if (user != null) {
-                    userMapper.update(null, new LambdaUpdateWrapper<User>()
-                            .eq(User::getId, user.getId())
-                            .set(User::getStatus, UserStatus.LOCKED));
+                    userMapper.update(null, new LambdaUpdateWrapper<BfUser>()
+                            .eq(BfUser::getId, user.getId())
+                            .set(BfUser::getStatus, UserStatus.LOCKED));
                     auditService.log(user.getId(), "ACCOUNT_LOCKED", "USER", user.getId(),
                             RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                             "登录失败" + MAX_FAILURES + "次，账号已自动锁定");
@@ -511,11 +352,11 @@ public class AuthServiceImpl implements AuthService {
      * 将用户状态从 LOCKED 恢复为 NORMAL（幂等），并记录审计日志。
      * <p>使用条件更新（WHERE status=LOCKED）：多实例并发扫描时仅首个实例生效，避免重复审计。
      */
-    private void restoreToNormal(User user, String ip, String ua) {
-        int updated = userMapper.update(null, new LambdaUpdateWrapper<User>()
-                .eq(User::getId, user.getId())
-                .eq(User::getStatus, UserStatus.LOCKED)
-                .set(User::getStatus, UserStatus.NORMAL));
+    private void restoreToNormal(BfUser user, String ip, String ua) {
+        int updated = userMapper.update(null, new LambdaUpdateWrapper<BfUser>()
+                .eq(BfUser::getId, user.getId())
+                .eq(BfUser::getStatus, UserStatus.LOCKED)
+                .set(BfUser::getStatus, UserStatus.NORMAL));
         if (updated <= 0) {
             return;
         }

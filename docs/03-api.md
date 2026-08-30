@@ -55,10 +55,6 @@
 - `POST /api/auth/login` — 登录建会话，返回 `{ token, sessionId, expiresAt, user }`；设备类型/名称走 `X-Device-Type` / `X-Device-Name` 请求头（ANDROID 长期 / WEB 短期）
   - 登录失败锁定：15 分钟内连续失败 5 次返回 `42301`，用户状态持久化为 `LOCKED`；锁键到期后由定时任务（每 60s）或登录兜底判定自动恢复为 `NORMAL`
 - `POST /api/auth/logout` — 吊销当前请求 token 对应的会话（立即生效）
-- `GET /api/auth/me`
-- `PATCH /api/auth/profile` — 更新展示名，**不允许为空**（空值返回 `40001` 展示名不能为空）
-- `POST /api/auth/avatar`（multipart, ≤1MB, jpg/png/gif/webp）— 头像文件名带时间戳版本，返回 URL 每次上传唯一（避免浏览器缓存旧图）；服务端会删除旧头像文件；`/avatars/**` 为公开静态资源（生产 nginx alias，开发经后端静态映射）
-- `DELETE /api/auth/avatar` — 删除当前用户头像（删除文件 + 清空 avatarUrl），回到首字占位
 - `POST /api/auth/change-password` — 改密后吊销该用户全部会话（所有设备下线）
 - `GET /api/auth/sessions` — 当前用户的登录会话列表 `{ id, deviceName, deviceType, ip, lastUsedAt, createdAt, current }`
 - `GET /api/auth/devices` — 当前用户的登录设备列表（**含历史与在线状态**；强制下线（撤销全部会话）后变为离线）`{ deviceName, deviceType, firstLoginAt, lastLoginAt, lastActiveAt, online, current, activeSessionId }`
@@ -72,6 +68,17 @@
 - `GET/PUT /api/users/{id}/permissions`
 - 用户状态仅支持 `NORMAL` / `DISABLED`（管理员禁用）；`LOCKED` 由登录失败自动锁定维护，不可手动设置，锁键到期自动恢复
 - 将锁定中的用户改为其他状态（如禁用）时，服务端会清除其 Redis 登录锁定键，避免残留锁键拦截登录
+
+### 用户（当前用户自服务，任何登录用户）
+- `GET /api/users/me` — 当前已登录用户信息
+- `PATCH /api/users/me/profile` — 更新展示名，**不允许为空**（空值返回 `40001` 展示名不能为空）
+- `POST /api/users/me/avatar`（multipart, ≤1MB, jpg/png/gif/webp）— 头像文件名带时间戳版本，返回 URL 每次上传唯一（避免浏览器缓存旧图）；服务端会删除旧头像文件；`/avatars/**` 为公开静态资源（生产 nginx alias，开发经后端静态映射）
+- `DELETE /api/users/me/avatar` — 删除当前用户头像（删除文件 + 清空 avatarUrl），回到首字占位
+
+### 传输记录（上传/下载历史）
+- `GET /api/upload-records?start=&end=&fileName=&source=&userId=&page=&size=` — 上传历史分页（时间倒序）。`start`/`end` 为 `YYYY-MM-DD`（含端点日），`fileName` 模糊，`source` ∈ `WEB`/`ANDROID`；**非 admin 只看自己**，admin 传 `userId` 可筛任意用户、不传则全部。返回含 `uploaderUsername`。
+- `GET /api/download-records?start=&end=&fileName=&source=&userId=&page=&size=` — 下载历史分页（时间倒序）。`source` ∈ `CLIENT`/`SHARE`；**非 admin 只看自己的 CLIENT 下载**（分享匿名下载 `downloaderUserId` 为空、普通用户不可见），admin 全部/按 `userId` 筛。返回含 `downloaderUsername`。
+- 数据：`bf_upload_record`（新增，上传成功时异步写入，来源取客户端设备类型 `X-Device-Type`，Web 缺省 WEB）/ `bf_download_record`（既有）。见 `docs/adr/ADR-003-transfer-history.md`。
 
 ### 存储根目录
 - `GET /api/storage-roots/active`（返回所有 ACTIVE 状态的存储根目录，供文件中心选择器使用）

@@ -11,6 +11,7 @@ description: BaiFlow Spring Boot 后端：API、认证、MyBatis Plus、MySQL、
 - DTO/VO/Entity/Request 分离，返回 `{ code, message, data, traceId }`
 - 密码/token/hash 不存明文，文件 ID 仅在服务端解析路径
 - `@Autowired` 字段注入，`@Slf4j` 日志，UTF-8 编码，中文注释
+- **命名**：绑定 `bf_*` 表的类加 `Bf` 前缀（按表名：Entity/Mapper/Service/Controller）；无单一主表的业务类与 DTO/VO/enum 不带（见 `docs/adr/ADR-002-bf-prefix-naming.md`）
 - 详见 `docs/06-coding-standards.md`
 
 ## 参考

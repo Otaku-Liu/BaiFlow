@@ -33,10 +33,11 @@ SharedPreferences 保存会话 token（长期保持）。**服务器地址固定
 ## 上传下载
 
 - 小文件 Retrofit multipart 上传；长任务前台服务（UploadService / DownloadService）带通知
+- **上传实现**：选择器返回 `content://` URI，`UploadService` 经 `ContentResolver.openInputStream` 完整读入（非文件路径）；**mime 按扩展名解析**（硬编码 octet-stream 会让服务端存错类型、图标/类型判断失效）；进度走自定义 `RequestBody` 按已写字节上报百分比，通知带**进度条**实时显示「上传中 N%」；上传中通知带「**取消**」动作（中断请求，不做暂停/断点续传；取消后通知显示「上传已取消」）；完成/失败更新同一条通知并 `STOP_FOREGROUND_DETACH` 脱离前台保留结果（不随 stopSelf 消失），失败原因可见。**文件中心列表顶部显示上传占位进度行**（文件名 + 进度条，轮询 `UploadService` 当前任务、仅目标目录匹配时展示），上传完成即隐藏并自动刷新当前目录换真实文件。Android 13+ 需运行时授权 `POST_NOTIFICATIONS`（MainActivity 启动时请求）
 - 下载计次由后端记录（见 `docs/02-database.md`、`docs/03-api.md`）
 - **下载落公共 Download 文件夹**：API 29+ 走 `MediaStore.Downloads`（作用域存储，无需权限，系统「下载」/文件管理器可见）；API 26-28 写 `Environment.DIRECTORY_DOWNLOADS`，下载前申请 `WRITE_EXTERNAL_STORAGE`
 - **不支持预览的文件**：点按弹「暂不支持在线预览」对话框（含「下载」按钮），**不自动下载**，手动点「下载」才下载
-- **预览渲染**：视频/音频用 Media3 ExoPlayer（视频 `PlayerView`、音频 `PlayerControlView`，正确处理旋转元数据、宽高比、控制器时长）；横屏视频按「旋转 90/270 或有效宽高为横」自动转横屏
+- **预览渲染**：视频/音频用 Media3 ExoPlayer（视频 `PlayerView`、音频 `PlayerControlView`，正确处理旋转元数据、宽高比、控制器时长）；横屏视频按「旋转 90/270 或有效宽高为横」自动转横屏，**离开时若强制过横屏则恢复传感器方向**（让旋转发生在预览页自身，避免把旋转带回文件列表触发其重建）
 
 ## 浏览进度（跨端同步）
 
@@ -47,9 +48,9 @@ SharedPreferences 保存会话 token（长期保持）。**服务器地址固定
 ## 页面
 
 - 登录 → **MainActivity**（底部三栏，`ViewPager2` 滑动 + 底部导航双向同步）；首启未登录直接进登录页（服务器已固定，无引导页/服务器配置）
-  - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「三点」菜单（下拉：新建文件夹 / 上传文件）；长按文件/文件夹弹操作菜单（重命名 / 下载 / 删除，重命名走 `PATCH /api/files/{id}/rename`）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等）；不支持预览的文件点按弹下载确认框。**隐私空间**：主目录下「隐私空间」文件夹，首次进入弹「设置密码」（`POST privacy`，40107），之后进入弹「输入密码」（`verifyPrivacy` 换令牌）；令牌仅存内存（`privacyTokens`），重进需重输；管理员访问后端直接放行
+  - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「三点」菜单（下拉：新建文件夹 / 上传文件）；长按文件/文件夹弹操作菜单（重命名 / 下载 / 删除，重命名走 `PATCH /api/files/{id}/rename`）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等），**mime 判断后按扩展名兜底**（服务端 mime 可能被硬编码为 octet-stream，扩展名兜底保证 mp4/mkv 等显示视频图标）；不支持预览的文件点按弹下载确认框；**目录导航持久化**：`folderStack`（当前..根）序列化存 `SharedPreferences`（`files_nav`），每次进/退目录与 `onSaveInstanceState` 写入，Activity 重建/进程回收/冷启动时兜底恢复当前目录（**冷启动落在上次目录**），从预览返回不再丢目录；登出清除。**隐私空间**：主目录下「隐私空间」文件夹，首次进入弹「设置密码」（`POST privacy`，40107），之后进入弹「输入密码」（`verifyPrivacy` 换令牌）；令牌仅存内存（`privacyTokens`），重进需重输；管理员访问后端直接放行
   - **随手记** `NotesFragment`：列表/搜索/删除 → `NoteEditActivity`（**所见即所得块编辑器**：RecyclerView 每块一个真实 View，文本 EditText 经 `BlockRichText` 渲染行内 markdown 的格式效果、编辑即预览，图片 ImageView，音频 `NoteAudioPlayerView`；加载 Markdown→`NoteBlocks.fromDoc`、保存 `NoteBlocks.toDoc`→Markdown，落库仍是 Markdown）→ `NoteDrawActivity`（画画）
-  - **我的** `MineFragment`：分组（账号/通用/同步）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认 + `doLogout()` 幂等守卫（`logoutStarted` 标志）防连点。头像展示：有 `avatarUrl` 时 OkHttp 拉取圆形展示（`AvatarLoader`），无则浅灰底 + 展示名首字；修改资料页（`ProfileActivity`）支持**更换头像**（96dp 圆形 + 贴底「编辑」带，选图即上传，`ImageUtil` 缩放/EXIF 校正/压缩 ≤1MB → `POST /api/auth/avatar`），实现细节见 `docs/07-ios-design-system.md`；Android 端不提供删除头像（服务端与 Web 端入口保留）。进入「我的」页时（`onResume`）在线模式调 `/auth/me` 刷新本地用户信息（头像/展示名可能在其他端修改）
+  - **我的** `MineFragment`：分组（账号/通用/传输记录/同步）；「传输记录」分组含**上传记录 / 下载记录**两个入口 → `RecordsActivity`（默认查当天，可切时间范围/文件名/来源；admin 按用户查看）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认 + `doLogout()` 幂等守卫（`logoutStarted` 标志）防连点。头像展示：有 `avatarUrl` 时 OkHttp 拉取圆形展示（`AvatarLoader`），无则浅灰底 + 展示名首字；修改资料页（`ProfileActivity`）支持**更换头像**（96dp 圆形 + 贴底「编辑」带，选图即上传，`ImageUtil` 缩放/EXIF 校正/压缩 ≤1MB → `POST /api/users/me/avatar`），实现细节见 `docs/07-ios-design-system.md`；Android 端不提供删除头像（服务端与 Web 端入口保留）。进入「我的」页时（`onResume`）在线模式调 `/users/me` 刷新本地用户信息（头像/展示名可能在其他端修改）
 
 ## 多语言（i18n）
 

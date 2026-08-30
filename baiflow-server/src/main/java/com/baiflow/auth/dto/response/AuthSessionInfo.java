@@ -1,6 +1,6 @@
 package com.baiflow.auth.dto.response;
 
-import com.baiflow.auth.entity.AuthSession;
+import com.baiflow.auth.entity.BfAuthSession;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 public record AuthSessionInfo(String id, String deviceName, String deviceType, String ip,
                               LocalDateTime lastUsedAt, LocalDateTime createdAt, boolean current) {
-    public static AuthSessionInfo from(AuthSession s, boolean current) {
+    public static AuthSessionInfo from(BfAuthSession s, boolean current) {
         return new AuthSessionInfo(s.getId(), s.getDeviceName(), s.getDeviceType(), s.getIp(),
                 s.getLastUsedAt(), s.getCreatedAt(), current);
     }

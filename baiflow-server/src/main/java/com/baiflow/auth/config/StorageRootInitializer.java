@@ -1,9 +1,9 @@
 package com.baiflow.auth.config;
 
-import com.baiflow.storage.entity.StorageRoot;
+import com.baiflow.storage.entity.BfStorageRoot;
 import com.baiflow.storage.enums.StorageRootStatus;
 import com.baiflow.storage.enums.StorageRootType;
-import com.baiflow.storage.mapper.StorageRootMapper;
+import com.baiflow.storage.mapper.BfStorageRootMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +28,7 @@ import java.nio.file.Path;
 public class StorageRootInitializer implements CommandLineRunner {
 
     @Autowired
-    private StorageRootMapper storageRootMapper;
+    private BfStorageRootMapper storageRootMapper;
 
     @Autowired
     private BaiflowProperties baiflowProperties;
@@ -62,7 +62,7 @@ public class StorageRootInitializer implements CommandLineRunner {
         }
 
         // 创建默认存储根目录记录
-        StorageRoot root = new StorageRoot();
+        BfStorageRoot root = new BfStorageRoot();
         root.setName("默认存储");
         root.setType(StorageRootType.LOCAL);
         root.setRootPath(path.toString());

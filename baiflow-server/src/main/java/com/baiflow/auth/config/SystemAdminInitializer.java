@@ -1,10 +1,10 @@
 package com.baiflow.auth.config;
 
-import com.baiflow.user.entity.User;
+import com.baiflow.user.entity.BfUser;
 import com.baiflow.user.enums.UserRole;
 import com.baiflow.user.enums.UserStatus;
-import com.baiflow.user.mapper.UserMapper;
-import com.baiflow.user.service.UserService;
+import com.baiflow.user.mapper.BfUserMapper;
+import com.baiflow.user.service.BfUserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,10 +25,10 @@ import org.springframework.stereotype.Component;
 public class SystemAdminInitializer implements CommandLineRunner {
 
     @Autowired
-    private UserMapper userMapper;
+    private BfUserMapper userMapper;
 
     @Autowired
-    private UserService userService;
+    private BfUserService userService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -40,10 +40,10 @@ public class SystemAdminInitializer implements CommandLineRunner {
     public void run(String... args) {
         String username = baiflowProperties.getInitAdmin().getUsername();
 
-        User existing;
+        BfUser existing;
         try {
-            existing = userService.getOne(new LambdaQueryWrapper<User>()
-                    .eq(User::getUsername, username)
+            existing = userService.getOne(new LambdaQueryWrapper<BfUser>()
+                    .eq(BfUser::getUsername, username)
                     .last("LIMIT 1"));
         } catch (Exception e) {
             log.warn("无法查询管理员用户（数据库表可能尚未创建，请先执行 db/migration/ 下的 DDL 脚本）: {}",
@@ -63,7 +63,7 @@ public class SystemAdminInitializer implements CommandLineRunner {
             return;
         }
 
-        User admin = new User();
+        BfUser admin = new BfUser();
         admin.setUsername(username);
         admin.setPasswordHash(passwordEncoder.encode(baiflowProperties.getInitAdmin().getPassword()));
         admin.setDisplayName("Administrator");

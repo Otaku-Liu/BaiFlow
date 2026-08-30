@@ -1,7 +1,7 @@
 package com.baiflow.schedule;
 
-import com.baiflow.share.entity.ShareLink;
-import com.baiflow.share.mapper.ShareLinkMapper;
+import com.baiflow.share.entity.BfShareLink;
+import com.baiflow.share.mapper.BfShareLinkMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -25,7 +25,7 @@ public class ViewCountSyncScheduler {
     @Autowired
     private StringRedisTemplate redisTemplate;
     @Autowired
-    private ShareLinkMapper shareMapper;
+    private BfShareLinkMapper shareMapper;
 
     @Scheduled(fixedRate = 60_000)
     public void syncViewCounts() {
@@ -47,7 +47,7 @@ public class ViewCountSyncScheduler {
                 }
 
                 String shareLinkId = key.substring(REDIS_SHARE_VIEW_KEY.length());
-                ShareLink sl = shareMapper.selectById(shareLinkId);
+                BfShareLink sl = shareMapper.selectById(shareLinkId);
                 if (sl != null) {
                     sl.setViewCount(sl.getViewCount() + delta);
                     shareMapper.updateById(sl);

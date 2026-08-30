@@ -1,10 +1,10 @@
 package com.baiflow.schedule;
 
-import com.baiflow.audit.service.AuditService;
+import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.auth.constant.LoginLockRedisKeys;
-import com.baiflow.user.entity.User;
+import com.baiflow.user.entity.BfUser;
 import com.baiflow.user.enums.UserStatus;
-import com.baiflow.user.mapper.UserMapper;
+import com.baiflow.user.mapper.BfUserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -29,29 +29,29 @@ import java.util.List;
 public class LoginLockScheduler {
 
     @Autowired
-    private UserMapper userMapper;
+    private BfUserMapper userMapper;
     @Autowired
     private StringRedisTemplate redisTemplate;
     @Autowired
-    private AuditService auditService;
+    private BfAuditLogService auditService;
 
     @Scheduled(fixedRate = 60_000)
     public void restoreExpiredLocks() {
-        List<User> lockedUsers = userMapper.selectList(
-                new LambdaQueryWrapper<User>().eq(User::getStatus, UserStatus.LOCKED));
+        List<BfUser> lockedUsers = userMapper.selectList(
+                new LambdaQueryWrapper<BfUser>().eq(BfUser::getStatus, UserStatus.LOCKED));
         if (lockedUsers == null || lockedUsers.isEmpty()) {
             return;
         }
 
         int restored = 0;
-        for (User user : lockedUsers) {
+        for (BfUser user : lockedUsers) {
             try {
                 // 锁键不存在即代表锁定已到期；条件更新（WHERE status=LOCKED）保证多实例并发扫描时仅首个生效
                 if (!redisTemplate.hasKey(LoginLockRedisKeys.LOCK + user.getUsername())) {
-                    int updated = userMapper.update(null, new LambdaUpdateWrapper<User>()
-                            .eq(User::getId, user.getId())
-                            .eq(User::getStatus, UserStatus.LOCKED)
-                            .set(User::getStatus, UserStatus.NORMAL));
+                    int updated = userMapper.update(null, new LambdaUpdateWrapper<BfUser>()
+                            .eq(BfUser::getId, user.getId())
+                            .eq(BfUser::getStatus, UserStatus.LOCKED)
+                            .set(BfUser::getStatus, UserStatus.NORMAL));
                     if (updated <= 0) {
                         continue;
                     }

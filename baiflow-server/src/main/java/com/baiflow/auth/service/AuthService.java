@@ -4,13 +4,11 @@ import com.baiflow.auth.dto.request.LoginRequest;
 import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
 import com.baiflow.auth.dto.response.UserDeviceInfo;
-import com.baiflow.user.dto.response.UserInfo;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 /**
- * 认证服务 — 负责登录令牌签发和当前用户信息查询。
+ * 认证服务 — 负责登录令牌签发、登录会话/设备管理和当前用户改密。
  */
 public interface AuthService {
 
@@ -27,41 +25,6 @@ public interface AuthService {
      * @throws com.baiflow.common.exception.BusinessException ACCOUNT_LOCKED    账号已被锁定
      */
     LoginResponse login(LoginRequest request);
-
-    /**
-     * 获取当前已认证用户的个人资料。
-     *
-     * @param userId JWT 中的用户 ID
-     * @return 用户信息（不含密码哈希）
-     * @throws com.baiflow.common.exception.BusinessException NOT_FOUND 用户不存在
-     */
-    UserInfo me(String userId);
-
-    /**
-     * 更新当前用户的展示名称。
-     *
-     * @param userId      当前用户 ID
-     * @param displayName 新的展示名称
-     * @return 更新后的用户信息
-     */
-    UserInfo updateProfile(String userId, String displayName);
-
-    /**
-     * 上传/更新当前用户的头像。
-     *
-     * @param userId 当前用户 ID
-     * @param file   上传的头像文件（≤1MB，常用图片格式）
-     * @return 更新后的用户信息（含新 avatarUrl）
-     */
-    UserInfo uploadAvatar(String userId, MultipartFile file);
-
-    /**
-     * 删除当前用户的头像（删除文件 + 清空 avatarUrl），回到首字占位。
-     *
-     * @param userId 当前用户 ID
-     * @return 更新后的用户信息（avatarUrl 为空）
-     */
-    UserInfo deleteAvatar(String userId);
 
     /**
      * 修改当前用户的密码，并吊销其**全部**登录会话（所有设备强制下线，重新登录）。

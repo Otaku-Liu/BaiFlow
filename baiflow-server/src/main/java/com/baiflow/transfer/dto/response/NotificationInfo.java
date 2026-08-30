@@ -1,6 +1,6 @@
 package com.baiflow.transfer.dto.response;
 
-import com.baiflow.transfer.entity.Notification;
+import com.baiflow.transfer.entity.BfNotification;
 import com.baiflow.transfer.enums.NotificationLevel;
 import com.baiflow.transfer.enums.ReadStatus;
 
@@ -19,7 +19,7 @@ public record NotificationInfo(
         LocalDateTime createdAt,
         LocalDateTime readAt) {
 
-    public static NotificationInfo from(Notification n) {
+    public static NotificationInfo from(BfNotification n) {
         return new NotificationInfo(n.getId(), n.getUserId(), n.getLevel(),
                 n.getTitle(), n.getContent(), n.getReadStatus(),
                 n.getCreatedAt(), n.getReadAt());

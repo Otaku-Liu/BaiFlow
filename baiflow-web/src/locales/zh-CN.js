@@ -278,7 +278,21 @@ export default {
     files: '文件中心',
     notes: '随手记',
     shares: '分享管理',
+    uploadRecords: '上传记录',
+    downloadRecords: '下载记录',
     users: '用户管理'
+  },
+  records: {
+    upload: '上传记录',
+    download: '下载记录',
+    fileName: '文件名',
+    source: '来源',
+    ip: 'IP',
+    time: '时间',
+    user: '操作人',
+    startDate: '开始日期',
+    endDate: '结束日期',
+    allUsers: '全部用户'
   },
   notes: {
     searchPlaceholder: '搜索笔记',

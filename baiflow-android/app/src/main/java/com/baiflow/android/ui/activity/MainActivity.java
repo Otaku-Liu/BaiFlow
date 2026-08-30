@@ -49,6 +49,13 @@ public class MainActivity extends BaseActivity {
 
         setContentView(R.layout.activity_main);
 
+        // Android 13+ 通知需要运行时权限（manifest 已声明，运行时要请求，否则上传/下载通知被静默丢弃）
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1001);
+        }
+
         registerNetworkListener();
 
         // 周期后台同步 + 实时 SSE 长连接（收到 NOTE_UPDATED 立即同步）

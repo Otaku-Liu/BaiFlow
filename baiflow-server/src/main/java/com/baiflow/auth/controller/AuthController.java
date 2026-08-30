@@ -7,20 +7,18 @@ import com.baiflow.auth.dto.response.UserDeviceInfo;
 import com.baiflow.auth.security.AuthTokens;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.common.entity.ApiResponse;
-import com.baiflow.user.dto.response.UserInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 认证接口控制器 — 处理登录、登出和当前用户信息查询。
+ * 认证接口控制器 — 处理登录、登出、登录会话/设备管理和修改密码。
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -93,43 +91,6 @@ public class AuthController {
             if ("ROLE_ADMIN".equals(ga.getAuthority())) return true;
         }
         return false;
-    }
-
-    /**
-     * 获取当前已登录用户的信息。
-     */
-    @GetMapping("/me")
-    public ApiResponse<UserInfo> me(Authentication authentication) {
-        return ApiResponse.success(authService.me(authentication.getPrincipal().toString()));
-    }
-
-    /**
-     * 更新当前用户的展示名称。
-     */
-    @PatchMapping("/profile")
-    public ApiResponse<UserInfo> updateProfile(@RequestBody Map<String, String> body,
-                                               Authentication authentication) {
-        return ApiResponse.success(authService.updateProfile(
-                authentication.getPrincipal().toString(),
-                body.get("displayName")));
-    }
-
-    /**
-     * 上传/更新当前用户的头像。文件大小 ≤1MB，仅支持 jpg/jpeg/png/gif/webp。
-     */
-    @PostMapping("/avatar")
-    public ApiResponse<UserInfo> uploadAvatar(@RequestParam("file") MultipartFile file,
-                                              Authentication authentication) {
-        return ApiResponse.success(authService.uploadAvatar(
-                authentication.getPrincipal().toString(), file));
-    }
-
-    /**
-     * 删除当前用户的头像（清除 URL + 删除文件），回到首字占位。
-     */
-    @DeleteMapping("/avatar")
-    public ApiResponse<UserInfo> deleteAvatar(Authentication authentication) {
-        return ApiResponse.success(authService.deleteAvatar(authentication.getPrincipal().toString()));
     }
 
     /**

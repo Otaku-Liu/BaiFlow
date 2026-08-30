@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.baiflow.audit.mapper.BfAuditLogMapper">
+
+    <select id="selectLoginLogs" resultType="com.baiflow.audit.dto.response.LoginLogVO">
+        SELECT a.id,
+               a.actor_user_id          AS userId,
+               COALESCE(u.username, CASE WHEN a.actor_user_id = '' THEN a.target_id END) AS username,
+               COALESCE(u.display_name, '') AS displayName,
+               a.action,
+               a.ip_address            AS ipAddress,
+               a.user_agent            AS userAgent,
+               a.detail,
+               a.created_at            AS createdAt
+        FROM `bf_audit_log` a
+                 LEFT JOIN `bf_user` u ON a.actor_user_id = u.id
+        WHERE a.action IN ('LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'FORCE_LOGOUT',
+                           'PASSWORD_CHANGED', 'ACCOUNT_LOCKED', 'ACCOUNT_UNLOCKED')
+        <if test="username != null and username != ''">
+            AND (u.username LIKE CONCAT('%', #{username}, '%')
+                     OR (a.actor_user_id = '' AND a.target_id LIKE CONCAT('%', #{username}, '%')))
+        </if>
+        <if test="status != null and status != ''">
+            AND a.action = #{status}
+        </if>
+        <if test="startDate != null">
+            AND a.created_at &gt;= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND a.created_at &lt;= #{endDate}
+        </if>
+        ORDER BY a.created_at DESC
+    </select>
+
+</mapper>

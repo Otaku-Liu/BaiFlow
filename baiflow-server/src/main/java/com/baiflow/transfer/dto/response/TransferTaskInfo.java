@@ -1,6 +1,6 @@
 package com.baiflow.transfer.dto.response;
 
-import com.baiflow.transfer.entity.TransferTask;
+import com.baiflow.transfer.entity.BfTransferTask;
 import com.baiflow.transfer.enums.TransferTaskStatus;
 import com.baiflow.transfer.enums.TransferTaskType;
 
@@ -21,7 +21,7 @@ public record TransferTaskInfo(
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {
 
-    public static TransferTaskInfo from(TransferTask t) {
+    public static TransferTaskInfo from(BfTransferTask t) {
         return new TransferTaskInfo(t.getId(), t.getCreatedBy(), t.getTaskType(),
                 t.getSourceType(), t.getTargetType(), t.getStatus(),
                 t.getProgress(), t.getErrorMessage(), t.getCreatedAt(), t.getUpdatedAt());

@@ -16,6 +16,8 @@ import com.baiflow.android.ui.activity.LoginActivity;
  */
 public class SessionManager {
     private static final String PREF_NAME = "baiflow_session";
+    /** 文件目录导航栈持久化文件名（FilesFragment 使用；登出时一并清除避免残留上一用户目录） */
+    public static final String PREFS_FILES_NAV = "files_nav";
     private static final String KEY_TOKEN = "token";
     private static final String KEY_USER_ID = "user_id";
     private static final String KEY_USERNAME = "username";
@@ -129,6 +131,8 @@ public class SessionManager {
                 .remove(KEY_ROLE)
                 .remove(KEY_LAST_SYNC_AT)
                 .apply();
+        // 清文件目录导航栈持久化，避免换账号/登出后残留上一用户目录
+        appContext.getSharedPreferences(PREFS_FILES_NAV, Context.MODE_PRIVATE).edit().clear().apply();
     }
 
     /** 彻底清除（清除应用数据语义）：清全部 */

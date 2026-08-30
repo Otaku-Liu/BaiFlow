@@ -1,6 +1,6 @@
 package com.baiflow.note.dto.response;
 
-import com.baiflow.note.entity.Note;
+import com.baiflow.note.entity.BfNote;
 import com.baiflow.note.enums.NoteStatus;
 
 import java.time.LocalDateTime;
@@ -15,13 +15,13 @@ import java.time.LocalDateTime;
 public record NoteSummary(String id, String title, NoteStatus status,
                           LocalDateTime createdAt, LocalDateTime updatedAt, String content) {
 
-    public static NoteSummary from(Note n) {
+    public static NoteSummary from(BfNote n) {
         return new NoteSummary(n.getId(), n.getTitle(), n.getStatus(),
                 n.getCreatedAt(), n.getUpdatedAt(), null);
     }
 
     /** 增量同步模式：携带正文，供离线客户端直接合并 */
-    public static NoteSummary fromWithContent(Note n) {
+    public static NoteSummary fromWithContent(BfNote n) {
         return new NoteSummary(n.getId(), n.getTitle(), n.getStatus(),
                 n.getCreatedAt(), n.getUpdatedAt(), n.getContent());
     }

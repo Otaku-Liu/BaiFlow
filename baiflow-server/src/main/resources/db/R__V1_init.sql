@@ -316,3 +316,20 @@ CREATE TABLE IF NOT EXISTS `bf_user_device` (
     UNIQUE KEY `uk_user_device` (`user_id`, `device_name`),
     KEY `idx_ud_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户登录设备表（按 user+device_name 登记，在线状态由活跃会话判定）';
+
+-- ----------------------------------------------------------
+-- 文件上传记录表（传输历史：与 bf_download_record 对称；上传只记新动作，不回填历史）
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_upload_record` (
+    `id`                VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
+    `file_id`           VARCHAR(32)  NOT NULL COMMENT '上传的文件 ID',
+    `file_name`         VARCHAR(512) NOT NULL DEFAULT '' COMMENT '文件名快照（文件删除后保留）',
+    `uploader_user_id`  VARCHAR(32)  NULL COMMENT '上传人用户 ID',
+    `source`            VARCHAR(16)  NOT NULL DEFAULT 'WEB' COMMENT '来源客户端：WEB / ANDROID',
+    `ip_address`        VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '上传 IP',
+    `user_agent`        VARCHAR(255) NOT NULL DEFAULT '' COMMENT '上传 UA',
+    `created_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_ur_file` (`file_id`, `created_at`),
+    KEY `idx_ur_user` (`uploader_user_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件上传记录表';
