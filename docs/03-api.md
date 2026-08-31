@@ -78,7 +78,7 @@
 ### 传输记录（上传/下载历史）
 - `GET /api/upload-records?start=&end=&fileName=&source=&userId=&page=&size=` — 上传历史分页（时间倒序）。`start`/`end` 为 `YYYY-MM-DD`（含端点日），`fileName` 模糊，`source` ∈ `WEB`/`ANDROID`；**非 admin 只看自己**，admin 传 `userId` 可筛任意用户、不传则全部。返回含 `uploaderUsername`。
 - `GET /api/download-records?start=&end=&fileName=&source=&userId=&page=&size=` — 下载历史分页（时间倒序）。`source` ∈ `CLIENT`/`SHARE`；**非 admin 只看自己的 CLIENT 下载**（分享匿名下载 `downloaderUserId` 为空、普通用户不可见），admin 全部/按 `userId` 筛。返回含 `downloaderUsername`。
-- 数据：`bf_upload_record`（新增，上传成功时异步写入，来源取客户端设备类型 `X-Device-Type`，Web 缺省 WEB）/ `bf_download_record`（既有）。见 `docs/adr/ADR-003-transfer-history.md`。
+- 数据：`bf_upload_record`（新增，上传成功时异步写入，来源取客户端设备类型 `X-Device-Type`，Web 缺省 WEB）/ `bf_download_record`（既有）。
 
 ### 存储根目录
 - `GET /api/storage-roots/active`（返回所有 ACTIVE 状态的存储根目录，供文件中心选择器使用）
@@ -90,7 +90,7 @@
 - `POST /api/files/upload`（支持 `viewUserId` 参数）
 - `GET /api/files/download/{fileId}`（登录用户直接下载，写入下载记录）
 - `GET /api/files/{id}/downloads` — 文件的下载记录分页（时间/来源/下载人/IP；本人文件，管理员可查任意）
-- aria2 URL/磁力/BT 下载任务中心（`/api/downloads**`）已整体移除，文件下载仅经上述两条通道（登录直接下载 + 分享下载）
+- 文件下载仅两条通道：登录直接下载 + 分享下载（aria2/BT 任务中心已移除）
 - `POST /api/files/folders`（支持 `viewUserId` 参数）
 - `PATCH /api/files/{id}/rename` · `PATCH /api/files/{id}/move`
 - `DELETE /api/files/{id}`（软删除；**级联删除该文件的播放/阅读进度行**）
@@ -124,7 +124,7 @@
 
 预览 URL 同时支持 `?token=` 查询参数鉴权。
 
-**Office 文档**（doc/docx/xls/xlsx/ppt/pptx/odt/ods/odp）**暂不支持在线预览**：前端将其归为不支持类型，预览抽屉降级为「下载查看」。后端 `FileConvertService`（LibreOffice 转 PDF）为遗留代码，依赖未安装且前端不再触发。
+**Office 文档**（doc/docx/xls/xlsx/ppt/pptx/odt/ods/odp）**暂不支持在线预览**：前端归为不支持类型，预览抽屉降级为「下载查看」。
 
 ### 随手记（笔记）
 - `GET /api/notes?page=&size=&keyword=&viewUserId=&updatedAfter=` — 分页列出笔记，按更新时间倒序；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换。**普通列表不含正文**；传 `updatedAfter` 为增量同步模式（返回 `updated_at` 之后更新，含软删除，且列表项**携带 `content` 正文**，供离线客户端直接合并，避免逐条拉详情）
@@ -149,7 +149,7 @@
 ### 传输 · 通知 · 设备 · 事件
 - `GET /api/transfers` · `GET /api/transfers/{id}`
 - `GET /api/notifications` · `PATCH /api/notifications/{id}/read`
-- `GET /api/events`（SSE，需登录）：事件类型 `NOTE_UPDATED`（笔记跨端同步刷新；曾规划的传输/下载/通知事件已移除）
+- `GET /api/events`（SSE，需登录）：事件类型 `NOTE_UPDATED`（笔记跨端同步刷新）
 
 SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GET /api/events?token=<会话token>` 查询参数（后端 `SessionAuthenticationFilter` 支持 `?token=` fallback）。`NOTE_UPDATED` 只推送给笔记所有者。
 

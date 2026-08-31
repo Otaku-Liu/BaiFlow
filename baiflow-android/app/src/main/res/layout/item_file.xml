@@ -40,6 +40,34 @@
                 android:singleLine="true"
                 android:ellipsize="middle" />
 
+            <!-- 上传占位行进度：正常文件行隐藏；占位行替代 tvMeta 显示横向进度条 + 百分比 -->
+            <LinearLayout
+                android:id="@+id/uploadProgressArea"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="3dp"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:id="@+id/uploadProgressBar"
+                    android:layout_width="0dp"
+                    android:layout_height="4dp"
+                    android:layout_weight="1"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:max="100"
+                    android:progressTint="@color/text_accent_selector" />
+
+                <TextView
+                    android:id="@+id/tvUploadPercent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/tvMeta"
                 android:layout_width="match_parent"

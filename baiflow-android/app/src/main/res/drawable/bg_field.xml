@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 表单字段底色（浅灰圆角，iOS 搜索框样式；用于卡片内 EditText） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/background" />
+    <corners android:radius="8dp" />
+</shape>

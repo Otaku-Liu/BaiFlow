@@ -7,7 +7,7 @@ BaiFlow（小白流转）——个人服务器上的下载与文件协同中心�
 - **文件中心**：多存储根、隐私文件夹、分享、下载
 - **随手记**：所见即所得块编辑器（文本/标题 + 图片/录音/画画），Web/Android 双向 Markdown 互认
 - **浏览进度跨端同步**：视频/音频续播、文本/笔记续读，Web/Android 共用一份数据
-- 登录会话持久化与设备管理、传输中心、Android 离线模式（本地缓存 + outbox 同步）、中英双语
+- 登录会话持久化与设备管理、传输中心、随手记在线同步（Room 本地缓存 + outbox + SSE 实时）、中英双语
 
 ## 模块
 
@@ -32,10 +32,6 @@ cd baiflow-web && npm install && npm run dev
 # 部署 server + web（MySQL/Redis 复用已有容器；先复制 deploy/.env.example 为 .env）
 cd deploy && docker compose up -d --build
 ```
-
-## 项目阶段
-
-10 个阶段（Phase 0–9）全部完成：文档体系、项目骨架、认证与权限、文件中心、隐私文件夹、传输与通知、Android MVP、NAS 接入、分享与访问控制、安全与部署加固（详见 `docs/`）。
 
 ## 文档
 

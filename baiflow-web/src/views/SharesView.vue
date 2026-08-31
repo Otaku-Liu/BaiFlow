@@ -11,6 +11,7 @@
         <el-option :label="t('shares.status.expired')" value="EXPIRED" />
         <el-option :label="t('shares.status.revoked')" value="REVOKED" />
       </el-select>
+      <el-button @click="handleReset">{{ t('common.reset') }}</el-button>
       <el-button :loading="loading" @click="loadShares" style="margin-left:auto">{{ t('common.refresh') }}</el-button>
     </div>
 
@@ -275,6 +276,12 @@ function pickSelect(row) {
     type: row.itemType === 'DIRECTORY' ? 'FOLDER' : 'FILE'
   }
   showTargetPicker.value = false
+}
+
+/** 重置筛选（状态=全部）并重新加载 */
+function handleReset() {
+  filterStatus.value = ''
+  loadShares()
 }
 
 async function loadShares() {

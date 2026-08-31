@@ -33,7 +33,13 @@ SharedPreferences 保存会话 token（长期保持）。**服务器地址固定
 ## 上传下载
 
 - 小文件 Retrofit multipart 上传；长任务前台服务（UploadService / DownloadService）带通知
-- **上传实现**：选择器返回 `content://` URI，`UploadService` 经 `ContentResolver.openInputStream` 完整读入（非文件路径）；**mime 按扩展名解析**（硬编码 octet-stream 会让服务端存错类型、图标/类型判断失效）；进度走自定义 `RequestBody` 按已写字节上报百分比，通知带**进度条**实时显示「上传中 N%」；上传中通知带「**取消**」动作（中断请求，不做暂停/断点续传；取消后通知显示「上传已取消」）；完成/失败更新同一条通知并 `STOP_FOREGROUND_DETACH` 脱离前台保留结果（不随 stopSelf 消失），失败原因可见。**文件中心列表顶部显示上传占位进度行**（文件名 + 进度条，轮询 `UploadService` 当前任务、仅目标目录匹配时展示），上传完成即隐藏并自动刷新当前目录换真实文件。Android 13+ 需运行时授权 `POST_NOTIFICATIONS`（MainActivity 启动时请求）
+- **上传实现**：
+  - 选择器 `GetMultipleContents` **多选** → `UploadService` **顺序队列**（`ConcurrentLinkedQueue`，一个传完才传下一个）；`content://` URI 经 `ContentResolver` 读入；**mime 按扩展名解析**；进度按已写字节上报
+  - **占位行**：列表顶部渲染，外观与真实文件行一致（图标/文件名，meta 位换横向进度条 + 百分比），随列表滚动、空目录也显示；仅当上传目标目录 = 当前目录时展示；点击弹「取消上传」——**上传中项取消续下一个、排队项直接移出队列**
+  - **完成过渡**：占位行就地换真实行（响应 `FileItem`，meta 显示真实大小）再 `loadFiles()` 归位；失败/取消移除占位 + Toast
+  - 上传到**隐私文件夹**透传 `effectivePrivacyToken()`
+  - **通知（单条前台）**：「第 i/N 个 fileName N%」+「取消」动作；队列耗尽 `STOP_FOREGROUND_DETACH` 保留结果；不做暂停/断点续传
+  - Android 13+ 需运行时授权 `POST_NOTIFICATIONS`
 - 下载计次由后端记录（见 `docs/02-database.md`、`docs/03-api.md`）
 - **下载落公共 Download 文件夹**：API 29+ 走 `MediaStore.Downloads`（作用域存储，无需权限，系统「下载」/文件管理器可见）；API 26-28 写 `Environment.DIRECTORY_DOWNLOADS`，下载前申请 `WRITE_EXTERNAL_STORAGE`
 - **不支持预览的文件**：点按弹「暂不支持在线预览」对话框（含「下载」按钮），**不自动下载**，手动点「下载」才下载
@@ -50,7 +56,11 @@ SharedPreferences 保存会话 token（长期保持）。**服务器地址固定
 - 登录 → **MainActivity**（底部三栏，`ViewPager2` 滑动 + 底部导航双向同步）；首启未登录直接进登录页（服务器已固定，无引导页/服务器配置）
   - **文件** `FilesFragment`：标题居中；左上「返回上一级」图标（根目录置灰）、右上「刷新」+「三点」菜单（下拉：新建文件夹 / 上传文件）；长按文件/文件夹弹操作菜单（重命名 / 下载 / 删除，重命名走 `PATCH /api/files/{id}/rename`）；文件列表按类型用彩色 PNG 图标（md/pdf/json/xml/word/excel/ppt 等），**mime 判断后按扩展名兜底**（服务端 mime 可能被硬编码为 octet-stream，扩展名兜底保证 mp4/mkv 等显示视频图标）；不支持预览的文件点按弹下载确认框；**目录导航持久化**：`folderStack`（当前..根）序列化存 `SharedPreferences`（`files_nav`），每次进/退目录与 `onSaveInstanceState` 写入，Activity 重建/进程回收/冷启动时兜底恢复当前目录（**冷启动落在上次目录**），从预览返回不再丢目录；登出清除。**隐私空间**：主目录下「隐私空间」文件夹，首次进入弹「设置密码」（`POST privacy`，40107），之后进入弹「输入密码」（`verifyPrivacy` 换令牌）；令牌仅存内存（`privacyTokens`），重进需重输；管理员访问后端直接放行
   - **随手记** `NotesFragment`：列表/搜索/删除 → `NoteEditActivity`（**所见即所得块编辑器**：RecyclerView 每块一个真实 View，文本 EditText 经 `BlockRichText` 渲染行内 markdown 的格式效果、编辑即预览，图片 ImageView，音频 `NoteAudioPlayerView`；加载 Markdown→`NoteBlocks.fromDoc`、保存 `NoteBlocks.toDoc`→Markdown，落库仍是 Markdown）→ `NoteDrawActivity`（画画）
-  - **我的** `MineFragment`：分组（账号/通用/传输记录/同步）；「传输记录」分组含**上传记录 / 下载记录**两个入口 → `RecordsActivity`（默认查当天，可切时间范围/文件名/来源；admin 按用户查看）；修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认 + `doLogout()` 幂等守卫（`logoutStarted` 标志）防连点。头像展示：有 `avatarUrl` 时 OkHttp 拉取圆形展示（`AvatarLoader`），无则浅灰底 + 展示名首字；修改资料页（`ProfileActivity`）支持**更换头像**（96dp 圆形 + 贴底「编辑」带，选图即上传，`ImageUtil` 缩放/EXIF 校正/压缩 ≤1MB → `POST /api/users/me/avatar`），实现细节见 `docs/07-ios-design-system.md`；Android 端不提供删除头像（服务端与 Web 端入口保留）。进入「我的」页时（`onResume`）在线模式调 `/users/me` 刷新本地用户信息（头像/展示名可能在其他端修改）
+  - **我的** `MineFragment`：分组（账号/通用/传输记录/同步）
+    - **传输记录**：「上传记录 / 下载记录」两个入口 → `RecordsActivity`（**按入口直达类型，页内无 Tab 切换**；默认查当天，时间/文件名/来源过滤 + 重置；admin 按用户查看）。**记录行** = 类型图标 + 文件名 + 时间（不展示用户/IP）；长摁弹详情（复用 `dialog_file_info.xml`）支持**下载**（计入下载记录）、**删除源文件**（`40401` 提示「源文件不存在」）与（仅下载记录且本机下载过）**打开文件 / 保存位置**：`ACTION_VIEW` 系统打开（API 29+ MediaStore URI / API 26-28 FileProvider），位置可点按复制；本地位置由 `DownloadLocationStore` 按 `fileId` 持久化。**查询区 = 卡片表单行**：时间/来源/用户（admin）为「标签 + 值 + chevron」字段行，来源/用户用 `DropdownMenu`，时间点开 DatePicker，文件名 `bg_field` 输入框 + `Ios.Button.Primary` 查询 + `Ios.Button.Text` 重置；字号统一 14sp
+    - 修改资料 / 修改密码 / 语言为独立页面；退出登录二次确认 + `doLogout()` 幂等守卫
+    - **头像**：有 `avatarUrl` 时 OkHttp 圆形展示（`AvatarLoader`），无则浅灰底 + 首字；`ProfileActivity` 支持更换头像（96dp 圆形 + 贴底「编辑」带，选图即上传，`ImageUtil` 缩放/EXIF/压缩 ≤1MB → `POST /api/users/me/avatar`，见 `docs/07-ios-design-system.md`）；Android 不提供删除头像
+    - `onResume` 在线模式调 `/users/me` 刷新本地用户信息（头像/展示名可能在其他端修改）
 
 ## 多语言（i18n）
 
@@ -95,6 +105,6 @@ SharedPreferences 保存会话 token（长期保持）。**服务器地址固定
 - 同步：outbox（`dirty` + tombstone）先推 create/update（带 `baseUpdatedAt`）/delete，再 `GET /api/notes?updatedAfter=` 增量拉取合并（增量模式列表携带正文，直接合并，无 N+1）；**另有 SSE 长连接**（`NoteSseClient`，手写解析 `/api/events`，收到 `NOTE_UPDATED` 立即触发一次增量同步）——实时 + 周期兜底；WorkManager 后台周期 + 网络恢复触发 + 手动「同步」按钮
 - **冲突**：乐观并发（`baseUpdatedAt` 必传，缺失 40001 / 早于服务端 40901）；冲突弹窗**先拉服务端版本做块级差异预览**（本地改动 N 块 / 服务端改动 M 块 + 前 3 块预览），用户再选「覆盖」（以服务端最新 updatedAt 为基准重推）或「重新加载」
 - **同步状态可见性**：笔记列表项右侧**徽标**（冲突=红 / 待推=灰，`LocalNote.dirty/conflict`）；「我的」页同步区显示「待同步 N 条 · 冲突 M 条」（`LocalNoteDao.countDirty/countConflict`，有未同步改动时显示）
-- 媒体：本地新建媒体先上传回填服务端 URL；服务器媒体按需下载缓存到 `filesDir/note_media_cache/<id>`（**批量接口 + 有界并发**：`POST /api/notes/media/batch` 每批 ≤10、3 批并行；服务端跳过的大文件/失败项回退单个流式下载）。**缓存管理**：「我的」页「存储」分组——「清理缓存」行（右侧显示大小，二次确认后清空 `note_media_cache/`，清除后需重新下载）+「缓存上限」行（SeekBar 50–2000MB 默认 300MB）；同步写完媒体后自动按上限 LRU 清理（`MediaFiles.enforceLimit`）。本地新建媒体 `note_media/`（可能未上传）**永不自动清理**。见 `docs/adr/ADR-001-media-cache-management.md`
+- 媒体：本地新建媒体先上传回填服务端 URL；服务器媒体按需下载缓存到 `filesDir/note_media_cache/<id>`（**批量接口 + 有界并发**：`POST /api/notes/media/batch` 每批 ≤10、3 批并行；服务端跳过的大文件/失败项回退单个流式下载）。**缓存管理**：「我的」页「存储」分组——「清理缓存」行（右侧显示大小，二次确认后清空 `note_media_cache/`，清除后需重新下载）+「缓存上限」行（SeekBar 50–2000MB 默认 300MB）；同步写完媒体后自动按上限 LRU 清理（`MediaFiles.enforceLimit`）。本地新建媒体 `note_media/`（可能未上传）**永不自动清理**。
 - 安全边界：本地笔记明文存设备（不加密，设备级信任）
 - 边界：管理员移动端按用户切换笔记视图不支持（分区 = 本人笔记）

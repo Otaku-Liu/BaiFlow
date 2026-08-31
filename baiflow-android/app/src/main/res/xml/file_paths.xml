@@ -2,4 +2,6 @@
 <paths>
     <files-path name="downloads" path="downloads/" />
     <cache-path name="cache" path="/" />
+    <!-- 公共 Download 目录（API 26-28 下载落盘处）：供系统查看器打开已下载文件 -->
+    <external-path name="download" path="Download/" />
 </paths>

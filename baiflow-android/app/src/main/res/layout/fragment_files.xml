@@ -117,37 +117,6 @@
         android:indeterminate="true"
         android:visibility="gone" />
 
-    <!-- 上传占位进度行（文件中心列表中显示进行中的上传，完成即隐藏并刷新） -->
-    <LinearLayout
-        android:id="@+id/uploadProgressRow"
-        android:orientation="vertical"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/white"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/tvUploadProgress"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="@color/text_primary"
-            android:maxLines="1"
-            android:ellipsize="middle" />
-
-        <ProgressBar
-            android:id="@+id/uploadProgressBar"
-            android:layout_width="match_parent"
-            android:layout_height="4dp"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:max="100"
-            android:progressTint="@color/text_accent_selector" />
-    </LinearLayout>
-
     <!-- 文件列表（SwipeRefresh 与空状态叠放，空文案居中于整个列表区） -->
     <FrameLayout
         android:layout_width="match_parent"

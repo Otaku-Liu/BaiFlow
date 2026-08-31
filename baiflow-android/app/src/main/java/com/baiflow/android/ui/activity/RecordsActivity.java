@@ -1,17 +1,22 @@
 package com.baiflow.android.ui.activity;
 
 import android.app.DatePickerDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.Spinner;
+import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -24,30 +29,42 @@ import com.baiflow.android.model.UploadRecord;
 import com.baiflow.android.model.UserInfo;
 import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.network.UiCallback;
+import com.baiflow.android.util.DownloadLocationStore;
+import com.baiflow.android.util.DownloadUtil;
+import com.baiflow.android.util.FileTypeIcon;
+import com.baiflow.android.util.FormatUtil;
+import com.baiflow.android.util.MimeUtil;
+import com.baiflow.android.widget.DropdownMenu;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 import retrofit2.Call;
 import retrofit2.Response;
 
 /**
- * 传输记录页 — 我的/文件上传与下载历史。
- * <p>两个 Tab（上传/下载）各自独立查询；过滤：时间范围/文件名/来源；admin 可按用户查看。
+ * 传输记录页 — 我的/文件上传或下载历史（类型由 EXTRA_UPLOAD 决定，页内不提供 Tab 切换）。
+ * <p>过滤：时间范围/文件名/来源 + 重置；admin 可按用户查看。
+ * <p>记录行 = 文件类型图标 + 文件名 + 时间；长摁弹详情（复用文件中心弹窗）支持下载/删除源文件/打开文件。
  */
 public class RecordsActivity extends BaseActivity {
 
-    /** 预选 Tab：true=上传记录，false=下载记录 */
+    /** 记录类型：true=上传记录，false=下载记录 */
     public static final String EXTRA_UPLOAD = "extra_upload";
 
     private ApiClient client;
 
-    private com.google.android.material.tabs.TabLayout tabLayout;
-    private TextView btnDateRange;
-    private Spinner spinnerSource;
-    private Spinner spinnerUser;
+    private View rowDateRange;
+    private TextView tvDateRange;
+    private View rowSource;
+    private TextView tvSource;
+    private View rowUser;
+    private TextView tvUser;
+    private View dividerSourceUser;
     private EditText etFileName;
     private RecyclerView recyclerView;
     private TextView tvEmpty;
@@ -64,7 +81,8 @@ public class RecordsActivity extends BaseActivity {
     private boolean loading;
     private boolean noMore;
 
-    private List<UserInfo> users = new ArrayList<>();
+    private final List<String> userLabels = new ArrayList<>();
+    private final List<String> userIds = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,41 +98,34 @@ public class RecordsActivity extends BaseActivity {
         start = today;
         end = today;
 
-        tabLayout = findViewById(R.id.tabLayout);
-        btnDateRange = findViewById(R.id.btnDateRange);
-        spinnerSource = findViewById(R.id.spinnerSource);
-        spinnerUser = findViewById(R.id.spinnerUser);
+        rowDateRange = findViewById(R.id.rowDateRange);
+        tvDateRange = findViewById(R.id.tvDateRange);
+        rowSource = findViewById(R.id.rowSource);
+        tvSource = findViewById(R.id.tvSource);
+        rowUser = findViewById(R.id.rowUser);
+        tvUser = findViewById(R.id.tvUser);
+        dividerSourceUser = findViewById(R.id.dividerSourceUser);
         etFileName = findViewById(R.id.etFileName);
         recyclerView = findViewById(R.id.recyclerView);
         tvEmpty = findViewById(R.id.tvEmpty);
-        btnDateRange.setText(start + " ~ " + end);
+        tvDateRange.setText(start + " ~ " + end);
+
+        // 标题按入口类型显示（我的页已区分上传/下载入口，页内不再提供 Tab 切换）
+        ((TextView) findViewById(R.id.tvTitle)).setText(
+                getString(uploadTab ? R.string.records_upload_tab : R.string.records_download_tab));
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-        btnDateRange.setOnClickListener(v -> pickDateRange());
+        rowDateRange.setOnClickListener(v -> pickDateRange());
         findViewById(R.id.btnSearch).setOnClickListener(v -> {
             page = 1;
             load();
         });
+        findViewById(R.id.btnReset).setOnClickListener(v -> resetFilters());
 
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.records_upload_tab));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.records_download_tab));
-        tabLayout.addOnTabSelectedListener(new com.google.android.material.tabs.TabLayout.OnTabSelectedListener() {
-            @Override
-            public void onTabSelected(com.google.android.material.tabs.TabLayout.Tab tab) {
-                uploadTab = tab.getPosition() == 0;
-                setupSourceSpinner();
-                page = 1;
-                load();
-            }
-
-            @Override public void onTabUnselected(com.google.android.material.tabs.TabLayout.Tab tab) { }
-
-            @Override public void onTabReselected(com.google.android.material.tabs.TabLayout.Tab tab) { }
-        });
-
-        setupSourceSpinner();
+        setupSourceField();
         if ("ADMIN".equals(session.getRole())) {
-            spinnerUser.setVisibility(View.VISIBLE);
+            rowUser.setVisibility(View.VISIBLE);
+            dividerSourceUser.setVisibility(View.VISIBLE);
             loadUsers();
         }
 
@@ -141,31 +152,53 @@ public class RecordsActivity extends BaseActivity {
             return false;
         });
 
+        load();
+    }
+
+    /** 重置全部查询条件到默认（当天），并重新查询 */
+    private void resetFilters() {
+        String today = java.time.LocalDate.now().toString();
+        start = today;
+        end = today;
+        source = "";
+        userId = "";
+        tvDateRange.setText(start + " ~ " + end);
+        tvSource.setText(getString(R.string.records_source_all));
+        tvUser.setText(getString(R.string.records_all_users));
+        etFileName.setText("");
+        page = 1;
+        load();
+    }
+
+    /** 来源字段：随 Tab 切换选项（上传 WEB/ANDROID，下载 CLIENT/SHARE），DropdownMenu 选择 */
+    private void setupSourceField() {
+        source = "";
+        tvSource.setText(getString(R.string.records_source_all));
+        rowSource.setOnClickListener(v -> showSourceMenu(v));
+    }
+
+    private void showSourceMenu(View anchor) {
+        List<DropdownMenu.Option> options = new ArrayList<>();
+        options.add(new DropdownMenu.Option(getString(R.string.records_source_all), source.isEmpty(), 0,
+                () -> selectSource("")));
         if (uploadTab) {
-            load();
+            options.add(new DropdownMenu.Option("WEB", "WEB".equals(source), 0, () -> selectSource("WEB")));
+            options.add(new DropdownMenu.Option("ANDROID", "ANDROID".equals(source), 0, () -> selectSource("ANDROID")));
         } else {
-            // 预选下载 Tab：触发 onTabSelected → 切到下载并加载
-            tabLayout.selectTab(tabLayout.getTabAt(1));
+            options.add(new DropdownMenu.Option("CLIENT", "CLIENT".equals(source), 0, () -> selectSource("CLIENT")));
+            options.add(new DropdownMenu.Option("SHARE", "SHARE".equals(source), 0, () -> selectSource("SHARE")));
         }
+        DropdownMenu.show(this, anchor, options);
     }
 
-    /** 来源下拉随 Tab 切换：上传 WEB/ANDROID，下载 CLIENT/SHARE */
-    private void setupSourceSpinner() {
-        String[] options = uploadTab
-                ? new String[]{getString(R.string.records_source_all), "WEB", "ANDROID"}
-                : new String[]{getString(R.string.records_source_all), "CLIENT", "SHARE"};
-        ArrayAdapter<String> ad = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, options);
-        ad.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerSource.setAdapter(ad);
-        spinnerSource.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                source = pos == 0 ? "" : options[pos];
-            }
-            @Override public void onNothingSelected(AdapterView<?> p) { }
-        });
+    private void selectSource(String value) {
+        source = value;
+        tvSource.setText(value.isEmpty() ? getString(R.string.records_source_all) : value);
+        page = 1;
+        load();
     }
 
-    /** admin 加载用户下拉（默认「全部用户」） */
+    /** admin 加载用户列表（字段行默认「全部用户」，DropdownMenu 选择） */
     private void loadUsers() {
         client.listUsers(1, 100).enqueue(new UiCallback<ApiResponse<PagedResult<UserInfo>>>(this) {
             @Override
@@ -173,30 +206,50 @@ public class RecordsActivity extends BaseActivity {
                                         Response<ApiResponse<PagedResult<UserInfo>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isOk()
                         && response.body().getData() != null) {
-                    users = response.body().getData().getRecords() != null
+                    userLabels.clear();
+                    userIds.clear();
+                    List<UserInfo> users = response.body().getData().getRecords() != null
                             ? response.body().getData().getRecords() : new ArrayList<>();
-                    List<String> labels = new ArrayList<>();
-                    labels.add(getString(R.string.records_all_users));
                     for (UserInfo u : users) {
-                        labels.add(u.getDisplayName() != null && !u.getDisplayName().isEmpty()
+                        userLabels.add(u.getDisplayName() != null && !u.getDisplayName().isEmpty()
                                 ? u.getDisplayName() : u.getUsername());
+                        userIds.add(u.getId());
                     }
-                    ArrayAdapter<String> ad = new ArrayAdapter<>(RecordsActivity.this,
-                            android.R.layout.simple_spinner_item, labels);
-                    ad.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    spinnerUser.setAdapter(ad);
-                    spinnerUser.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                        @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                            userId = pos == 0 ? "" : users.get(pos - 1).getId();
-                        }
-                        @Override public void onNothingSelected(AdapterView<?> p) { }
-                    });
+                    tvUser.setText(getString(R.string.records_all_users));
+                    rowUser.setOnClickListener(v -> showUserMenu(v));
                 }
             }
 
             @Override
             protected void onUiFailure(Call<ApiResponse<PagedResult<UserInfo>>> call, Throwable t) { }
         });
+    }
+
+    private void showUserMenu(View anchor) {
+        List<DropdownMenu.Option> options = new ArrayList<>();
+        options.add(new DropdownMenu.Option(getString(R.string.records_all_users), userId.isEmpty(), 0,
+                () -> selectUser("")));
+        for (int i = 0; i < userIds.size(); i++) {
+            String id = userIds.get(i);
+            options.add(new DropdownMenu.Option(userLabels.get(i), id.equals(userId), 0, () -> selectUser(id)));
+        }
+        DropdownMenu.show(this, anchor, options);
+    }
+
+    private void selectUser(String id) {
+        userId = id;
+        tvUser.setText(id.isEmpty() ? getString(R.string.records_all_users) : userLabelOf(id));
+        page = 1;
+        load();
+    }
+
+    private String userLabelOf(String id) {
+        for (int i = 0; i < userIds.size(); i++) {
+            if (id.equals(userIds.get(i))) {
+                return userLabels.get(i);
+            }
+        }
+        return id;
     }
 
     private void pickDateRange() {
@@ -208,7 +261,7 @@ public class RecordsActivity extends BaseActivity {
             start = String.format(java.util.Locale.ROOT, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
             new DatePickerDialog(RecordsActivity.this, (view2, year2, month2, dayOfMonth2) -> {
                 end = String.format(java.util.Locale.ROOT, "%04d-%02d-%02d", year2, month2 + 1, dayOfMonth2);
-                btnDateRange.setText(start + " ~ " + end);
+                tvDateRange.setText(start + " ~ " + end);
                 page = 1;
                 load();
             }, y, m, d).show();
@@ -231,8 +284,8 @@ public class RecordsActivity extends BaseActivity {
                             loading = false;
                             List<UploadRecord> recs = dataRecords(response);
                             if (recs != null) {
-                                applyRows(recs, r -> new Row(r.getFileName(), r.getUploaderUsername(),
-                                        r.getSource(), r.getIpAddress(), r.getCreatedAt()));
+                                applyRows(recs, r -> new Row(r.getFileId(), r.getFileName(),
+                                        r.getSource(), r.getCreatedAt()));
                             } else {
                                 noMore = true;
                             }
@@ -252,8 +305,8 @@ public class RecordsActivity extends BaseActivity {
                             loading = false;
                             List<DownloadRecord> recs = dataRecords(response);
                             if (recs != null) {
-                                applyRows(recs, r -> new Row(r.getFileName(), r.getDownloaderUsername(),
-                                        r.getSource(), r.getIpAddress(), r.getCreatedAt()));
+                                applyRows(recs, r -> new Row(r.getFileId(), r.getFileName(),
+                                        r.getSource(), r.getCreatedAt()));
                             } else {
                                 noMore = true;
                             }
@@ -289,15 +342,141 @@ public class RecordsActivity extends BaseActivity {
         recyclerView.setVisibility(rows.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
-    /** 单行数据（上传/下载统一形状） */
-    private static class Row {
-        final String fileName, username, source, ip, time;
+    /** ISO 时间 → 可读串；空/无效回落原始值（T 换空格） */
+    private String formatTime(String iso) {
+        String formatted = FormatUtil.formatDateTime(iso);
+        return formatted.isEmpty() ? (iso != null ? iso.replace('T', ' ') : "") : formatted;
+    }
 
-        Row(String fileName, String username, String source, String ip, String time) {
+    /** 长摁记录行：弹详情（复用文件中心弹窗）— 图标/文件名/来源/时间 + 下载/删除该文件 */
+    private void showRecordDialog(Row row) {
+        View content = LayoutInflater.from(this).inflate(R.layout.dialog_file_info, null);
+        ((ImageView) content.findViewById(R.id.dialogFileIcon))
+                .setImageResource(FileTypeIcon.forName(row.fileName, null));
+        ((TextView) content.findViewById(R.id.dialogFileName)).setText(row.fileName);
+        ((TextView) content.findViewById(R.id.dialogFileMeta))
+                .setText(getString(R.string.records_source_fmt,
+                        row.source.isEmpty() ? "-" : row.source));
+        ((TextView) content.findViewById(R.id.dialogFileCreated))
+                .setText(getString(uploadTab ? R.string.records_upload_time_fmt : R.string.records_download_time_fmt,
+                        formatTime(row.time)));
+        content.findViewById(R.id.dialogFileModified).setVisibility(View.GONE);
+        content.findViewById(R.id.dialogFileLastOpened).setVisibility(View.GONE);
+        content.findViewById(R.id.actionRename).setVisibility(View.GONE);
+        content.findViewById(R.id.dividerRenameDownload).setVisibility(View.GONE);
+        // 弹窗默认隐藏下载/删除动作（文件中心按需显示）；记录详情两者都展示
+        content.findViewById(R.id.actionDownload).setVisibility(View.VISIBLE);
+        content.findViewById(R.id.dividerDownloadDelete).setVisibility(View.VISIBLE);
+
+        // 下载记录：本机下载过则展示保存位置（可点复制）+ 打开文件（系统查看器）；上传记录无此能力
+        final DownloadLocationStore.Location loc =
+                !uploadTab ? DownloadLocationStore.load(this, row.fileId) : null;
+        if (loc != null) {
+            TextView tvLocation = content.findViewById(R.id.dialogFileLocation);
+            tvLocation.setText(getString(R.string.records_saved_to,
+                    getString(R.string.records_download_dir) + "/" + loc.displayName));
+            tvLocation.setVisibility(View.VISIBLE);
+            tvLocation.setOnClickListener(v -> copyLocation(loc));
+            content.findViewById(R.id.actionOpen).setVisibility(View.VISIBLE);
+            content.findViewById(R.id.dividerOpenDownload).setVisibility(View.VISIBLE);
+        }
+
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setView(content)
+                .setCancelable(true)
+                .show();
+
+        content.findViewById(R.id.actionOpen).setOnClickListener(v -> {
+            dialog.dismiss();
+            if (loc != null) {
+                openDownloadedFile(loc, row.fileName);
+            }
+        });
+        content.findViewById(R.id.actionDownload).setOnClickListener(v -> {
+            dialog.dismiss();
+            // 记录无文件大小，传 0（通知显示「未知大小」）；后端自动计入下载记录（CLIENT）
+            DownloadUtil.startDownloadService(this, row.fileId, row.fileName, 0L);
+            Toast.makeText(this, getString(R.string.files_download_started, row.fileName), Toast.LENGTH_SHORT).show();
+        });
+        content.findViewById(R.id.actionDelete).setOnClickListener(v -> {
+            dialog.dismiss();
+            confirmDeleteRecordFile(row);
+        });
+    }
+
+    /** 复制保存位置（实际 URI/路径）到剪贴板 */
+    private void copyLocation(DownloadLocationStore.Location loc) {
+        String value = loc.uri != null ? loc.uri : loc.filePath;
+        if (value == null) {
+            return;
+        }
+        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        cm.setPrimaryClip(ClipData.newPlainText(getString(R.string.records_clip_label), value));
+        Toast.makeText(this, getString(R.string.records_copied), Toast.LENGTH_SHORT).show();
+    }
+
+    /** 用 Android 系统查看器打开已下载文件（ACTION_VIEW，非内置预览）；失败提示 */
+    private void openDownloadedFile(DownloadLocationStore.Location loc, String fileName) {
+        try {
+            Uri uri;
+            if (loc.uri != null) {
+                // API 29+：MediaStore content URI 可直接打开
+                uri = Uri.parse(loc.uri);
+            } else {
+                // API 26-28：公共 Download 目录文件需经 FileProvider 暴露（file:// 受限）
+                uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider",
+                        new java.io.File(loc.filePath));
+            }
+            Intent view = new Intent(Intent.ACTION_VIEW);
+            view.setDataAndType(uri, MimeUtil.guessFromName(fileName));
+            view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(view);
+        } catch (Exception e) {
+            Toast.makeText(this, getString(R.string.records_open_failed), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** 删除文件二次确认：删服务器真实文件（记录保留） */
+    private void confirmDeleteRecordFile(Row row) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.records_delete_file_title))
+                .setMessage(getString(R.string.records_delete_file_message, row.fileName))
+                .setPositiveButton(getString(R.string.files_delete_immediately), (d, w) -> deleteRecordFile(row))
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .show();
+    }
+
+    private void deleteRecordFile(Row row) {
+        client.deleteFile(row.fileId, null).enqueue(new UiCallback<ApiResponse<Map<String, Object>>>(this) {
+            @Override
+            protected void onUiResponse(Call<ApiResponse<Map<String, Object>>> call,
+                                        Response<ApiResponse<Map<String, Object>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isOk()) {
+                    Toast.makeText(RecordsActivity.this, getString(R.string.common_deleted), Toast.LENGTH_SHORT).show();
+                } else if (response.body() != null && response.body().getCode() == 40401) {
+                    // 源文件已不存在：给「未找到」专用提示，记录保留
+                    Toast.makeText(RecordsActivity.this, getString(R.string.records_source_missing),
+                            Toast.LENGTH_SHORT).show();
+                } else if (response.body() != null) {
+                    Toast.makeText(RecordsActivity.this, response.body().getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            protected void onUiFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable t) {
+                // 网络失败已由 UiCallback 统一提示
+            }
+        });
+    }
+
+    /** 单行数据（上传/下载统一形状；仅保留详情所需字段） */
+    private static class Row {
+        final String fileId, fileName, source, time;
+
+        Row(String fileId, String fileName, String source, String time) {
+            this.fileId = fileId == null ? "" : fileId;
             this.fileName = fileName == null ? "" : fileName;
-            this.username = username == null ? "" : username;
             this.source = source == null ? "" : source;
-            this.ip = ip == null ? "" : ip;
             this.time = time == null ? "" : time;
         }
     }
@@ -307,31 +486,34 @@ public class RecordsActivity extends BaseActivity {
         @NonNull
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext())
-                    .inflate(android.R.layout.simple_list_item_2, parent, false);
+            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_record, parent, false);
             return new VH(v);
         }
 
         @Override
         public void onBindViewHolder(@NonNull VH holder, int pos) {
             Row r = rows.get(pos);
-            holder.title.setText(r.fileName + "  [" + r.source + "]");
-            String meta = r.time.replace('T', ' ');
-            if (!r.username.isEmpty()) meta = r.username + " · " + meta;
-            if (!r.ip.isEmpty()) meta = meta + " · " + r.ip;
-            holder.subtitle.setText(meta);
+            holder.ivIcon.setImageResource(FileTypeIcon.forName(r.fileName, null));
+            holder.tvName.setText(r.fileName);
+            holder.tvTime.setText(formatTime(r.time));
+            holder.itemView.setOnLongClickListener(v -> {
+                showRecordDialog(r);
+                return true;
+            });
         }
 
         @Override
         public int getItemCount() { return rows.size(); }
 
         class VH extends RecyclerView.ViewHolder {
-            final TextView title, subtitle;
+            final ImageView ivIcon;
+            final TextView tvName, tvTime;
 
             VH(View v) {
                 super(v);
-                title = v.findViewById(android.R.id.text1);
-                subtitle = v.findViewById(android.R.id.text2);
+                ivIcon = v.findViewById(R.id.ivIcon);
+                tvName = v.findViewById(R.id.tvName);
+                tvTime = v.findViewById(R.id.tvTime);
             }
         }
     }

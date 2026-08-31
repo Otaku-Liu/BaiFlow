@@ -52,7 +52,7 @@
     </el-dialog>
 
     <!-- 文件列表表格 -->
-    <el-table :data="fileStore.items" v-loading="loading" stripe style="margin-top:16px"
+    <el-table :data="fileStore.items" v-loading="loading" stripe style="margin-top:16px" :row-style="{ height: '66px' }"
       @row-dblclick="onRowDblClick" @sort-change="onSortChange">
       <el-table-column :label="t('common.name')" min-width="280" prop="name" sortable="custom" :sort-orders="['ascending']">
         <template #default="{ row }">
@@ -70,7 +70,7 @@
           <span v-else>{{ row.childCount != null ? t('files.itemCount', { count: row.childCount }) : '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="t('files.uploadTime')" prop="createdAt" sortable="custom" :sort-orders="['descending']">
+      <el-table-column :label="t('files.uploadTime')" prop="createdAt" sortable="custom" :sort-orders="['descending']" min-width="170" show-overflow-tooltip>
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column :label="t('files.downloadCount')" width="110" align="right">

@@ -292,7 +292,12 @@ export default {
     user: 'User',
     startDate: 'Start date',
     endDate: 'End date',
-    allUsers: 'All users'
+    allUsers: 'All users',
+    action: 'Actions',
+    deleteSource: 'Delete source file',
+    deleteSourceConfirm: 'Delete source file "{name}"? This cannot be undone. The download record will be kept.',
+    sourceMissing: 'Source file not found or deleted',
+    deleted: 'Deleted'
   },
   notes: {
     searchPlaceholder: 'Search notes',

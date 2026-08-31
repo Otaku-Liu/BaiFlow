@@ -292,7 +292,12 @@ export default {
     user: '操作人',
     startDate: '开始日期',
     endDate: '结束日期',
-    allUsers: '全部用户'
+    allUsers: '全部用户',
+    action: '操作',
+    deleteSource: '删除源文件',
+    deleteSourceConfirm: '确定删除源文件「{name}」？删除后不可恢复，下载记录将保留。',
+    sourceMissing: '源文件不存在或已删除',
+    deleted: '已删除'
   },
   notes: {
     searchPlaceholder: '搜索笔记',

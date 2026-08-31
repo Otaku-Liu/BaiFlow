@@ -84,26 +84,55 @@ const ICON_DIR = '/icons/'
 /** 文件夹图标 */
 export const folderIconPath = `${ICON_DIR}ic_folder.png`
 
+/** 按扩展名兜底识别（对齐 Android FileTypeIcon）：mime 为空或未命中时使用 */
+const VIDEO_EXTS = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'ts', 'mpeg', 'mpg']
+const AUDIO_EXTS = ['mp3', 'wav', 'aac', 'flac', 'm4a', 'ogg', 'opus', 'wma', 'amr']
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'svg']
+const ARCHIVE_EXTS = ['zip', 'rar', '7z', 'gz', 'tar', 'bz2', 'xz']
+
 /**
  * 根据文件名/MIME 返回文件类型图标路径。
  * md 优先按扩展名识别：服务端存的 mime 是上传方 Content-Type，.md 可能不是 text/markdown。
+ * mime 为空（如传输记录无 mime）或未命中（如硬编码 octet-stream）时按扩展名兜底。
  */
 export function fileIconPath(name, mime) {
   if (isMarkdown(name, mime)) return `${ICON_DIR}ic_type_md.png`
-  if (!mime) return `${ICON_DIR}ic_type_file.png`
-  if (mime.startsWith('image/')) return `${ICON_DIR}ic_type_image.png`
-  if (mime.startsWith('video/')) return `${ICON_DIR}ic_type_video.png`
-  if (mime.startsWith('audio/')) return `${ICON_DIR}ic_type_audio.png`
-  if (mime === 'application/pdf') return `${ICON_DIR}ic_type_pdf.png`
-  if (mime.endsWith('json')) return `${ICON_DIR}ic_type_json.png`
-  if (mime.endsWith('xml')) return `${ICON_DIR}ic_type_xml.png`
-  if (mime.startsWith('text/')) return `${ICON_DIR}ic_type_file.png`
-  if (mime.includes('msword') || mime.includes('wordprocessingml')) return `${ICON_DIR}ic_type_word.png`
-  if (mime.includes('ms-excel') || mime.includes('spreadsheetml')) return `${ICON_DIR}ic_type_excel.png`
-  if (mime.includes('ms-powerpoint') || mime.includes('presentationml')) return `${ICON_DIR}ic_type_ppt.png`
-  if (mime.includes('zip') || mime.includes('compressed') || mime.includes('x-tar')
-      || mime.includes('gzip')) return `${ICON_DIR}ic_type_archive.png`
+  if (mime) {
+    if (mime.startsWith('image/')) return `${ICON_DIR}ic_type_image.png`
+    if (mime.startsWith('video/')) return `${ICON_DIR}ic_type_video.png`
+    if (mime.startsWith('audio/')) return `${ICON_DIR}ic_type_audio.png`
+    if (mime === 'application/pdf') return `${ICON_DIR}ic_type_pdf.png`
+    if (mime.endsWith('json')) return `${ICON_DIR}ic_type_json.png`
+    if (mime.endsWith('xml')) return `${ICON_DIR}ic_type_xml.png`
+    if (mime.startsWith('text/')) return `${ICON_DIR}ic_type_file.png`
+    if (mime.includes('msword') || mime.includes('wordprocessingml')) return `${ICON_DIR}ic_type_word.png`
+    if (mime.includes('ms-excel') || mime.includes('spreadsheetml')) return `${ICON_DIR}ic_type_excel.png`
+    if (mime.includes('ms-powerpoint') || mime.includes('presentationml')) return `${ICON_DIR}ic_type_ppt.png`
+    if (mime.includes('zip') || mime.includes('compressed') || mime.includes('x-tar')
+        || mime.includes('gzip')) return `${ICON_DIR}ic_type_archive.png`
+  }
+  const ext = extensionOf(name)
+  if (ext) {
+    if (VIDEO_EXTS.includes(ext)) return `${ICON_DIR}ic_type_video.png`
+    if (AUDIO_EXTS.includes(ext)) return `${ICON_DIR}ic_type_audio.png`
+    if (IMAGE_EXTS.includes(ext)) return `${ICON_DIR}ic_type_image.png`
+    if (ext === 'pdf') return `${ICON_DIR}ic_type_pdf.png`
+    if (ARCHIVE_EXTS.includes(ext)) return `${ICON_DIR}ic_type_archive.png`
+    if (ext === 'doc' || ext === 'docx') return `${ICON_DIR}ic_type_word.png`
+    if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return `${ICON_DIR}ic_type_excel.png`
+    if (ext === 'ppt' || ext === 'pptx') return `${ICON_DIR}ic_type_ppt.png`
+    if (ext === 'json') return `${ICON_DIR}ic_type_json.png`
+    if (ext === 'xml') return `${ICON_DIR}ic_type_xml.png`
+  }
   return `${ICON_DIR}ic_type_file.png`
+}
+
+/** 取小写扩展名（不含点）；无扩展名返回空串 */
+function extensionOf(name) {
+  if (!name) return ''
+  const dot = name.lastIndexOf('.')
+  if (dot < 0 || dot === name.length - 1) return ''
+  return name.substring(dot + 1).toLowerCase()
 }
 
 /** 是否 Markdown 文件：扩展名 .md/.markdown，或 MIME 含 markdown */

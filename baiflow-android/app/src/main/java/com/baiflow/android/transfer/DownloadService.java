@@ -21,6 +21,7 @@ import com.baiflow.android.network.ApiClient;
 import com.baiflow.android.model.ApiResponse;
 import com.baiflow.android.model.FileItem;
 import com.baiflow.android.ui.activity.MainActivity;
+import com.baiflow.android.util.DownloadLocationStore;
 import com.baiflow.android.util.FormatUtil;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -74,6 +75,7 @@ public class DownloadService extends Service {
 
     private void performDownload(String fileId, String fileName, long totalBytes) {
         Uri mediaUri = null;   // API 29+ 的 MediaStore 条目（失败时清理）
+        File targetFile = null; // API 26-28 落盘文件（持久化保存位置用）
         try {
             ApiClient client = ApiClient.getInstance(session);
             Call<ResponseBody> call = client.downloadFile(fileId, null);
@@ -107,7 +109,8 @@ public class DownloadService extends Service {
                 // API 26-28：写入公共 Download 目录（需 WRITE_EXTERNAL_STORAGE，由调用方申请）
                 File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                 if (!dir.exists()) { dir.mkdirs(); }
-                out = new FileOutputStream(new File(dir, safeName));
+                targetFile = new File(dir, safeName);
+                out = new FileOutputStream(targetFile);
             }
 
             byte[] buffer = new byte[8192];
@@ -140,6 +143,11 @@ public class DownloadService extends Service {
                 done.put(MediaStore.Downloads.IS_PENDING, 0);
                 getContentResolver().update(mediaUri, done, null, null);
             }
+
+            // 持久化保存位置（供下载记录详情「打开文件/保存位置」；仅本机下载过才可打开）
+            DownloadLocationStore.save(this, fileId, safeName,
+                    mediaUri != null ? mediaUri.toString() : null,
+                    targetFile != null ? targetFile.getAbsolutePath() : null);
 
             updateNotification(fileName, getString(R.string.transfer_download_completed), 100);
             Log.i(TAG, "下载完成: " + safeName);

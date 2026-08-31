@@ -48,6 +48,7 @@ import com.baiflow.android.transfer.DownloadService;
 import com.baiflow.android.transfer.UploadService;
 import com.baiflow.android.ui.activity.PreviewActivity;
 import com.baiflow.android.util.DownloadUtil;
+import com.baiflow.android.util.FileTypeIcon;
 import com.baiflow.android.util.FormatUtil;
 import com.baiflow.android.widget.DropdownMenu;
 
@@ -109,12 +110,12 @@ public class FilesFragment extends Fragment {
     /** 排序按钮（打开排序菜单；方向用菜单内「>」图标指示） */
     private View btnSort;
 
-    // 上传占位进度：轮询 UploadService 当前任务，仅当前目录匹配时展示，完成时刷新一次
-    private View uploadProgressRow;
-    private TextView tvUploadProgress;
-    private ProgressBar uploadProgressBar;
+    // 上传占位进度：轮询 UploadService 任务队列，仅目标目录匹配的任务渲染占位行，完成换真行
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private UploadService.UploadTask handledTask;
+    /** 已处理的终端任务（完成/失败/取消），避免同一任务被轮询重复处理 */
+    private final java.util.Set<String> handledTasks = new java.util.HashSet<>();
+    /** 最近一次渲染的占位行签名（避免无变化的轮询整体重绑列表） */
+    private String lastPlaceholdersSig = "";
     private boolean polling;
 
     private final Runnable uploadPoller = new Runnable() {
@@ -130,20 +131,34 @@ public class FilesFragment extends Fragment {
     // 隐私文件夹映射: folderId -> accessToken
     private final Map<String, String> privacyTokens = new java.util.HashMap<>();
 
-    /** 上传文件选择器（Activity Result API） */
+    /** 上传文件选择器（Activity Result API，多选 → 顺序上传队列） */
     private final ActivityResultLauncher<String> filePicker = registerForActivityResult(
-            new ActivityResultContracts.GetContent(), uri -> {
-                if (uri != null) {
+            new ActivityResultContracts.GetMultipleContents(), uris -> {
+                if (uris == null || uris.isEmpty()) {
+                    return;
+                }
+                // 队列首个任务用 startForegroundService 启动服务，其余仅入队（服务已在前台）；
+                // 隐私令牌取当前目录的有效令牌，随任务透传给后端（此前缺令牌上传隐私文件夹被 403）
+                String privacyToken = effectivePrivacyToken();
+                boolean first = true;
+                for (Uri uri : uris) {
                     String fileName = getFileName(uri);
                     Intent uploadIntent = new Intent(requireContext(), UploadService.class);
                     uploadIntent.putExtra(UploadService.EXTRA_STORAGE_ROOT_ID, currentRootId);
                     uploadIntent.putExtra(UploadService.EXTRA_PARENT_ID, currentParentId != null ? currentParentId : "");
                     uploadIntent.putExtra(UploadService.EXTRA_FILE_PATH, uri.toString());
                     uploadIntent.putExtra(UploadService.EXTRA_VIEW_USER_ID, currentViewUserId);
-                    uploadIntent.putExtra("file_name", fileName);
-                    requireContext().startForegroundService(uploadIntent);
-                    Toast.makeText(requireContext(), getString(R.string.files_upload_started, fileName), Toast.LENGTH_SHORT).show();
+                    uploadIntent.putExtra(UploadService.EXTRA_FILE_NAME, fileName);
+                    uploadIntent.putExtra(UploadService.EXTRA_PRIVACY_TOKEN, privacyToken);
+                    if (first) {
+                        requireContext().startForegroundService(uploadIntent);
+                        first = false;
+                    } else {
+                        requireContext().startService(uploadIntent);
+                    }
                 }
+                Toast.makeText(requireContext(),
+                        getString(R.string.files_upload_started_count, uris.size()), Toast.LENGTH_SHORT).show();
             });
 
     @Nullable
@@ -166,9 +181,6 @@ public class FilesFragment extends Fragment {
         tvEmpty = view.findViewById(R.id.tvEmpty);
         progressBar = view.findViewById(R.id.progressBar);
         adminRow = view.findViewById(R.id.adminRow);
-        uploadProgressRow = view.findViewById(R.id.uploadProgressRow);
-        tvUploadProgress = view.findViewById(R.id.tvUploadProgress);
-        uploadProgressBar = view.findViewById(R.id.uploadProgressBar);
         spinnerUser = view.findViewById(R.id.spinnerUser);
         View btnNew = view.findViewById(R.id.btnNew);
         btnUp = view.findViewById(R.id.btnUp);
@@ -270,37 +282,98 @@ public class FilesFragment extends Fragment {
         mainHandler.removeCallbacks(uploadPoller);
     }
 
-    /** 轮询当前上传任务：匹配当前目录显示占位进度；完成时隐藏并刷新一次 */
+    /** 轮询上传任务队列：目标目录匹配的排队/上传中任务渲染占位行；完成/失败/取消各处理一次并触发刷新 */
     private void pollUpload() {
-        UploadService.UploadTask t = UploadService.getCurrentTask();
-        if (t != null && currentRootId != null && currentRootId.equals(t.rootId)
-                && java.util.Objects.equals(currentParentId, t.parentId)) {
-            if (t.finished) {
-                if (handledTask != t) {
-                    handledTask = t;
-                    hideUploadProgress();
-                    loadFiles();
-                }
-            } else {
-                showUploadProgress(t.fileName, t.percent);
+        List<UploadService.UploadTask> tasks = UploadService.getQueueSnapshot();
+        if (tasks.isEmpty()) {
+            handledTasks.clear();
+        }
+        List<UploadService.UploadTask> placeholders = new ArrayList<>();
+        boolean needRefresh = false;
+        for (UploadService.UploadTask t : tasks) {
+            if (!matchesUploadDir(t)) {
+                continue;
             }
-        } else {
-            hideUploadProgress();
+            if (UploadService.STATE_QUEUED.equals(t.state)
+                    || UploadService.STATE_UPLOADING.equals(t.state)) {
+                placeholders.add(t);
+            } else if (handledTasks.add(t.taskId)) {
+                if (UploadService.STATE_DONE_OK.equals(t.state)) {
+                    handleUploadDone(t);
+                    needRefresh = true;
+                } else if (UploadService.STATE_FAILED.equals(t.state)) {
+                    Toast.makeText(requireContext(),
+                            t.errorMessage != null ? t.errorMessage : getString(R.string.transfer_upload_failed),
+                            Toast.LENGTH_SHORT).show();
+                    UploadService.removeTask(t.taskId);
+                } else if (UploadService.STATE_CANCELLED.equals(t.state)) {
+                    Toast.makeText(requireContext(), getString(R.string.transfer_upload_cancelled),
+                            Toast.LENGTH_SHORT).show();
+                    UploadService.removeTask(t.taskId);
+                }
+            }
+        }
+        // 仅占位状态（taskId+state+percent）变化才重绑，避免每 800ms 对无变化列表整体刷新
+        String sig = placeholderSig(placeholders);
+        if (!sig.equals(lastPlaceholdersSig)) {
+            lastPlaceholdersSig = sig;
+            adapter.setPlaceholders(placeholders);
+            updateEmptyState();
+        }
+        if (needRefresh) {
+            loadFiles();
         }
     }
 
-    private void showUploadProgress(String fileName, int percent) {
-        if (uploadProgressRow.getVisibility() != View.VISIBLE) {
-            uploadProgressRow.setVisibility(View.VISIBLE);
+    /** 占位行签名：taskId + 状态 + 百分比，用于判断是否需要重绑列表 */
+    private String placeholderSig(List<UploadService.UploadTask> placeholders) {
+        StringBuilder sb = new StringBuilder();
+        for (UploadService.UploadTask t : placeholders) {
+            sb.append(t.taskId).append('|').append(t.state).append('|').append(t.percent).append(';');
         }
-        tvUploadProgress.setText(getString(R.string.files_uploading, percent) + " " + fileName);
-        uploadProgressBar.setProgress(percent);
+        return sb.toString();
     }
 
-    private void hideUploadProgress() {
-        if (uploadProgressRow.getVisibility() != View.GONE) {
-            uploadProgressRow.setVisibility(View.GONE);
+    /** 上传任务目标目录是否等于当前浏览目录（仅该目录展示占位行）；根目录下 null 与空串等价 */
+    private boolean matchesUploadDir(UploadService.UploadTask t) {
+        if (currentRootId == null || !currentRootId.equals(t.rootId)) {
+            return false;
         }
+        return currentParentId == null
+                ? (t.parentId == null || t.parentId.isEmpty())
+                : currentParentId.equals(t.parentId);
+    }
+
+    /** 上传完成：用响应 FileItem 原位换真行（插入占位位置，随后 loadFiles 按排序归位） */
+    private void handleUploadDone(UploadService.UploadTask t) {
+        if (t.completedFileItem != null) {
+            List<FileItem> server = new ArrayList<>(adapter.getServerItems());
+            server.add(0, t.completedFileItem);
+            adapter.setServerItems(server);
+        }
+        UploadService.removeTask(t.taskId);
+    }
+
+    /** 点击占位行：确认后取消该任务（上传中 → 中断并续下一个；排队中 → 移出队列） */
+    private void confirmCancelUpload(UploadService.UploadTask task) {
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(getString(R.string.files_upload_cancel_title))
+                .setMessage(getString(R.string.files_upload_cancel_message, task.fileName))
+                .setPositiveButton(getString(R.string.common_confirm), (d, w) -> {
+                    Intent intent = new Intent(requireContext(), UploadService.class);
+                    intent.setAction(UploadService.ACTION_CANCEL_TASK);
+                    intent.putExtra(UploadService.EXTRA_TASK_ID, task.taskId);
+                    requireContext().startService(intent);
+                })
+                .setNegativeButton(getString(R.string.common_cancel), null)
+                .show();
+    }
+
+    /** 空态联动：服务器列表与占位行都为空才显示「此目录为空」 */
+    private void updateEmptyState() {
+        boolean empty = adapter.getServerItems().isEmpty() && adapter.getPlaceholders().isEmpty();
+        tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+        recyclerView.setVisibility(empty ? View.GONE : View.VISIBLE);
     }
 
     // ---- 存储根目录：自动选第一个可用根（不再用下拉框） ----
@@ -489,9 +562,8 @@ public class FilesFragment extends Fragment {
                             if (response.body().isOk()) {
                                 PagedResult<FileItem> result = response.body().getData();
                                 List<FileItem> items = result != null ? result.getRecords() : new ArrayList<>();
-                                adapter.setItems(items);
-                                tvEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                                recyclerView.setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
+                                adapter.setServerItems(items);
+                                updateEmptyState();
                             } else {
                                 handleError(response.body());
                             }
@@ -752,9 +824,37 @@ public class FilesFragment extends Fragment {
     // ==================== RecyclerView Adapter ====================
 
     class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
-        private List<FileItem> items = new ArrayList<>();
+        static final int TYPE_UPLOAD = 1;
+        static final int TYPE_FILE = 2;
+        private List<UploadService.UploadTask> placeholders = new ArrayList<>();
+        private List<FileItem> serverItems = new ArrayList<>();
+        /** 展示序 = 占位行（队首在上） + 服务器文件 */
+        private List<Object> display = new ArrayList<>();
 
-        void setItems(List<FileItem> items) { this.items = items; notifyDataSetChanged(); }
+        void setPlaceholders(List<UploadService.UploadTask> tasks) {
+            this.placeholders = tasks;
+            rebuild();
+        }
+
+        void setServerItems(List<FileItem> items) {
+            this.serverItems = items;
+            rebuild();
+        }
+
+        List<UploadService.UploadTask> getPlaceholders() {
+            return placeholders;
+        }
+
+        List<FileItem> getServerItems() {
+            return serverItems;
+        }
+
+        private void rebuild() {
+            display.clear();
+            display.addAll(placeholders);
+            display.addAll(serverItems);
+            notifyDataSetChanged();
+        }
 
         @NonNull @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -763,9 +863,26 @@ public class FilesFragment extends Fragment {
         }
 
         @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int pos) {
-            FileItem item = items.get(pos);
+        public int getItemViewType(int position) {
+            return display.get(position) instanceof UploadService.UploadTask ? TYPE_UPLOAD : TYPE_FILE;
+        }
 
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int pos) {
+            Object o = display.get(pos);
+            if (o instanceof UploadService.UploadTask) {
+                bindUpload(holder, (UploadService.UploadTask) o);
+            } else {
+                bindFile(holder, (FileItem) o);
+            }
+        }
+
+        @Override
+        public int getItemCount() {
+            return display.size();
+        }
+
+        private void bindFile(ViewHolder holder, FileItem item) {
             holder.tvName.setText(item.getName());
             if (item.isDirectory()) {
                 // 文件夹：显示子项数（隐私文件夹不提供，显示 "-" 对齐 Web）；并显示「>」箭头表示可进入下一级
@@ -780,8 +897,14 @@ public class FilesFragment extends Fragment {
             }
 
             holder.ivIcon.setImageResource(iconFor(item));
-
             holder.tvPrivacyTag.setVisibility(item.isPrivate() ? View.VISIBLE : View.GONE);
+
+            // 上传占位子视图复位（RecyclerView 复用占位行后可能残留）
+            holder.uploadProgressArea.setVisibility(View.GONE);
+            holder.uploadProgressBar.setProgress(0);
+            holder.uploadProgressBar.setIndeterminate(false);
+            holder.tvUploadPercent.setVisibility(View.GONE);
+            holder.tvMeta.setVisibility(View.VISIBLE);
 
             holder.itemView.setOnClickListener(v -> {
                 if (item.isDirectory()) {
@@ -807,73 +930,40 @@ public class FilesFragment extends Fragment {
             });
         }
 
-        @Override
-        public int getItemCount() { return items.size(); }
+        /** 上传占位行：外观与真实文件行一致，原 meta 位置换成横向进度条 + 百分比 */
+        private void bindUpload(ViewHolder holder, UploadService.UploadTask task) {
+            holder.tvName.setText(task.fileName);
+            holder.ivIcon.setImageResource(FileTypeIcon.forName(task.fileName, null));
+            holder.tvPrivacyTag.setVisibility(View.GONE);
+            holder.ivChevron.setVisibility(View.GONE);
+            holder.tvMeta.setVisibility(View.GONE);
+            holder.uploadProgressArea.setVisibility(View.VISIBLE);
+            holder.tvUploadPercent.setVisibility(View.VISIBLE);
+            if (UploadService.STATE_QUEUED.equals(task.state)) {
+                // 排队中：进度 0 + 「排队中」，与上传中区分（点击语义不同：排队可移出、上传中可中断）
+                holder.uploadProgressBar.setProgress(0);
+                holder.tvUploadPercent.setText(getString(R.string.files_upload_queued));
+            } else {
+                holder.uploadProgressBar.setProgress(task.percent);
+                holder.tvUploadPercent.setText(getString(R.string.files_uploading, task.percent));
+            }
 
-        /** 按文件类型返回图标（彩色 PNG；md/json/xml 独立，其它 text 共用文件图标） */
+            holder.itemView.setOnClickListener(v -> confirmCancelUpload(task));
+            holder.itemView.setOnLongClickListener(null);
+        }
+
+        /** 按文件类型返回图标（委托公共工具，与传输记录行共用） */
         private int iconFor(FileItem item) {
-            if (item.isDirectory()) return R.drawable.ic_folder;
-            // md 优先按扩展名识别：服务端存的 mime 是上传方 Content-Type，.md 可能不是 text/markdown
-            if (isMarkdown(item)) return R.drawable.ic_type_md;
-            String mime = item.getMimeType();
-            if (mime != null) {
-                if (mime.startsWith("image/")) return R.drawable.ic_type_image;
-                if (mime.startsWith("video/")) return R.drawable.ic_type_video;
-                if (mime.startsWith("audio/")) return R.drawable.ic_type_audio;
-                if ("application/pdf".equals(mime)) return R.drawable.ic_type_pdf;
-                if (mime.endsWith("json")) return R.drawable.ic_type_json;
-                if (mime.endsWith("xml")) return R.drawable.ic_type_xml;
-                if (mime.startsWith("text/")) return R.drawable.ic_type_file;
-                if (mime.contains("msword") || mime.contains("wordprocessingml")) return R.drawable.ic_type_word;
-                if (mime.contains("ms-excel") || mime.contains("spreadsheetml")) return R.drawable.ic_type_excel;
-                if (mime.contains("ms-powerpoint") || mime.contains("presentationml")) return R.drawable.ic_type_ppt;
-                if (mime.contains("zip") || mime.contains("compressed") || mime.contains("x-tar")
-                        || mime.contains("gzip")) return R.drawable.ic_type_archive;
-            }
-            // 扩展名兜底：服务端 mime 可能被上传方硬编码为 application/octet-stream，按扩展名识别常见类型
-            String ext = extensionOf(item.getName());
-            if (ext != null) {
-                if (VIDEO_EXTS.contains(ext)) return R.drawable.ic_type_video;
-                if (AUDIO_EXTS.contains(ext)) return R.drawable.ic_type_audio;
-                if (IMAGE_EXTS.contains(ext)) return R.drawable.ic_type_image;
-                if ("pdf".equals(ext)) return R.drawable.ic_type_pdf;
-                if (ARCHIVE_EXTS.contains(ext)) return R.drawable.ic_type_archive;
-            }
-            return R.drawable.ic_type_file;
-        }
-
-        private static final java.util.Set<String> VIDEO_EXTS =
-                java.util.Set.of("mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v", "3gp", "ts", "mpeg", "mpg");
-        private static final java.util.Set<String> AUDIO_EXTS =
-                java.util.Set.of("mp3", "wav", "aac", "flac", "m4a", "ogg", "opus", "wma", "amr");
-        private static final java.util.Set<String> IMAGE_EXTS =
-                java.util.Set.of("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "svg");
-        private static final java.util.Set<String> ARCHIVE_EXTS =
-                java.util.Set.of("zip", "rar", "7z", "gz", "tar", "bz2", "xz");
-
-        /** 取小写扩展名（不含点）；无扩展名返回 null */
-        private static String extensionOf(String name) {
-            if (name == null) return null;
-            int dot = name.lastIndexOf('.');
-            if (dot < 0 || dot == name.length() - 1) return null;
-            return name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
-        }
-
-        /** 是否 Markdown 文件：扩展名 .md/.markdown，或 MIME 含 markdown */
-        private boolean isMarkdown(FileItem item) {
-            String name = item.getName();
-            if (name != null) {
-                String lower = name.toLowerCase(java.util.Locale.ROOT);
-                if (lower.endsWith(".md") || lower.endsWith(".markdown")) return true;
-            }
-            String mime = item.getMimeType();
-            return mime != null && mime.contains("markdown");
+            return item.isDirectory() ? FileTypeIcon.forDirectory()
+                    : FileTypeIcon.forName(item.getName(), item.getMimeType());
         }
 
         class ViewHolder extends RecyclerView.ViewHolder {
             ImageView ivIcon;
-            TextView tvName, tvMeta, tvPrivacyTag;
+            TextView tvName, tvMeta, tvPrivacyTag, tvUploadPercent;
             ImageView ivChevron;
+            View uploadProgressArea;
+            ProgressBar uploadProgressBar;
             ViewHolder(View v) {
                 super(v);
                 ivIcon = v.findViewById(R.id.ivIcon);
@@ -881,6 +971,9 @@ public class FilesFragment extends Fragment {
                 tvMeta = v.findViewById(R.id.tvMeta);
                 tvPrivacyTag = v.findViewById(R.id.tvPrivacyTag);
                 ivChevron = v.findViewById(R.id.ivChevron);
+                uploadProgressArea = v.findViewById(R.id.uploadProgressArea);
+                uploadProgressBar = v.findViewById(R.id.uploadProgressBar);
+                tvUploadPercent = v.findViewById(R.id.tvUploadPercent);
             }
         }
     }

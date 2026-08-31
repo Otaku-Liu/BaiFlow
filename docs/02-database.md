@@ -64,7 +64,7 @@
 ### upload_record — 文件上传记录
 `id, file_id, file_name, uploader_user_id, source(WEB/ANDROID), ip_address, user_agent, created_at`
 
-> 每次上传一条（来源 = 客户端设备类型，取 `X-Device-Type`，Web 缺省 WEB），与下载记录对称；只记新上传、不回填历史。见 `docs/adr/ADR-003-transfer-history.md`。
+> 每次上传一条（来源 = 客户端设备类型，取 `X-Device-Type`，Web 缺省 WEB），与下载记录对称；只记新上传、不回填历史。
 
 ### transfer_task — 传输任务
 `id, created_by, task_type(UPLOAD/DOWNLOAD/DEVICE_SEND), status(WAITING/RUNNING/PAUSED/FAILED/COMPLETED), progress, error_message, created_at, updated_at`

@@ -13,6 +13,7 @@ public class UploadRecord {
     @SerializedName("ipAddress") private String ipAddress;
     @SerializedName("createdAt") private String createdAt;
 
+    public String getFileId() { return fileId; }
     public String getFileName() { return fileName; }
     public String getUploaderUsername() { return uploaderUsername; }
     public String getSource() { return source; }

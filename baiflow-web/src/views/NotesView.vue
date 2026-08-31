@@ -6,6 +6,7 @@
         <el-input v-model="keyword" :placeholder="t('notes.searchPlaceholder')" clearable size="small" class="search-input" @input="onSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
+        <el-button size="small" @click="handleReset">{{ t('common.reset') }}</el-button>
         <el-button type="primary" size="small" @click="newNote">
           <el-icon style="margin-right:4px"><Plus /></el-icon>{{ t('notes.newNote') }}
         </el-button>
@@ -126,6 +127,12 @@ async function loadList() {
 function onSearch() {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(loadList, 300)
+}
+
+/** 重置关键词搜索并重新加载 */
+function handleReset() {
+  keyword.value = ''
+  onSearch()
 }
 
 // ---- 保存 ----

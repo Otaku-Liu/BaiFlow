@@ -22,7 +22,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 - **bf_note_progress**
   笔记阅读进度表：`(user_id, note_id)` 唯一，`position_type` + `position_value`，本期只有 `SCROLL_PERCENT`。
 - **Bf 类名前缀（Bf Naming Prefix）**
-  绑定 `bf_*` 表的后端类统一加 `Bf` 前缀、按表名命名（Entity / Mapper / Service(+Impl) / Controller），如 `bf_share_link` → `BfShareLink` / `BfShareLinkMapper` / `BfShareLinkService`；无单一主表的业务类（`AuthService`、`PublicShareController`、`HealthService` 等）不带 `Bf`；DTO / VO / Request / enum 保持原名。见 `docs/adr/ADR-002-bf-prefix-naming.md`、`docs/06-coding-standards.md`。
+  绑定 `bf_*` 表的后端类统一加 `Bf` 前缀、按表名命名（Entity / Mapper / Service(+Impl) / Controller），如 `bf_share_link` → `BfShareLink` / `BfShareLinkMapper` / `BfShareLinkService`；无单一主表的业务类（`AuthService`、`PublicShareController`、`HealthService` 等）不带 `Bf`；DTO / VO / Request / enum 保持原名。见 `docs/06-coding-standards.md`。
 
 ## C
 
@@ -65,7 +65,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
   Android 防重复执行的轻量手段：方法内加标志位（如 `logoutStarted`），首行 `if (flag) return; flag = true;`，后续任何重复触发直接返回。用于 `doLogout()` 兜底连点/双弹窗导致的重复执行（重复 `startActivity` + `finish` 会触发 Fragment detach 闪退）。见 `docs/05-android.md`。
 
 - **媒体缓存（Media Cache）**
-  笔记媒体离线缓存：服务端媒体缓存 `note_media_cache/`（可重下，「我的」页可手动清理 + 上限 50–2000MB 超限 LRU）；离线新建媒体 `note_media/`（可能未上传）**永不自动清理**。见 `docs/adr/ADR-001-media-cache-management.md`。
+  笔记媒体离线缓存：服务端媒体缓存 `note_media_cache/`（可重下，「我的」页可手动清理 + 上限 50–2000MB 超限 LRU）；离线新建媒体 `note_media/`（可能未上传）**永不自动清理**。见 `docs/05-android.md`。
 
 ## N
 
@@ -75,7 +75,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 ## O
 
 - **离线模式（Offline Mode）**
-  **已移除**（2026-08）：Android 仅在线模式（已登录即在线），原「主动离线看缓存笔记」随本地模式一起下线。服务器地址固定由构建类型决定（读本地 `local.properties`，模板见 `local.properties.example`，真实地址 git 忽略不提交）。见 `docs/05-android.md`。
+  Android **仅在线模式**（已登录即在线），无主动离线看缓存。服务器地址固定由构建类型决定（读本地 `local.properties`，真实地址 git 忽略）。见 `docs/05-android.md`。
 
 - **Outbox（本地待同步队列）**
   本地笔记的待同步标记（`dirty + source`），编辑保存后先推 outbox（create/update 带 `baseUpdatedAt`、TOMBSTONE 删除），再按 `updatedAfter` 拉增量合并。见 `docs/05-android.md`。
@@ -90,7 +90,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 ## R
 
 - **Room**
-  Android 官方 SQLite ORM。随手记离线功能用它缓存笔记列表与正文，支持离线查看/编辑。
+  Android 官方 SQLite ORM。随手记同步用它本地缓存笔记列表与正文（在线模式）。
 
 ## S
 
@@ -108,12 +108,15 @@ BaiFlow 涉及的关键术语速查。按字母序。
   服务端单向实时推送（`text/event-stream`）。`GET /api/events` 维护「用户 → 连接」注册表 + 心跳清理，仅推送 `NOTE_UPDATED`（笔记跨端刷新）。
 - **Server Connection Timeout（服务器连接超时）**
   Web 对网络级失败的处理：距上次成功联系 ≥30s 判定超时，返回登录页（**保留 token**）+「重新连接」。见 `docs/04-frontend.md`。
+- **SseEmitter**
+  Spring 的 SSE 实现：服务端保持连接，向客户端推事件。
+
+## U
 
 - **UiCallback（Android 网络回调包装）**
   Retrofit `Callback` 包装：统一成功联系记录 + 失败分类提示，页面只写业务；后台传输用 `execute()` 不弹 UI。见 `docs/05-android.md`。
-
-- **SseEmitter**
-  Spring 的 SSE 实现：服务端保持连接，向客户端推事件。
+- **上传占位行（Upload Placeholder Row）**
+  文件中心上传时，列表顶部渲染的、外观与真实文件行一致（图标 + 文件名 + 原 meta 位置换成进度条/百分比）的临时行，由 `UploadService` 任务队列（多文件顺序上传）驱动；上传完成用响应 `FileItem` 原位换真后再按排序归位，失败/取消即移除并提示；纯客户端机制，不新增后端记录。见 `docs/05-android.md`。
 
 ## V
 
@@ -134,4 +137,4 @@ BaiFlow 涉及的关键术语速查。按字母序。
 
 - **内容同步**：编辑保存 → 服务端 `updated_at=now` → SSE 推 `NOTE_UPDATED` → 其他端刷新
 - **阅读进度**：滚动 → 防抖保存 `bf_note_progress` → 换端打开时自动恢复到记录位置并提示「已恢复到上次观看位置」；回顶保存 0 清除历史
-- **离线**：离线编辑 → Room + outbox → 联网 → 推 PATCH + `updatedAfter` 拉取合并 → 冲突对齐在线端乐观并发（覆盖 / 重载）
+- **在线同步**：编辑保存 → outbox 推 PATCH → `updatedAfter` 增量拉取合并 → 冲突对齐乐观并发（覆盖 / 重载）

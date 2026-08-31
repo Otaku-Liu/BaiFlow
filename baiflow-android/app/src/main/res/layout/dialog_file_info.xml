@@ -64,6 +64,18 @@
         android:textSize="14sp"
         android:textColor="@color/text_secondary" />
 
+    <!-- 下载记录：本机保存位置（可点按复制 URI/路径）；默认隐藏 -->
+    <TextView
+        android:id="@+id/dialogFileLocation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
+        android:background="?android:attr/selectableItemBackground"
+        android:paddingVertical="2dp"
+        android:visibility="gone" />
+
     <!-- 与动作区分隔（隐私项隐藏动作区时一并隐藏） -->
     <View
         android:id="@+id/dividerActionsTop"
@@ -73,6 +85,19 @@
         android:background="@color/divider" />
 
     <!-- 动作列表 -->
+    <TextView
+        android:id="@+id/actionOpen"
+        style="@style/Ios.DialogAction"
+        android:text="@string/files_open_file"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/dividerOpenDownload"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/actionRename"
         style="@style/Ios.DialogAction"

@@ -4,6 +4,7 @@ import android.os.Build;
 import android.util.Log;
 import com.baiflow.android.auth.SessionManager;
 import com.baiflow.android.model.*;
+import com.baiflow.android.util.MimeUtil;
 import okhttp3.*;
 import retrofit2.Call;
 import retrofit2.Retrofit;
@@ -395,22 +396,7 @@ public class ApiClient {
         RequestBody parentPart = RequestBody.create(parentId != null ? parentId : "", MediaType.parse("text/plain"));
         // mime 按扩展名解析（硬编码 octet-stream 会让服务端存错类型，文件列表图标/类型判断全失效）
         return getService().uploadFile(rootPart, parentPart,
-                buildFilePart(fileBytes, fileName, resolveMime(fileName), progress), viewUserId, privacyToken);
-    }
-
-    /** 按扩展名解析 MIME 类型；无法识别时回退通用二进制 */
-    private static String resolveMime(String fileName) {
-        if (fileName != null) {
-            int dot = fileName.lastIndexOf('.');
-            if (dot >= 0 && dot < fileName.length() - 1) {
-                String ext = fileName.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
-                String mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
-                if (mime != null) {
-                    return mime;
-                }
-            }
-        }
-        return "application/octet-stream";
+                buildFilePart(fileBytes, fileName, MimeUtil.guessFromName(fileName), progress), viewUserId, privacyToken);
     }
 
     public Call<ResponseBody> downloadFile(String fileId, String privacyToken) {

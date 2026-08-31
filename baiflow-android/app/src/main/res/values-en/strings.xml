@@ -5,6 +5,7 @@
     <string name="common_save">Save</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_confirm">OK</string>
+    <string name="common_reset">Reset</string>
     <string name="common_delete">Delete</string>
     <string name="common_deleted">Deleted</string>
     <string name="common_delete_failed">Delete failed</string>
@@ -74,7 +75,11 @@
     <string name="files_folder">Folder</string>
     <string name="files_privacy_tag">Private</string>
     <string name="files_type_icon_desc">File type icon</string>
-    <string name="files_upload_started">Upload started: %1$s</string>
+    <string name="files_upload_started_count">Started uploading %1$d file(s)</string>
+    <string name="files_uploading">Uploading %1$d%%</string>
+    <string name="files_upload_queued">Queued</string>
+    <string name="files_upload_cancel_title">Cancel Upload</string>
+    <string name="files_upload_cancel_message">Cancel upload of "%1$s"?</string>
     <string name="files_download">Download</string>
     <string name="files_delete_immediately">Delete Now</string>
     <string name="files_sort_name">Name</string>
@@ -164,6 +169,30 @@
     <string name="preview_playing">Now playing: %1$s</string>
     <string name="preview_audio_default">Audio</string>
 
+    <!-- ==================== Transfer records ==================== -->
+    <string name="records_upload_tab">Uploads</string>
+    <string name="records_download_tab">Downloads</string>
+    <string name="records_file_name_hint">File name</string>
+    <string name="records_search">Search</string>
+    <string name="records_empty">No records</string>
+    <string name="records_source_all">All sources</string>
+    <string name="records_all_users">All users</string>
+    <string name="records_time_label">Time</string>
+    <string name="records_source_label">Source</string>
+    <string name="records_user_label">User</string>
+    <string name="records_source_fmt">Source: %1$s</string>
+    <string name="records_upload_time_fmt">Upload time: %1$s</string>
+    <string name="records_download_time_fmt">Download time: %1$s</string>
+    <string name="records_delete_file_title">Delete File</string>
+    <string name="records_delete_file_message">This will permanently delete "%1$s" from the server. The record will be kept.</string>
+    <string name="records_saved_to">Saved to: %1$s</string>
+    <string name="records_download_dir">Download</string>
+    <string name="records_clip_label">Download location</string>
+    <string name="records_copied">Copied</string>
+    <string name="records_source_missing">Source file not found or deleted</string>
+    <string name="records_open_failed">Cannot open file</string>
+    <string name="files_open_file">Open file</string>
+
     <!-- ==================== Mine ==================== -->
     <string name="mine_profile">Edit Profile</string>
     <string name="mine_password">Change Password</string>
@@ -197,6 +226,10 @@
     <!-- ==================== Transfer ==================== -->
     <string name="transfer_upload_preparing">Preparing upload...</string>
     <string name="transfer_upload_uploading">Uploading...</string>
+    <string name="transfer_upload_progress">Uploading...%1$d%%</string>
+    <string name="transfer_upload_queue_pos">Item %1$d/%2$d: %3$s</string>
+    <string name="transfer_upload_cancel">Cancel</string>
+    <string name="transfer_upload_cancelled">Upload cancelled</string>
     <string name="transfer_upload_completed">Upload complete</string>
     <string name="transfer_upload_failed">Upload failed</string>
     <string name="transfer_upload_failed_detail">Upload failed: %1$s</string>

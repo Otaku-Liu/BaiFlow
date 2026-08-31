@@ -14,6 +14,7 @@ public class DownloadRecord {
     @SerializedName("ipAddress") private String ipAddress;
     @SerializedName("createdAt") private String createdAt;
 
+    public String getFileId() { return fileId; }
     public String getFileName() { return fileName; }
     public String getDownloaderUsername() { return downloaderUsername; }
     public String getSource() { return source; }
