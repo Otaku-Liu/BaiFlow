@@ -20,7 +20,7 @@ import java.nio.file.Path;
  * 如果数据库中没有任何存储根目录，则根据 {@code baiflow.storage.default-root-path}
  * 配置自动创建一个 LOCAL 类型的默认根目录，同时确保磁盘路径存在。
  * <p>
- * 运行顺序在 {@link SystemAdminInitializer} 之后，确保管理员账户已就绪。
+ * 运行顺序在 {@link com.baiflow.setup.config.SetupTokenInitializer} 之后。
  */
 @Slf4j
 @Component

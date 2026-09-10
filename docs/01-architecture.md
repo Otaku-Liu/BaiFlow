@@ -34,7 +34,7 @@ Vue 3 Web 管理台          Android Java App
 - **baiflow-server**：核心业务、权限、数据库、文件操作、下载任务、随手记笔记、SSE 事件、对外 API。文件路径只在服务端存在。
 - **数据访问层**：实体 Service（IService）承载单表查询（`lambdaQuery()` 等），Mapper 保持纯 `BaseMapper`；仅多表 JOIN / 特殊 SQL 留在 XML Mapper（见 `docs/06-coding-standards.md`）
 - **baiflow-web**：Web 管理台，只通过 REST API 通信。
-- **baiflow-android**：移动端文件查看、上传、下载、随手记（仅在线模式；服务器地址按构建类型固定，不手动配置）。
+- **baiflow-android**：移动端文件查看、上传、下载、随手记（仅在线模式；**服务器地址在 App 内运行时设置**，见 `docs/05-android.md`「登录态」）。
 - **deploy**：Docker Compose、Nginx、环境变量。
 
 ### SSE 事件（`com.baiflow.event`）
@@ -98,13 +98,19 @@ Vue 3 Web 管理台          Android Java App
 
 ### Docker Compose（server + web 容器化）
 - `deploy/docker-compose.yml`：`server`（Spring Boot，宿主机 8080）+ `web`（Nginx，宿主机 8088），host 网络直连服务器上**已有的 MySQL/Redis 容器**（不重建、不动数据）
+- 镜像从 GHCR 拉取，服务器上不编译源码；命名空间与版本都在 `deploy/.env`（`BAIFLOW_IMAGE_NAMESPACE` / `BAIFLOW_IMAGE_TAG`，发版时由 `release.yml` 自动写入），仓库里不写死账号名
+- 回滚 = 把 `BAIFLOW_IMAGE_TAG` 改成上一版号再 `docker compose pull`
 - 连接信息与管理员密码配在 `deploy/.env`（模板 `deploy/.env.example`）；数据目录默认 `/data/baiflow`（`BAIFLOW_DATA_DIR`）bind mount 进容器
-- 首次启动自动建表（Flyway `R__V1_init.sql`）、创建初始管理员、创建存储根目录
-- 首次启动：`cd deploy && docker compose up -d --build`；重启 server/web：`docker compose restart`（MySQL/Redis 为服务器既有容器，独立管理，不随 compose 重启）
+- 首次启动自动建表（Flyway `R__V1_init.sql`）与创建存储根目录；**不再预置管理员账号**——第一个管理员由 Web 端 `/setup` 向导创建（需启动日志里的一次性初始化令牌，见「安全基线 · 初始化入口」）
+- 启动：`cd deploy && docker compose pull && docker compose up -d`；重启 server/web：`docker compose restart`（MySQL/Redis 为服务器既有容器，独立管理，不随 compose 重启）
+- 本地从源码构建验证（不拉镜像）：`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`
 
-### 镜像构建
-- `baiflow-server/Dockerfile`：Maven 多阶段 → Temurin JRE
-- `baiflow-web/Dockerfile`：Node 构建 → Nginx（`baiflow-web/nginx.conf` 容器版配置）
+### 镜像构建与发布（GitHub Actions）
+- `baiflow-server/Dockerfile`：Maven 多阶段 → Temurin JRE；`baiflow-web/Dockerfile`：Node 构建 → Nginx（`baiflow-web/nginx.conf` 容器版配置）
+- `.github/workflows/ci.yml`：push main 与 PR 触发，三端并行校验——后端 `mvn package`、前端 `npm ci && npm run build`、Android `testDebugUnitTest + assembleDebug`（debug APK 作为构建产物上传）；不依赖任何 Secret
+- `.github/workflows/release.yml`：推 `v*` tag 触发，构建 server/web 镜像推 GHCR（打 `v1.2.3` / `sha-<短哈希>` / `latest` 三个 tag），随后 SSH 登服务器把版本号写进 `.env`、`docker compose pull && up -d`，最后探 `/api/health` 确认就绪（失败则输出容器状态与日志并让工作流失败）
+- 镜像在 GHCR 上设为公开，服务器拉取无需登录；首次推送后需在 GitHub 包设置里手动改为 Public
+- 部署用的服务器地址、SSH 用户与私钥、仓库路径存于 GitHub 仓库 Secret，不写进仓库
 
 ### Nginx 职责
 - 托管静态文件、`/api/` 反代（127.0.0.1:8080）、SSE 支持、Range/流式透传、上传大小限制、头像静态服务
@@ -123,12 +129,20 @@ Vue 3 Web 管理台          Android Java App
 - 强制 ADMIN/USER/GUEST 角色行为（role 取用户表当前值）
 - 密码、分享 token、提取码、隐私密码、会话 token 只存 hash
 
+### 初始化入口
+- 首次部署无预置账号，第一个管理员经 `POST /api/setup/init` 创建；入口本身公开，因此**必须携带启动时生成的一次性令牌**（32 字节随机、常量时间比对、15 分钟内错 10 次锁定）
+- 令牌打印到启动日志并落盘 `setup-token.txt`（`BAIFLOW_SETUP_TOKEN_PATH`，仅属主可读）；初始化成功后文件删除、令牌作废
+- 入口开关只看 `bf_system_setting.initialized_at` **单向标记**，不看是否存在管理员——删号/改名不会重新开放入口；数据库不可用时保守判定为「已初始化」（fail-closed）
+- 初始化成功直接签发登录会话（避免刚设置的密码立刻输错）
+
 ### 文件安全
 - 文件操作限制在配置的 Storage Root 内，路径需归一化校验
 - 后端进程不用 root 运行
 - 不向客户端暴露服务器绝对路径
 - 启动时自动从 `baiflow.storage.default-root-path` 创建默认存储根目录（环境变量 `BAIFLOW_STORAGE_ROOT`）
 - 笔记媒体（随手记图片/录音/画画）落盘 `baiflow.notes.media-path`（环境变量 `BAIFLOW_NOTE_MEDIA_PATH`），独立于文件中心，不参与 `/api/files` 列表
+- NAS_MOUNT 类型的存储根离线时**拒绝写入**（读取放行）
+- **NAS 健康检查定时任务默认关闭**：`baiflow.nas.health-check-enabled`（环境变量 `BAIFLOW_NAS_HEALTH_CHECK_ENABLED`）——暂无 NAS 硬件时不空转，接上 NAS 后设为 true 恢复（无需改代码）。关闭期间存储根 status 不自动刷新，需要时调 `POST /api/storage-roots/{id}/check` 手工检测
 
 ### 分享安全
 - 分享 URL 使用不可预测 token，数据库只存 hash
@@ -140,7 +154,8 @@ Vue 3 Web 管理台          Android Java App
 
 ### 隐私与机密
 - 配置中避免出现真实用户路径/域名/硬编码凭据；每次代码调整涉及配置/路径/凭据时做隐私与机密核查，涉及隐私先确认「保留还是屏蔽 git」
-- **已知待办**：`/home/lxb/...` 真实路径暂存于 `application.yml`（3 处默认）、`application-dev.example.yml`（2 处默认）、`deploy/nginx.conf`（root/alias/注释），部署脚本化时统一改为占位符 + 环境变量注入
+- 真实路径与域名已从仓库清除：`application.yml` 存储默认值改为中性的 `/data/baiflow/...`（生产实际值仍由 `BAIFLOW_*` 环境变量注入）、`application-dev.example.yml` 改为 `/path/to/...` 占位符
+- 含真实路径且与 web 容器抢 8088 端口的本地测试配置 `deploy/nginx.conf` 已删除，本地测试统一走 `baiflow-web/nginx.conf`（容器版）
 - 真实运行配置（`application-dev.yml`，含域名与凭据）gitignored，不随仓库分发
 
 ### 安全检查项

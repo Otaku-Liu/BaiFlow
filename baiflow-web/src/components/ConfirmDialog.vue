@@ -1,11 +1,10 @@
 <template>
   <el-dialog
     :model-value="visible"
-    @update:model-value="$emit('cancel')"
+    @update:model-value="$emit('cancel', distinguishClose ? 'close' : 'cancel')"
     :title="displayTitle"
     width="400px"
     :close-on-click-modal="false"
-    @close="$emit('cancel')"
   >
     <div class="confirm-body">
       <el-icon v-if="type === 'warning'" :size="22" color="#FF9500">
@@ -20,7 +19,7 @@
       <span class="confirm-message">{{ message }}</span>
     </div>
     <template #footer>
-      <el-button @click="$emit('cancel')">{{ displayCancelText }}</el-button>
+      <el-button @click="$emit('cancel', 'cancel')">{{ displayCancelText }}</el-button>
       <el-button :type="confirmButtonType" @click="$emit('confirm')">
         {{ displayConfirmText }}
       </el-button>
@@ -41,7 +40,12 @@ const props = defineProps({
   message: { type: String, default: '' },
   confirmText: { type: String, default: '' },
   cancelText: { type: String, default: '' },
-  type: { type: String, default: 'warning' }
+  type: { type: String, default: 'warning' },
+  /**
+   * 是否区分「取消按钮」与「关闭（X / ESC / 遮罩）」：开启后前者 emit `'cancel'`、后者 emit `'close'`。
+   * 默认关闭——两者都 emit `'cancel'`，调用方不必关心关闭方式。
+   */
+  distinguishClose: { type: Boolean, default: false }
 })
 
 defineEmits(['confirm', 'cancel'])
@@ -67,5 +71,7 @@ const confirmButtonType = computed(() => {
   color: var(--el-text-color-regular);
   line-height: 1.6;
   padding-top: 1px;
+  /* 保留消息里的换行（块级差异预览等多行文案），单行文案渲染不变 */
+  white-space: pre-line;
 }
 </style>

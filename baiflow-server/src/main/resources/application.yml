@@ -62,10 +62,14 @@ baiflow:
   auth-session:
     web-hours: ${BAIFLOW_AUTH_WEB_HOURS:2}
     android-days: ${BAIFLOW_AUTH_ANDROID_DAYS:180}
-  init-admin:
-    username: ${BAIFLOW_INIT_ADMIN_USERNAME:admin}
-    password: ${BAIFLOW_INIT_ADMIN_PASSWORD:admin}
+  setup:
+    # 首次初始化令牌的落盘位置（日志之外的第二来源）；初始化完成后自动删除
+    token-path: ${BAIFLOW_SETUP_TOKEN_PATH:./setup-token.txt}
+  nas:
+    # NAS 健康检查定时任务开关：默认关闭（暂无 NAS 硬件，不必每 60 秒空转探测）；
+    # 接上 NAS 后设为 true（或设环境变量 BAIFLOW_NAS_HEALTH_CHECK_ENABLED=true）即可恢复
+    health-check-enabled: ${BAIFLOW_NAS_HEALTH_CHECK_ENABLED:false}
   storage:
-    default-root-path: ${BAIFLOW_STORAGE_ROOT:/home/lxb/baiflow-data/files}
-    avatar-path: ${BAIFLOW_AVATAR_PATH:/home/lxb/baiflow-data/avatars}
-    note-media-path: ${BAIFLOW_NOTE_MEDIA_PATH:/home/lxb/baiflow-data/notes-media}
+    default-root-path: ${BAIFLOW_STORAGE_ROOT:/data/baiflow/files}
+    avatar-path: ${BAIFLOW_AVATAR_PATH:/data/baiflow/avatars}
+    note-media-path: ${BAIFLOW_NOTE_MEDIA_PATH:/data/baiflow/notes-media}

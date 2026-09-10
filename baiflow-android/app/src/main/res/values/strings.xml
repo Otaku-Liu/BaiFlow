@@ -32,10 +32,9 @@
     <string name="mine_cache_limit">缓存上限</string>
     <string name="mine_cache_limit_value">%1$d MB</string>
     <string name="mine_clear_cache_confirm_title">清理缓存</string>
-    <string name="mine_clear_cache_confirm_msg">将清除已下载的笔记媒体（图片/音频）。清除后，离线打开相应笔记或媒体时需要重新下载。此操作不可恢复，确定继续？</string>
+    <string name="mine_clear_cache_confirm_msg">将清除已下载的笔记媒体（图片/音频）。清除后，再次打开相应笔记或媒体时需要重新下载。此操作不可恢复，确定继续？</string>
     <string name="mine_clear_cache_confirm">清除</string>
     <string name="mine_clear_cache_done">缓存已清除</string>
-    <string name="mine_mode_online">在线模式</string>
 
     <!-- ==================== 底部导航 ==================== -->
     <string name="nav_files">文件</string>
@@ -52,6 +51,29 @@
     <string name="login_failed">登录失败</string>
     <string name="login_success">登录成功</string>
     <string name="login_fetch_user_failed">获取用户信息失败</string>
+    <string name="login_no_server">尚未设置服务器地址，点此设置</string>
+    <string name="login_go_settings">去设置服务器</string>
+    <string name="login_server_not_initialized">该服务器尚未初始化，请先用浏览器打开下面的地址创建第一个管理员：%1$s</string>
+
+    <!-- ==================== 服务器设置 ==================== -->
+    <string name="mine_server">服务器</string>
+    <string name="server_title">服务器设置</string>
+    <string name="server_hint">服务器地址</string>
+    <string name="server_hint_helper">含 http:// 或 https://；不写协议时，有端口按 http、无端口按 https</string>
+    <string name="server_test">测试连接</string>
+    <string name="server_testing">正在连接服务器…</string>
+    <string name="server_save">保存</string>
+    <string name="server_empty">请填写服务器地址</string>
+    <string name="server_unchanged">地址未变化</string>
+    <string name="server_saved">已保存</string>
+    <string name="server_test_ok">连接成功，将使用：%1$s</string>
+    <string name="server_test_failed">连接失败：%1$s</string>
+    <string name="server_not_initialized">连接成功，但该服务器尚未初始化。\n请用浏览器打开下面的地址创建第一个管理员：\n%1$s\n（初始化令牌在服务器启动日志中）</string>
+    <string name="server_open_browser">用浏览器打开</string>
+    <string name="server_switch_confirm_title">切换服务器</string>
+    <string name="server_switch_confirm_msg">切换服务器会退出当前账号，并清除该服务器的登录状态与同步进度。笔记缓存按服务器分开保存，切回时仍在。确定继续？</string>
+    <string name="server_save_failed_confirm">连接失败：%1$s\n仍要保存吗？</string>
+    <string name="common_browser_unavailable">没有可用的浏览器</string>
 
     <!-- ==================== 文件 ==================== -->
     <string name="files_title">文件中心</string>

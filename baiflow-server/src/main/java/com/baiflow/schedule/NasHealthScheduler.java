@@ -3,6 +3,7 @@ package com.baiflow.schedule;
 import com.baiflow.storage.service.BfStorageRootService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,10 +17,18 @@ import org.springframework.stereotype.Component;
  * </ul>
  * <p>
  * DISABLED 状态的存储根目录不会被检查（管理员手动禁用）。
- * 启用条件配置：{@code baiflow.nas.health-check-enabled=true}
+ * <p>
+ * <b>开关</b>：{@code baiflow.nas.health-check-enabled}（环境变量
+ * {@code BAIFLOW_NAS_HEALTH_CHECK_ENABLED}），默认 **false** —— 没有 NAS 硬件时不必空转；
+ * 接上 NAS 后改成 true 即可恢复。关闭期间存储根状态不再自动刷新，需要时用
+ * {@code POST /api/storage-roots/{id}/check} 手工检测。
+ * <p>
+ * 库里没有 NAS_MOUNT 类型的存储根时本任务本就是空转（查不到、不记日志），关闭它是为了
+ * 在没有 NAS 的阶段少一个无意义的后台探测。
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "baiflow.nas.health-check-enabled", havingValue = "true", matchIfMissing = true)
 public class NasHealthScheduler {
 
     @Autowired

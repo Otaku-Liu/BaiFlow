@@ -37,8 +37,27 @@ public class ApiClient {
         return instance;
     }
 
-    private ApiService getService() {
-        // 服务器地址由构建类型固定（不再切换），Retrofit 实例一次性构建
+    /**
+     * 丢弃内部 Retrofit 实例 —— 服务器地址变更后调用，下次请求按新地址重建。
+     * <p>
+     * 单例对象本身不重建：其它类（PasswordActivity / RecordsActivity / NoteAudioPlayerView 等）
+     * 已持有该引用，换对象会让它们继续打旧地址。
+     */
+    public synchronized void invalidate() {
+        apiService = null;
+    }
+
+    /** 服务器地址变更后重建 Retrofit 实例（对已持有引用的调用方同样生效） */
+    public static void onServerChanged() {
+        synchronized (ApiClient.class) {
+            if (instance != null) {
+                instance.invalidate();
+            }
+        }
+    }
+
+    private synchronized ApiService getService() {
+        // baseUrl 取自 SessionManager 的当前服务器地址；地址变更时由 onServerChanged() 清缓存重建
         if (apiService == null) {
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(new AuthInterceptor(session))

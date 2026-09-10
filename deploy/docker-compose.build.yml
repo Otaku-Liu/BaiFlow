@@ -1,0 +1,17 @@
+# BaiFlow 本地源码构建覆盖文件 —— 只给本地/开发用，生产不用。
+#
+# 叠加在 docker-compose.yml 之上，给两个服务补回 build：，让镜像由本地源码构建，
+# 而不是从 GHCR 拉取（生产走的是拉镜像那条路）。
+#
+# 用法（在 deploy/ 目录下）：
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# 注意：构建产物会打上 .env 里 BAIFLOW_IMAGE_TAG 指定的标签（默认 latest），
+# 可能与 GHCR 拉下来的同名镜像混在一起；本地验证完可 docker compose down 清掉。
+
+services:
+  server:
+    build: ../baiflow-server
+
+  web:
+    build: ../baiflow-web

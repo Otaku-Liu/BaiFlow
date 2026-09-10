@@ -179,19 +179,24 @@
         <el-button type="primary" @click="handleChangePassword">确定修改</el-button>
       </template>
     </el-dialog>
+
+    <!-- 通用确认弹窗 -->
+    <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
   </div>
 </template>
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { FolderOpened, Share, User, Fold, Expand, Document, ArrowDown, Memo, Upload, Download } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { updateProfile, uploadAvatar, deleteAvatar, changePassword, listDevices, revokeSession, deleteDevice } from '../api/auth'
 import { formatDateTime } from '../utils/format'
 import { notifyRequestError } from '../utils/notify'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import FilesView from './FilesView.vue'
 import NotesView from './NotesView.vue'
 import SharesView from './SharesView.vue'
@@ -202,6 +207,7 @@ import RecordsView from './RecordsView.vue'
 const router = useRouter()
 const authStore = useAuthStore()
 const { t, locale } = useI18n()
+const { confirm, bindings, onConfirm, onCancel } = useConfirmDialog()
 const activeMenu = ref('files')
 
 // ---- 响应式侧边栏 ----
@@ -287,11 +293,12 @@ async function handleRevokeDevice(d) {
 /** 删除某登录设备（撤销其全部会话 + 删除登录历史记录，需确认） */
 async function handleDeleteDevice(d) {
   try {
-    await ElMessageBox.confirm(
-      `删除设备「${d.deviceName}」的登录记录？删除后该设备将从列表移除（在线设备需先强制下线）。`,
-      '删除登录设备',
-      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
-    )
+    await confirm({
+      title: '删除登录设备',
+      message: `删除设备「${d.deviceName}」的登录记录？删除后该设备将从列表移除（在线设备需先强制下线）。`,
+      confirmText: t('common.delete'),
+      type: 'warning'
+    })
   } catch (e) {
     return   // 取消
   }
@@ -355,10 +362,11 @@ async function handleAvatarUpload(file) {
 
 async function handleDeleteAvatar() {
   try {
-    await ElMessageBox.confirm('确定删除头像吗？删除后将显示默认首字头像。', '删除头像', {
-      type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消'
+    await confirm({
+      title: '删除头像',
+      message: '确定删除头像吗？删除后将显示默认首字头像。',
+      confirmText: t('common.delete'),
+      type: 'warning'
     })
   } catch {
     return // 用户取消

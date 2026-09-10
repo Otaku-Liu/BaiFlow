@@ -10,7 +10,7 @@ import com.baiflow.android.BuildConfig;
 import com.baiflow.android.ui.activity.LoginActivity;
 
 /**
- * 会话管理器 — 使用 SharedPreferences 存储 token 和用户信息；服务器地址由构建类型固定。
+ * 会话管理器 — 使用 SharedPreferences 存储服务器地址、token 和用户信息。
  * <p>
  * 负责登录态维护：token 存取、登录状态判断、清除会话；会话被吊销（401）时跳登录页。
  */
@@ -25,6 +25,8 @@ public class SessionManager {
     private static final String KEY_AVATAR_URL = "avatar_url";
     private static final String KEY_ROLE = "role";
     private static final String KEY_LANGUAGE = "language";
+    /** 服务器地址（运行时设置，见 setServerUrl） */
+    private static final String KEY_SERVER_URL = "server_url";
 
     private static SessionManager instance;
     private final Context appContext;
@@ -45,14 +47,70 @@ public class SessionManager {
     public String getToken() { return prefs.getString(KEY_TOKEN, null); }
     public boolean isLoggedIn() { return getToken() != null && !getToken().isEmpty(); }
 
-    // ---- Server URL（固定由构建类型决定，不再手动配置）----
-    // 真实地址在本地 local.properties（git 忽略），见 ../local.properties.example
+    // ---- Server URL（运行时设置，存 SharedPreferences）----
+    // 未设置时回落到打包默认值：调试包在 local.properties 里配了开发地址，正式包为空串，
+    // 正式包首次打开必须先去「服务器设置」填地址（见 ../local.properties.example）。
     public String getServerUrl() {
-        // 去尾部斜杠（local.properties 里配 http://host:port/ 也能归一），避免拼出 //api/
-        String url = BuildConfig.SERVER_URL;
-        return url != null ? url.replaceAll("/+$", "") : "";
+        String saved = prefs.getString(KEY_SERVER_URL, null);
+        if (saved != null && !saved.isEmpty()) {
+            return saved;
+        }
+        return normalizeServerUrl(BuildConfig.SERVER_URL);
     }
+
+    /** 是否已配置服务器地址（未配置时登录页引导去「服务器设置」） */
+    public boolean hasServer() {
+        return !getServerUrl().isEmpty();
+    }
+
     public String getApiBaseUrl() { return getServerUrl() + "/api/"; }
+
+    /**
+     * 设置服务器地址（归一化后持久化），并**清除当前会话**。
+     * <p>
+     * 换服务器必须清会话：token 与增量同步游标都绑定在具体服务器上——留着会把 A 的凭据发给 B，
+     * 并用 A 的时间戳去 B 拉增量（导致 B 的笔记漏拉，本类的登出注释里记录过同款问题）。
+     * 本地笔记缓存按服务器分区（{@link #getDataPartition()}），不属于当前服务器，不受影响。
+     */
+    public void setServerUrl(String url) {
+        prefs.edit().putString(KEY_SERVER_URL, normalizeServerUrl(url)).apply();
+        clearSession();
+    }
+
+    /**
+     * 归一化服务器地址：
+     * <ul>
+     *   <li>去首尾空白与尾部斜杠（避免拼出 {@code //api/}）</li>
+     *   <li>未写协议时补全：带端口按 http（自建服务自定义端口多为明文），否则按 https</li>
+     * </ul>
+     */
+    public static String normalizeServerUrl(String input) {
+        String url = input == null ? "" : input.trim();
+        if (url.isEmpty()) {
+            return "";
+        }
+        if (!url.matches("(?i)^https?://.*")) {
+            url = hasExplicitPort(url) ? "http://" + url : "https://" + url;
+        }
+        // 只写了协议没写主机：视为未填写
+        if (url.matches("(?i)^https?://$")) {
+            return "";
+        }
+        return url.replaceAll("/+$", "");
+    }
+
+    /** 「主机[:端口]」形式里是否显式写了端口（IPv6 字面量除外，它必然带冒号） */
+    private static boolean hasExplicitPort(String url) {
+        String authority = url;
+        int slash = authority.indexOf('/');
+        if (slash >= 0) {
+            authority = authority.substring(0, slash);
+        }
+        if (authority.startsWith("[")) {
+            return false;
+        }
+        return authority.indexOf(':') >= 0;
+    }
 
     // ---- Language（应用语言，BaseActivity 应用；替代 AppCompatDelegate.setApplicationLocales） ----
     public void saveLanguage(String lang) { prefs.edit().putString(KEY_LANGUAGE, lang).apply(); }

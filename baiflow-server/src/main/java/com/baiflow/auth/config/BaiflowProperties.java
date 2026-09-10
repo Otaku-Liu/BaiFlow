@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class BaiflowProperties {
 
     private final AuthSession authSession = new AuthSession();
-    private final InitAdmin initAdmin = new InitAdmin();
+    private final Setup setup = new Setup();
     private final Storage storage = new Storage();
 
     /** 登录会话时长：ANDROID 长期（滑动，天）/ WEB 短期（固定，小时） */
@@ -18,10 +18,10 @@ public class BaiflowProperties {
         private int androidDays = 180;
     }
 
+    /** 首次初始化：一次性初始化令牌的存放位置（日志之外的第二来源） */
     @Data
-    public static class InitAdmin {
-        private String username = "admin";
-        private String password = "admin";
+    public static class Setup {
+        private String tokenPath = "./setup-token.txt";
     }
 
     @Data

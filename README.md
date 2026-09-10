@@ -8,6 +8,7 @@ BaiFlow（小白流转）——个人服务器上的下载与文件协同中心�
 - **随手记**：所见即所得块编辑器（文本/标题 + 图片/录音/画画），Web/Android 双向 Markdown 互认
 - **浏览进度跨端同步**：视频/音频续播、文本/笔记续读，Web/Android 共用一份数据
 - 登录会话持久化与设备管理、传输中心、随手记在线同步（Room 本地缓存 + outbox + SSE 实时）、中英双语
+- **首次部署向导**：用启动日志里的一次性令牌创建第一个管理员（不再预置 admin/admin）
 
 ## 模块
 
@@ -29,8 +30,11 @@ cd baiflow-server && mvn spring-boot:run -Dspring-boot.run.profiles=dev
 # 前端（默认端口 5173，/api 自动代理到后端）
 cd baiflow-web && npm install && npm run dev
 
-# 部署 server + web（MySQL/Redis 复用已有容器；先复制 deploy/.env.example 为 .env）
-cd deploy && docker compose up -d --build
+# 部署 server + web（拉取 GHCR 镜像；MySQL/Redis 复用已有容器；先复制 deploy/.env.example 为 .env）
+cd deploy && docker compose pull && docker compose up -d
+
+# 本地从源码构建验证（改了代码、要验证镜像时）
+cd deploy && docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
 ## 文档

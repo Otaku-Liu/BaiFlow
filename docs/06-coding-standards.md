@@ -5,7 +5,7 @@
 - JDK 17，包名 `com.baiflow`
 - Controller → HTTP 映射与请求/响应转换，不写业务逻辑
 - Service → 业务逻辑、权限校验、事务边界、文件操作
-- Mapper → 纯 `BaseMapper`，不写自定义查询方法（单表查询在 Service 层 IService 完成）
+- Mapper → 纯 `BaseMapper`，不写自定义查询方法
 - DTO / VO / Entity / Request 分离
 - **命名规则**：绑定 `bf_*` 表的类统一 `Bf` 前缀、**按表名命名**（Entity / Mapper / Service(+Impl) / Controller 四层，如 `bf_share_link` → `BfShareLink` / `BfShareLinkMapper` / `BfShareLinkService`）；无单一主表的业务类（`AuthService`、`PublicShareController`、`HealthService`）不带 `Bf`；DTO / VO / Request / enum 保持原名。
 - 统一返回 `{ code, message, data, traceId }`
@@ -39,7 +39,6 @@
 - 多表 JOIN / 特殊 SQL（如 MySQL `ON DUPLICATE KEY UPDATE`）→ XML Mapper（仅剩审计登录日志 JOIN 与笔记进度 upsert）
 - 分页用 MyBatis Plus 分页插件
 - SQL 关键字大写、列名表名小写下划线、多行格式化、子句独占一行
-- 逻辑删除字段统一 `deleted`
 - SQL 日志 SLF4J 桥接
 
 ## 日志
@@ -50,7 +49,7 @@
 
 ## MySQL
 - 表名/字段名小写下划线
-- 主键 `id`，时间字段 `created_at` / `updated_at` / `deleted_at`
+- 主键 `id`，时间字段 `created_at` / `updated_at` / `deleted_at`（逻辑删除时间，`NULL` 表示未删除）
 - 密码/token/hash 不存明文
 
 ## 权限与安全

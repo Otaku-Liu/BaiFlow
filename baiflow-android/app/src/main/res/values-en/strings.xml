@@ -32,10 +32,9 @@
     <string name="mine_cache_limit">Cache limit</string>
     <string name="mine_cache_limit_value">%1$d MB</string>
     <string name="mine_clear_cache_confirm_title">Clear cache</string>
-    <string name="mine_clear_cache_confirm_msg">This will clear downloaded note media (images/audio). After clearing, opening the note or media offline will require re-download. This cannot be undone. Continue?</string>
+    <string name="mine_clear_cache_confirm_msg">This will clear downloaded note media (images/audio). After clearing, opening that note or media again will require a re-download. This cannot be undone. Continue?</string>
     <string name="mine_clear_cache_confirm">Clear</string>
     <string name="mine_clear_cache_done">Cache cleared</string>
-    <string name="mine_mode_online">Online mode</string>
 
     <!-- ==================== Bottom navigation ==================== -->
     <string name="nav_files">Files</string>
@@ -52,6 +51,29 @@
     <string name="login_failed">Login failed</string>
     <string name="login_success">Logged in</string>
     <string name="login_fetch_user_failed">Failed to fetch user info</string>
+    <string name="login_no_server">No server configured — tap to set up</string>
+    <string name="login_go_settings">Set up server</string>
+    <string name="login_server_not_initialized">This server is not initialized yet. Open the address below in a browser to create the first administrator: %1$s</string>
+
+    <!-- ==================== Server settings ==================== -->
+    <string name="mine_server">Server</string>
+    <string name="server_title">Server Settings</string>
+    <string name="server_hint">Server address</string>
+    <string name="server_hint_helper">Include http:// or https://. Without a scheme, a port implies http and no port implies https.</string>
+    <string name="server_test">Test Connection</string>
+    <string name="server_testing">Connecting…</string>
+    <string name="server_save">Save</string>
+    <string name="server_empty">Enter the server address</string>
+    <string name="server_unchanged">Address unchanged</string>
+    <string name="server_saved">Saved</string>
+    <string name="server_test_ok">Connected. Will use: %1$s</string>
+    <string name="server_test_failed">Connection failed: %1$s</string>
+    <string name="server_not_initialized">Connected, but this server is not initialized yet.\nOpen the address below in a browser to create the first administrator:\n%1$s\n(The setup token is printed in the server startup log.)</string>
+    <string name="server_open_browser">Open in Browser</string>
+    <string name="server_switch_confirm_title">Switch Server</string>
+    <string name="server_switch_confirm_msg">Switching servers logs you out and clears the login state and sync progress for this server. Note caches are kept per server, so they remain when you switch back. Continue?</string>
+    <string name="server_save_failed_confirm">Connection failed: %1$s\nSave anyway?</string>
+    <string name="common_browser_unavailable">No browser available</string>
 
     <!-- ==================== Files ==================== -->
     <string name="files_title">File Center</string>

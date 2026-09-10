@@ -114,9 +114,15 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
-        // 4. 登录成功：清除失败计数，更新最后登录时间，建登录会话（长会话 token）
+        // 4. 登录成功：清除失败计数，建登录会话（长会话 token）
         clearFailures(request.username());
         auditService.log(user.getId(), "LOGIN_SUCCESS", "USER", user.getId(), ip, ua, "登录成功");
+        return issueSession(user);
+    }
+
+    @Override
+    public LoginResponse issueSession(BfUser user) {
+        String ua = RequestUtil.getClientUserAgent();
 
         user.setLastLoginAt(LocalDateTime.now());
         userMapper.updateById(user);
@@ -124,7 +130,7 @@ public class AuthServiceImpl implements AuthService {
         String deviceType = "ANDROID".equalsIgnoreCase(RequestUtil.getHeader("X-Device-Type")) ? "ANDROID" : "WEB";
         String deviceName = resolveDeviceName(deviceType, RequestUtil.getHeader("X-Device-Name"), ua);
         SessionTokenService.CreatedSession created = sessionTokenService.create(
-                user.getId(), deviceType, deviceName, ip, ua);
+                user.getId(), deviceType, deviceName, RequestUtil.getClientIp(), ua);
         // 登记登录过的设备（user + device_name 唯一，登出不删，保留历史）
         userDeviceService.recordLogin(user.getId(), deviceName, deviceType);
         return new LoginResponse(created.token(), created.sessionId(), created.expiresAt(), UserInfo.from(user));

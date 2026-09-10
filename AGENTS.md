@@ -1,46 +1,10 @@
-﻿# BaiFlow Agent Instructions
+# BaiFlow — Agent Instructions
 
-## Project Identity
-BaiFlow（小白流转）是一个个人服务器上的下载与文件协同中心，重点是文件流转、下载任务、设备协同、传输与通知。项目必须小步推进，每个阶段都要可运行、可验收、可回滚。
+项目说明、技术栈、开发规则、功能决策、模块技能与验收项**统一维护在 [`CLAUDE.md`](CLAUDE.md)**，先读它。
 
-## Read First
-Before planning or coding, read:
-1. `SKILL.md`
-2. `docs/01-architecture.md`
-3. `docs/README.md`
-4. The module-specific `SKILL.md` for the area being changed.
+再按需读：
 
-## Fixed Technical Choices
-- Backend: JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8, Redis 7.
-- Web: Vue 3, Vite, Vue Router, Pinia, Axios.
-- Android: Java, Retrofit, OkHttp, WorkManager, Foreground Service.
-- Deployment: Ubuntu 24, Docker Compose, Nginx.
+1. [`docs/README.md`](docs/README.md) — 文档索引（架构 / 数据库 / API / 前端 / Android / 编码规范 / 术语表）
+2. 改动模块目录下的 `SKILL.md`（`baiflow-server` / `baiflow-web` / `baiflow-android` / `deploy`）
 
-## Current Feature Decisions
-- Support users and roles: `ADMIN`, `USER`, `GUEST`.
-- Support sharing selected files or folders with generated URLs.
-- Support optional extraction code for share links.
-- Support privacy folders protected by an additional password.
-- Store passwords, share tokens, extraction codes, and privacy passwords as hashes only.
-- Do not expose server absolute paths to Web, Android, or public share visitors.
-
-## Development Discipline
-- Do not implement future-phase features early.
-- Update docs when requirements, APIs, database tables, security rules, or deployment behavior change.
-- Keep business logic in backend services, not controllers or mappers.
-- Keep Web and Android clients behind documented REST APIs.
-- Store file contents on disk or mounted NAS paths; store only metadata in MySQL.
-- Protect every file operation with Storage Root boundary checks.
-
-## Phase Order
-1. Docs and project boundary.
-2. Project skeleton.
-3. Auth, users, roles, and basic permissions.
-4. File center MVP.
-5. Privacy folders.
-6. Download center.
-7. Transfer center and notifications.
-8. Android Java MVP.
-9. NAS mounted directory access.
-10. Share URLs and public access controls.
-11. Deployment and security hardening.
+> 本文件不再复述规则——同一套约定写多份必然版本不一致。

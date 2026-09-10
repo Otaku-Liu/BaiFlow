@@ -14,17 +14,16 @@ android {
         versionName "0.1.0"
     }
 
-    // 服务器地址按构建类型固定（不再手动配置），从本地 local.properties 读取：
-    // BAIFLOW_RELEASE_SERVER_URL（release 打包连线上）/ BAIFLOW_DEBUG_SERVER_URL（debug 调试）。
-    // local.properties 被 git 忽略（真实地址不提交），模板见 ../local.properties.example；
-    // 未配置时回落下列占位默认值。换后端 = 改本地 local.properties 重新打包。
+    // 服务器地址改为 App 内运行时设置（「我的 → 服务器」），存在手机上，不随安装包分发。
+    // 这里只提供**调试包**的预填地址，从本地 local.properties 读 BAIFLOW_DEBUG_SERVER_URL
+    // （git 忽略，真实地址不提交；模板见 ../local.properties.example），省去每次装包手输；
+    // 留空则调试包首次打开同样走服务器设置页。
     def serverProps = new Properties()
     def localPropsFile = rootProject.file('local.properties')
     if (localPropsFile.exists()) {
         localPropsFile.withInputStream { serverProps.load(it) }
     }
-    def debugServerUrl = serverProps.getProperty('BAIFLOW_DEBUG_SERVER_URL', 'http://10.0.2.2:8080')
-    def releaseServerUrl = serverProps.getProperty('BAIFLOW_RELEASE_SERVER_URL', 'http://YOUR_SERVER_HOST:PORT')
+    def debugServerUrl = serverProps.getProperty('BAIFLOW_DEBUG_SERVER_URL', '')
 
     buildFeatures {
         buildConfig true
@@ -35,7 +34,8 @@ android {
             buildConfigField "String", "SERVER_URL", "\"${debugServerUrl}\""
         }
         release {
-            buildConfigField "String", "SERVER_URL", "\"${releaseServerUrl}\""
+            // 正式包不预填任何地址：必须由用户在 App 内的「服务器设置」里配置
+            buildConfigField "String", "SERVER_URL", '""'
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

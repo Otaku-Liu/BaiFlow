@@ -11,8 +11,7 @@
 
 - 表名/字段名：小写下划线
 - 主键：`id`（varchar 类型）
-- 时间：`created_at`、`updated_at`、`deleted_at`
-- 逻辑删除：`deleted`（0/1）
+- 时间：`created_at`、`updated_at`、`deleted_at`（逻辑删除时间，`NULL` 表示未删除）
 - 密码/提取码/token 只存 hash
 - 注释：**所有表与字段必须带 `COMMENT` 注释**，说明其含义，便于管理与理解
 
@@ -107,7 +106,14 @@ Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体�
 
 登录设备登记（按 `user_id + device_name` 唯一）：每次登录 upsert，**登出不删，保留登录历史**。在线状态由「是否存在未过期会话（bf_auth_session）」判定；`GET /api/auth/devices` 返回本表**全部历史 + 在线/离线状态**，强制下线（撤销该设备全部会话）后变为离线，`DELETE /api/auth/devices` 删除离线设备记录后不再展示。
 
-> 以上 5 张表统一由可重复迁移 `db/R__V1_init.sql` 创建（**项目约定：新表一律追加进 `R__V1_init.sql`，不单独建迁移脚本**；可重复迁移文件有改动即自动重新执行，全表 `IF NOT EXISTS` 幂等），**所有表与字段均带 COMMENT 注释**，便于管理与理解。
+### system_setting — 系统设置
+`id, setting_key, setting_value, created_at, updated_at`
+
+跨用户共享的键值对配置，`setting_key` 唯一。目前只承载 `initialized_at`（系统首次初始化完成时间）：**单向标记**，写入后不再清除，用于永久关闭首次初始化入口。
+
+「是否已初始化」只认这张表，**不看 `bf_user` 里有没有管理员**——否则删掉或改名管理员会让初始化入口重新开放，公网任何人都能抢注管理员。数据库不可用时判定保守返回「已初始化」（fail-closed），同样不开放入口。
+
+> 以上 6 张表统一由可重复迁移 `db/R__V1_init.sql` 创建（**项目约定：新表一律追加进 `R__V1_init.sql`，不单独建迁移脚本**；可重复迁移文件有改动即自动重新执行，全表 `IF NOT EXISTS` 幂等），**所有表与字段均带 COMMENT 注释**，便于管理与理解。
 
 ## 常用查询
 

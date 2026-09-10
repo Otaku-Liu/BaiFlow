@@ -1,11 +1,10 @@
-# BaiFlow Android — 本地服务器地址配置模板
+# BaiFlow Android — 本地开发配置模板
 #
-# 用法：复制本文件为 `local.properties` 并填你的服务器地址。
-# `local.properties` 已被 git 忽略（见 .gitignore），真实地址不会提交到仓库；
-# 未配置时 build.gradle 回落占位默认值（debug http://10.0.2.2:8080 / release http://YOUR_SERVER_HOST:PORT）。
-# 服务器地址在 App 内不再手动配置，换后端 = 改这里重新打包。
+# 用法：复制本文件为 `local.properties`（已被 git 忽略，真实地址不会提交到仓库）。
 #
-# release 打包连的服务器（线上）：
-BAIFLOW_RELEASE_SERVER_URL=http://YOUR_SERVER_HOST:PORT
-# debug 调试连的服务器（真机连开发机局域网 IP；Android 模拟器用 http://10.0.2.2:8080 指向宿主机）：
-BAIFLOW_DEBUG_SERVER_URL=http://192.168.X.X:PORT
+# 服务器地址现在由 App 内「我的 → 服务器 → 服务器设置」配置，存在手机本地，
+# 不编进安装包（换服务器不用重新打包）。这里只配**调试包**的预填地址：
+# 装了 debug 包打开就带好地址，省去每次手输；留空则调试包首次打开同样走服务器设置页。
+#
+# 正式（release）包不读取任何预填地址，装好后必须由用户自己填。
+BAIFLOW_DEBUG_SERVER_URL=http://192.168.X.X:8080

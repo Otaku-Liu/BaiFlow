@@ -1,0 +1,85 @@
+# BaiFlow — 提交校验（CI）
+#
+# 触发：push 到 main、任意 PR
+# 做什么：三端并行验证「能编译、逻辑正确」，不产出任何发布物
+#   - server  ：Maven 打包（仓库内暂无后端测试，只验编译）
+#   - web     ：npm ci + vite 构建（暂无 lint/测试脚本）
+#   - android ：单元测试 + 调试包编译，并把 debug APK 作为产物上传
+#
+# 本工作流不需要任何 Secret。公开仓库的 GitHub 托管 runner 不计费。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同一分支有新提交时，取消上一轮还在跑的校验
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: 后端编译
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Maven 打包
+        working-directory: baiflow-server
+        run: mvn -B -DskipTests package
+
+  web:
+    name: 前端构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: baiflow-web/package-lock.json
+
+      - name: 安装依赖并构建
+        working-directory: baiflow-web
+        run: |
+          npm ci
+          npm run build
+
+  android:
+    name: Android 单测与编译
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # 接受 SDK 许可并补齐 compileSdk 34 对应的平台/构建工具
+      - uses: android-actions/setup-android@v3
+
+      - name: 安装 Android SDK 组件
+        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+
+      # 仓库内 3 个纯 JVM 单测在 app/src/test（Markdown 往返 / 块富文本 / 笔记块）
+      - name: 单元测试 + 调试包编译
+        working-directory: baiflow-android
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+
+      - name: 上传 debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: baiflow-debug-apk
+          path: baiflow-android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

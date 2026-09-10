@@ -33,7 +33,9 @@
 | 40105 | 需要隐私空间/隐私文件夹密码 |
 | 40106 | 隐私空间/隐私文件夹密码错误 |
 | 40107 | 隐私空间尚未设置密码，需先设置 |
+| 40108 | 首次初始化令牌不正确 |
 | 40301 | 无权限 |
+| 40302 | 系统已完成初始化，初始化入口已关闭 |
 | 40401 | 资源不存在 |
 | 40402 | 分享链接无效 |
 | 40901 | 笔记已被其他设备修改（乐观并发冲突） |
@@ -42,6 +44,7 @@
 | 42301 | 账号已被锁定 |
 | 42302 | 账号已被禁用 |
 | 42901 | 分享访问或下载次数已达上限 |
+| 42902 | 初始化令牌错误次数过多 |
 | 50000 | 服务端内部错误 |
 | 50001 | 文件操作失败 |
 | 50002 | 存储根目录不可用 |
@@ -50,6 +53,10 @@
 
 ### 系统
 - `GET /api/health`
+- `GET /api/setup/status` — 公开。返回 `{ initialized }`，供 Web 路由守卫判断是否强制跳首次初始化向导
+- `POST /api/setup/init` — 公开。首次初始化：`{ setupToken, username, password, displayName? }` → 创建第一个 ADMIN、写入初始化标记、作废令牌，并**直接返回登录会话**（同 `/auth/login` 的 `{ token, sessionId, expiresAt, user }`，前端无需再输一次密码）
+  - 令牌来源：服务器启动日志中打印的一次性 `setup token`（也落盘到 `baiflow.setup.token-path`，仅属主可读）
+  - 失败：令牌错误 `40108`（15 分钟内错 10 次锁 `42902`）；已初始化 `40302`（**恒返回，入口永久关闭**）；用户名已存在 `40902`
 
 ### 认证
 - `POST /api/auth/login` — 登录建会话，返回 `{ token, sessionId, expiresAt, user }`；设备类型/名称走 `X-Device-Type` / `X-Device-Name` 请求头（ANDROID 长期 / WEB 短期）
@@ -83,7 +90,7 @@
 ### 存储根目录
 - `GET /api/storage-roots/active`（返回所有 ACTIVE 状态的存储根目录，供文件中心选择器使用）
 - `GET/POST /api/storage-roots` · `PATCH /api/storage-roots/{id}`（管理员）
-- `POST /api/storage-roots/{id}/check`（管理员检测 NAS 连通性）
+- `POST /api/storage-roots/{id}/check`（管理员检测 NAS 连通性；**NAS 健康检查定时任务默认关闭**，需要刷新状态时用这个端点手工触发，见 `docs/01-architecture.md`「文件安全」）
 
 ### 文件
 - `GET /api/files?storageRootId=&parentId=&page=&size=&viewUserId=&sort=&dir=`（文件列表每项含 `downloadCount`、`lastOpenedAt`、`childCount`——目录的直接活跃子项数（文件+子文件夹），**隐私目录为 null 不返回**；`sort`：`name`/`createdAt`/`size`（默认 `name`），`dir`：`asc`/`desc`（缺省按惯例：名称升序 / 创建时间降序 / 大小降序），**任何排序都目录优先**；非法 `sort` 回落 `name`）
@@ -162,3 +169,4 @@ SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GE
 - 下载通道仅两条：登录用户（owner/admin，文件归属 + 隐私校验）与有效分享链接（token/过期/次数/提取码）；**不存在匿名直下端点**
 - 所有下载写入 `bf_download_record`，可追溯并按文件聚合下载次数（ADMIN 审计）
 - 公开分享接口记录访问日志
+- **首次初始化入口**（`/api/setup/*`）虽公开，但建管理员必须携带启动时生成的一次性令牌（32 字节随机、常量时间比对、失败限流），且初始化完成即永久关闭入口——状态由 `bf_system_setting.initialized_at` 单向标记控制，删号/改名不会重新开放

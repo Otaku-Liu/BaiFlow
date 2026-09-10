@@ -14,9 +14,7 @@ baiflow:
   auth-session:
     web-hours: 2
     android-days: 180
-  init-admin:
-    username: admin
-    password: change-me
   storage:
-    default-root-path: /home/lxb/baiflow-data/files
-    avatar-path: /home/lxb/baiflow-data/avatars
+    # 改成你本机的实际路径（真实路径不要提交）
+    default-root-path: /path/to/baiflow-data/files
+    avatar-path: /path/to/baiflow-data/avatars

@@ -1,97 +1,64 @@
 # BaiFlow
 
-BaiFlow（小白流转）是一个个人服务器上的下载与文件协同中心，包含 Spring Boot 后端、Vue 3 Web 管理台和 Android 客户端。
+BaiFlow（小白流转）——个人服务器上的下载与文件协同中心。小步推进，每个阶段都要可运行、可验收、可回滚。
 
-## 技术栈
+## 技术栈与结构
 
-| 层面 | 技术 |
-|---|---|
-| 后端 | JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8 |
-| Web | Vue 3, Vite, Vue Router, Pinia, Axios |
-| Android | Java, Retrofit, OkHttp, WorkManager, Foreground Service |
-| 部署 | Ubuntu 24, Docker Compose, Nginx |
-
-## 项目结构
-
-```
-baiflow-server/     Spring Boot API 服务端
-baiflow-web/        Vue 3 Web 管理台
-baiflow-android/    Android 客户端
-deploy/             Docker Compose 部署配置
-docs/               项目文档（需求、架构、API、数据库等）
-```
+| 层面 | 技术 | 目录 |
+|---|---|---|
+| 后端 | JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8 | `baiflow-server/` |
+| Web | Vue 3, Vite, Vue Router, Pinia, Axios | `baiflow-web/` |
+| Android | Java, Retrofit, OkHttp, WorkManager, Foreground Service | `baiflow-android/` |
+| 部署 | Ubuntu 24, Docker Compose, Nginx, GitHub Actions | `deploy/`、`.github/` |
+| 文档 | — | `docs/`（索引见 `docs/README.md`） |
 
 ## 开发规则
 
-### 架构约束
-- Controller 只做 HTTP 映射和请求/响应转换，Service 持有业务逻辑，Mapper 只做 SQL
-- DTO、VO、Entity、Request 类分离，不混用
-- 统一 API 返回格式：`{ code, message, data, traceId }`
-- API 前缀统一用 `/api`
+### 架构
+- Controller 只做 HTTP 映射与请求/响应转换，Service 持有业务逻辑，Mapper 只做 SQL
+- DTO、VO、Entity、Request 分离，不混用
+- 统一返回 `{ code, message, data, traceId }`，API 前缀 `/api`
 - 文件本体落磁盘，数据库只存元数据
-- 不向 Web/Android 暴露服务器绝对路径，文件 ID 到服务端路径的解析只在后端发生
+- 不向 Web/Android 暴露服务器绝对路径；文件 ID → 服务端路径的解析只在后端发生
 
-### 安全规则
-- 受保护 API 必须携带 `Authorization: Bearer <token>`
-- 强制 ADMIN、USER、GUEST 角色行为
-- 用户密码、分享 token、提取码、隐私文件夹密码只存储 hash
-- 文件操作必须限制在配置的 Storage Root 内，路径需归一化校验
-- MySQL 不暴露在公网路由上
-- **每次代码调整**（尤其涉及配置/路径/凭据）做一次**隐私与机密核查**：真实路径（`/home/lxb/...`）、真实域名、硬编码密码/secret/token/API Key
-- 若改动涉及隐私（真实用户名路径/域名/凭据），**先向用户确认「保留还是屏蔽 git」**，不擅自提交
-- 已知待办：`/home/lxb/...` 真实路径散落在 `application.yml` / `application-dev.example.yml` / `deploy/nginx.conf`，后续**部署脚本化时统一改为占位符 + 环境变量注入**
+### 安全
+- 受保护 API 必须携带 `Authorization: Bearer <token>`，强制 ADMIN / USER / GUEST 角色行为
+- 密码、分享 token、提取码、隐私文件夹密码只存 hash
+- 文件操作限制在 Storage Root 内，路径需归一化校验；MySQL 不暴露公网
+- 工作流里的敏感值一律走 GitHub Secrets，yml 内不出现真实地址/密钥/路径（详见 `deploy/SKILL.md`）
+- **每次代码调整做隐私与机密核查**：真实路径、真实域名、硬编码密码/secret/token/API Key。涉及隐私先向用户确认「保留还是屏蔽 git」，不擅自提交
 
 ### 变更纪律
-- 修改代码时注意不要破坏已有功能
-- 修改需求、API、数据库、安全规则或部署行为后同步更新 `docs/` 对应文档
+- 不破坏已有功能；不提前实现后续阶段的功能
+- 改需求 / API / 数据库 / 安全规则 / 部署行为后，同步更新 `docs/` 对应主文档
 
 ### 数据库迁移
-- schema 统一维护在**单个可重复迁移** `baiflow-server/src/main/resources/db/R__V1_init.sql`（全部表结构 + 初始数据）：
-  - **可重复迁移**：每次启动比对校验和，文件有改动即自动重新执行（全表 `IF NOT EXISTS`、管理员 `INSERT WHERE NOT EXISTS`，幂等）
-  - **新表 DDL 一律追加本文件末尾，不新建迁移脚本**；版本号以文件名 `R__V{n}_` 标识（排序与管理用）
-- 脚本内只保留表/字段的 COMMENT 描述；长期约定与表结构说明写在 `docs/02-database.md` 等 md 文档
+- schema 只在**单个可重复迁移** `baiflow-server/src/main/resources/db/R__V1_init.sql`（全部表结构）：文件有改动即自动重跑，全表 `IF NOT EXISTS`，幂等
+- **新表 DDL 一律追加该文件末尾，不新建迁移脚本**；版本号以文件名 `R__V{n}_` 标识
+- 脚本内只留表/字段 COMMENT；长期约定与表结构说明写 `docs/02-database.md`
 
 ## 功能决策
 
-- 支持三种角色：`ADMIN`、`USER`、`GUEST`
-- 访客通过分享 URL 访问，不参与管理台登录
+- 三种角色 `ADMIN` / `USER` / `GUEST`；访客经分享 URL 访问，不参与管理台登录
 - 分享链接支持过期时间、访问次数、下载次数、提取码
-- 隐私文件夹需要额外密码验证，密码只存 hash
+- 隐私文件夹需额外密码验证，密码只存 hash
 - 权限模型提前设计，功能分阶段落地
-
-## 模块技能
-
-每个模块目录下都有 `SKILL.md`，处理对应模块前先读取：
-- `baiflow-server/SKILL.md` — 后端架构、安全、持久化、注释规范
-- `baiflow-web/SKILL.md` — 前端 UI 原则、API 调用、状态管理
-- `baiflow-android/SKILL.md` — Android 客户端网络、UI、传输规则
-- `deploy/SKILL.md` — 部署目标、服务编排、安全配置
-
-## 参考文档
-
-- `docs/01-architecture.md` — 技术架构、需求范围、部署与安全
-- `docs/02-database.md` — 数据库表结构与索引
-- `docs/03-api.md` — API 约定与接口清单
-- `docs/04-frontend.md` — Web 前端设计与 Apple 风格 Design Token
-- `docs/05-android.md` — Android 客户端设计（含随手记离线三态）
-- `docs/06-coding-standards.md` — 编码规范（后端/前端/Android）
-- `docs/07-ios-design-system.md` — Android iOS 风格设计系统（集中式 styles）
-- `docs/08-brand-assets.md` — 品牌资产：App 图标与 Web Logo
-- `docs/glossary.md` — 术语表
-
-单个功能/修复不单开文档：功能现状写进上面对应的主文档（Web 行为 → `04`、Android 行为 → `05`、表结构 → `02`、接口 → `03`），根因分析与排障过程不入库。
+- **首次部署不预置管理员**：先在 Web 端 `/setup` 用启动日志里的一次性令牌创建第一个管理员；入口由 `bf_system_setting.initialized_at` 单向标记永久关闭（删号/改名不会重开）
+- **Android 服务器地址是运行时设置**（存本机），正式包不预填；仅调试包可用 `local.properties` 的 `BAIFLOW_DEBUG_SERVER_URL` 预填
 
 ## 测试与验收
 
-- 后端：单元测试 + 接口测试
-- Web：手动验收，关键组件补测试
-- Android：真机或模拟器手动验收
-- 部署：每次改动后至少本地 Docker Compose 启动验证
+- 后端单元/接口测试；Web、Android 手动验收；部署每次改动后至少本地 Docker Compose 启动验证
+- 关键安全检查项：未登录访问文件接口 401 · 越权文件 403 · 分享过期/超次不可访问 · 提取码错误不可访问 · 隐私文件夹密码错误不可访问 · 文件操作不越出 Storage Root
+- 初始化入口：无令牌或令牌错误不能创建管理员；初始化完成后恒返回 40302（删号/改名也不会重开）
+- Android 换服务器后，旧服务器的 token 不会再被发往新服务器
 
-### 关键安全检查项
-- 未登录访问文件接口返回 401
-- 普通用户访问未授权文件返回 403
-- 分享链接过期/超次后不可访问
-- 提取码错误不能访问分享内容
-- 隐私文件夹密码错误不能访问
-- 文件操作不会越出 Storage Root
+## 模块技能
+
+改哪个模块，先读它的 `SKILL.md`：`baiflow-server/`（后端）· `baiflow-web/`（前端）· `baiflow-android/`（Android）· `deploy/`（部署）。
+
+## 文档
+
+主文档：`01-architecture`（架构/范围/部署/安全）· `02-database`（表结构）· `03-api`（接口与错误码）· `04-frontend`（Web）· `05-android`（Android）· `06-coding-standards`（编码规范）· `07-ios-design-system`（Android 设计系统）· `08-brand-assets`（品牌资产）· `glossary`（术语表）。索引见 `docs/README.md`。
+
+单个功能/修复不单开文档：功能现状进对应主文档（Web 行为 → `04`、Android 行为 → `05`、表结构 → `02`、接口 → `03`），根因分析与排障过程不入库。

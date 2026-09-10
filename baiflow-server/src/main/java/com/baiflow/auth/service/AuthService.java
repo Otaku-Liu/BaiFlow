@@ -4,6 +4,7 @@ import com.baiflow.auth.dto.request.LoginRequest;
 import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
 import com.baiflow.auth.dto.response.UserDeviceInfo;
+import com.baiflow.user.entity.BfUser;
 
 import java.util.List;
 
@@ -25,6 +26,16 @@ public interface AuthService {
      * @throws com.baiflow.common.exception.BusinessException ACCOUNT_LOCKED    账号已被锁定
      */
     LoginResponse login(LoginRequest request);
+
+    /**
+     * 为已通过其他方式完成身份校验的用户签发登录会话（不校验密码）。
+     * <p>供首次初始化向导创建管理员后直接登录使用；设备登记、最后登录时间更新与
+     * {@link #login} 完全一致。
+     *
+     * @param user 已完成身份校验的用户
+     * @return 会话 token、会话信息与用户信息
+     */
+    LoginResponse issueSession(BfUser user);
 
     /**
      * 修改当前用户的密码，并吊销其**全部**登录会话（所有设备强制下线，重新登录）。

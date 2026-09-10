@@ -61,6 +61,8 @@ public class SecurityConfig {
                         // 无需登录
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
+                        // 首次部署初始化向导（未初始化时开放；完成初始化后由服务层恒返回 403）
+                        .requestMatchers("/api/setup/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         // 头像为公开静态资源（页面 <img> 直接引用，生产由 nginx alias 服务）
                         .requestMatchers("/avatars/**").permitAll()

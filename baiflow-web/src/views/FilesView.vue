@@ -170,7 +170,7 @@
       </template>
     </el-dialog>
 
-    <!-- 通用确认弹窗（替换 ElMessageBox） -->
+    <!-- 通用确认弹窗 -->
     <ConfirmDialog v-bind="bindings" @confirm="onConfirm" @cancel="onCancel" />
 
     <!-- 隐私空间首次设置密码弹窗 -->

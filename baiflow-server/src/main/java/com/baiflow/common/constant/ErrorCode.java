@@ -51,8 +51,14 @@ public final class ErrorCode {
     /** 隐私空间尚未设置密码，需先设置 */
     public static final int PRIVATE_SETUP_REQUIRED = 40107;
 
+    /** 首次初始化令牌不正确 */
+    public static final int SETUP_TOKEN_INVALID = 40108;
+
     /** 无权限 */
     public static final int FORBIDDEN = 40301;
+
+    /** 系统已完成初始化，初始化入口已关闭 */
+    public static final int SETUP_ALREADY_INITIALIZED = 40302;
 
     /** 资源不存在 */
     public static final int NOT_FOUND = 40401;
@@ -77,6 +83,9 @@ public final class ErrorCode {
 
     /** 分享访问或下载次数已达上限 */
     public static final int SHARE_LIMIT_EXCEEDED = 42901;
+
+    /** 初始化令牌尝试次数过多 */
+    public static final int SETUP_RATE_LIMITED = 42902;
 
     /** 服务端内部错误 */
     public static final int INTERNAL_ERROR = 50000;

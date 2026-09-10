@@ -49,9 +49,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, h } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ElMessageBox } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
 import { listNotes, createNote, getNote, updateNote, deleteNote } from '../api/notes'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
@@ -184,19 +183,21 @@ async function handleConflict() {
 
   let overwrite = false
   try {
-    // 消息含多行差异预览：用 VNode + pre-line 渲染，避免 dangerouslyUseHTMLString 引入 XSS
-    await ElMessageBox.confirm(h('div', { style: 'white-space: pre-line' }, message), t('notes.conflictTitle'), {
-      confirmButtonText: t('notes.conflictOverwrite'),
-      cancelButtonText: t('notes.conflictReload'),
-      distinguishCancelAndClose: true,
-      type: 'warning'
+    // 消息含多行差异预览（ConfirmDialog 的 message 以 pre-line 渲染，保留换行）
+    // distinguishClose：点「重新加载」才重新加载；点 X 关闭只关闭，不丢弃本地未保存的改动
+    await confirm({
+      title: t('notes.conflictTitle'),
+      message,
+      confirmText: t('notes.conflictOverwrite'),
+      cancelText: t('notes.conflictReload'),
+      type: 'warning',
+      distinguishClose: true
     })
     overwrite = true
   } catch (action) {
     overwrite = false
     if (action === 'cancel') {
       await reloadOpenNote()
-      return
     }
     return
   }

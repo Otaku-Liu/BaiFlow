@@ -33,6 +33,8 @@
 
         <activity android:name=".ui.activity.LoginActivity"
             android:exported="false" />
+        <activity android:name=".ui.activity.ServerActivity"
+            android:exported="false" />
         <activity android:name=".ui.activity.ProfileActivity"
             android:exported="false" />
         <activity android:name=".ui.activity.PasswordActivity"

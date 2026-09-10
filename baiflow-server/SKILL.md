@@ -8,14 +8,9 @@ description: BaiFlow Spring Boot 后端：API、认证、MyBatis Plus、MySQL、
 ## 约束
 
 - Controller → HTTP 映射 · Service → 业务逻辑 · Mapper → SQL
-- DTO/VO/Entity/Request 分离，返回 `{ code, message, data, traceId }`
-- 密码/token/hash 不存明文，文件 ID 仅在服务端解析路径
-- `@Autowired` 字段注入，`@Slf4j` 日志，UTF-8 编码，中文注释
-- **命名**：绑定 `bf_*` 表的类加 `Bf` 前缀（按表名：Entity/Mapper/Service/Controller）；无单一主表的业务类与 DTO/VO/enum 不带（见 `docs/adr/ADR-002-bf-prefix-naming.md`）
-- 详见 `docs/06-coding-standards.md`
+- DTO / VO / Entity / Request 分离；统一返回 `{ code, message, data, traceId }`
+- 密码 / token 只存 hash；文件 ID 到服务端路径的解析只在后端发生
+- `@Autowired` 字段注入、`@Slf4j` 日志、UTF-8 编码、中文注释
+- 绑定 `bf_*` 表的类加 `Bf` 前缀并**按表名命名**（Entity / Mapper / Service(+Impl) / Controller）；无单一主表的业务类与 DTO / VO / enum 不带 `Bf`
 
-## 参考
-
-- `docs/01-architecture.md` — 架构、需求、安全基线
-- `docs/02-database.md` — 表结构
-- `docs/03-api.md` — 接口设计
+编码细则（注释、Lombok、MyBatis Plus、日志、API 设计）见 `docs/06-coding-standards.md`；架构 / 表结构 / 接口见 `docs/01`、`docs/02`、`docs/03`。

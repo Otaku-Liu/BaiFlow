@@ -1,6 +1,6 @@
 -- ============================================================
 -- R__V1 统一 schema（可重复迁移，唯一脚本）：全部表结构（含完整字段和表注释）+ 初始数据
--- 所有表 IF NOT EXISTS、管理员 INSERT WHERE NOT EXISTS，幂等；文件有改动即自动重新执行
+-- 所有表 IF NOT EXISTS，幂等；文件有改动即自动重新执行（不预置任何业务数据）
 -- 新表 DDL 一律追加于本文件末尾
 -- ============================================================
 
@@ -23,12 +23,9 @@ CREATE TABLE IF NOT EXISTS `bf_user` (
     KEY `idx_user_role_status` (`role`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统用户表';
 
--- 默认管理员账号（用户名 admin，密码 admin）
-INSERT INTO `bf_user` (`id`, `username`, `password_hash`, `display_name`, `role`, `status`, `avatar_url`, `created_at`, `updated_at`)
-SELECT REPLACE(UUID(), '-', ''), 'admin',
-       '$2a$10$J56W4KahX.odv.j2jNdzie00DVgxql0Lo4Fc3P6LUTz9iwIdEexQW',
-       'Administrator', 'ADMIN', 'NORMAL', '', NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM `bf_user` WHERE `username` = 'admin');
+-- 不再预置管理员账号：第一个管理员由首次部署向导创建（POST /api/setup/init，
+-- 需携带启动日志中的一次性初始化令牌）。管理员存在与否不再影响初始化入口的开合，
+-- 入口由 bf_system_setting.initialized_at 单向标记控制。
 
 -- -----------------------------------------------------------
 -- 存储根目录表
@@ -333,3 +330,18 @@ CREATE TABLE IF NOT EXISTS `bf_upload_record` (
     KEY `idx_ur_file` (`file_id`, `created_at`),
     KEY `idx_ur_user` (`uploader_user_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件上传记录表';
+
+-- ----------------------------------------------------------
+-- 系统设置表（键值对，跨用户共享的单例配置）
+-- 承载 initialized_at：系统首次初始化完成时间。该标记单向，写入后不再清除，
+-- 用于永久关闭首次初始化入口（不看管理员用户是否存在，避免删号后入口重开）。
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `bf_system_setting` (
+    `id`            VARCHAR(32)  NOT NULL COMMENT '主键，UUID',
+    `setting_key`   VARCHAR(64)  NOT NULL COMMENT '设置键，全局唯一',
+    `setting_value` VARCHAR(512) NOT NULL DEFAULT '' COMMENT '设置值',
+    `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_setting_key` (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统设置表（键值对）';
