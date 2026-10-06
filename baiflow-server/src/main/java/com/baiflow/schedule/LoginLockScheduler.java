@@ -1,16 +1,16 @@
 package com.baiflow.schedule;
 
-import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.auth.constant.LoginLockRedisKeys;
+import com.baiflow.auth.service.LoginLockService;
+import com.baiflow.auth.service.RedisLockKeyReader;
+import com.baiflow.auth.service.RedisLockKeyReader.LockKeyState;
 import com.baiflow.user.entity.BfUser;
 import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.BfUserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +22,7 @@ import java.util.List;
  * 登录失败达到阈值时（见 {@code AuthServiceImpl.recordFailure}），用户状态被持久化为 LOCKED，
  * 同时写入 Redis 锁键 {@code login:lock:<username>}（TTL = 锁定时长）。本任务每 60 秒扫描一次，
  * 对「状态=LOCKED 且 Redis 锁键已消失（到期）」的用户恢复为 NORMAL，
- * 使锁键与用户状态保持同生命周期。Redis 不可用时保守跳过（fail-closed），避免误解锁。
+ * 使锁键与用户状态保持同生命周期。锁键状态未知（Redis 不可用）时保守跳过，避免误解锁。
  */
 @Slf4j
 @Component
@@ -31,9 +31,9 @@ public class LoginLockScheduler {
     @Autowired
     private BfUserMapper userMapper;
     @Autowired
-    private StringRedisTemplate redisTemplate;
+    private RedisLockKeyReader redisLockKeyReader;
     @Autowired
-    private BfAuditLogService auditService;
+    private LoginLockService loginLockService;
 
     @Scheduled(fixedRate = 60_000)
     public void restoreExpiredLocks() {
@@ -46,24 +46,15 @@ public class LoginLockScheduler {
         int restored = 0;
         for (BfUser user : lockedUsers) {
             try {
-                // 锁键不存在即代表锁定已到期；条件更新（WHERE status=LOCKED）保证多实例并发扫描时仅首个生效
-                if (!redisTemplate.hasKey(LoginLockRedisKeys.LOCK + user.getUsername())) {
-                    int updated = userMapper.update(null, new LambdaUpdateWrapper<BfUser>()
-                            .eq(BfUser::getId, user.getId())
-                            .eq(BfUser::getStatus, UserStatus.LOCKED)
-                            .set(BfUser::getStatus, UserStatus.NORMAL));
-                    if (updated <= 0) {
-                        continue;
-                    }
-                    auditService.log(user.getId(), "ACCOUNT_UNLOCKED", "USER", user.getId(),
-                            null, null, "登录锁定到期，账号自动恢复为正常");
-                    log.info("登录锁定到期，账号恢复为 NORMAL: userId={}, username={}",
-                            user.getId(), user.getUsername());
+                // 仅确证锁键已消失（锁定到期）才恢复；状态未知时跳过，等待下一轮再判定。
+                // 条件更新（WHERE status=LOCKED）在 LoginLockService.restore 内，保证多实例并发扫描时仅首个生效
+                if (redisLockKeyReader.stateOf(LoginLockRedisKeys.LOCK, user.getUsername()) == LockKeyState.ABSENT
+                        && loginLockService.restore(user, null, null)) {
                     restored++;
                 }
             } catch (DataAccessException e) {
-                // Redis 不可用时跳过（fail-closed），等待下一轮再判定
-                log.warn("Redis 不可用，跳过登录锁定到期恢复: userId={}, error={}",
+                // 跳过该用户，等待下一轮再判定；Redis 异常已由 RedisLockKeyReader 归一为 UNKNOWN（不恢复）
+                log.warn("锁定到期恢复失败，跳过该用户: userId={}, error={}",
                         user.getId(), e.getMessage());
             }
         }

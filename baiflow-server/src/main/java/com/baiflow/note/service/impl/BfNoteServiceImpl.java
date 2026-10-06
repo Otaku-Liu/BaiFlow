@@ -1,5 +1,6 @@
 package com.baiflow.note.service.impl;
 
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.event.SseEventType;
@@ -178,7 +179,7 @@ public class BfNoteServiceImpl implements BfNoteService {
 
     /** 非管理员只能操作自己的笔记 */
     private void checkAccess(BfNote note, String userId, boolean isAdmin) {
-        if (!isAdmin && !userId.equals(note.getUserId())) {
+        if (!SecurityUtils.isOwnerOrAdmin(note.getUserId(), userId, isAdmin)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此笔记");
         }
     }

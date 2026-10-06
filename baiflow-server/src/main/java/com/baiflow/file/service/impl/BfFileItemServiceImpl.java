@@ -1,5 +1,6 @@
 package com.baiflow.file.service.impl;
 
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.common.util.I18nUtil;
@@ -788,7 +789,7 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
         if (folder == null || folder.getItemType() != ItemType.DIRECTORY) {
             return;
         }
-        if (!isAdmin && !userId.equals(folder.getOwnerUserId())) {
+        if (!SecurityUtils.isOwnerOrAdmin(folder.getOwnerUserId(), userId, isAdmin)) {
             return;
         }
         touchLastOpened(folderId);
@@ -821,7 +822,7 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
      * 非管理员只能操作自己拥有的文件。
      */
     private void checkOwnership(BfFileItem item, String userId, boolean isAdmin) {
-        if (!isAdmin && !userId.equals(item.getOwnerUserId())) {
+        if (!SecurityUtils.isOwnerOrAdmin(item.getOwnerUserId(), userId, isAdmin)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此文件");
         }
     }

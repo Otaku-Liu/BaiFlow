@@ -1,5 +1,6 @@
 package com.baiflow.downloadrecord.controller;
 
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.downloadrecord.dto.response.DownloadRecordInfo;
 import com.baiflow.downloadrecord.service.BfDownloadRecordService;
@@ -7,7 +8,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -34,17 +34,9 @@ public class BfDownloadRecordController {
             @RequestParam(defaultValue = "20") int size,
             Authentication auth) {
         String currentUserId = auth.getPrincipal().toString();
-        boolean isAdmin = isAdmin(auth);
+        boolean isAdmin = SecurityUtils.isAdmin(auth);
         return ApiResponse.success(downloadRecordService.pageHistory(
                 currentUserId, isAdmin, isAdmin ? userId : null,
                 start, end, fileName, source, page, size));
-    }
-
-    private boolean isAdmin(Authentication auth) {
-        if (auth == null || auth.getAuthorities() == null) return false;
-        for (GrantedAuthority ga : auth.getAuthorities()) {
-            if ("ROLE_ADMIN".equals(ga.getAuthority())) return true;
-        }
-        return false;
     }
 }

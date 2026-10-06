@@ -17,10 +17,10 @@ public class BfAuditLog {
     /** 操作者用户 ID（匿名操作为空） */
     private String actorUserId;
 
-    /** 操作类型：LOGIN_SUCCESS / LOGIN_FAILED / FILE_DELETE / SHARE_CREATE / SHARE_ACCESS / SHARE_REVOKE 等 */
+    /** 操作类型：取值集中在 {@link com.baiflow.audit.constant.AuditAction}（只列实际写入的取值，不预置未实现项） */
     private String action;
 
-    /** 操作目标类型：USER / FILE / SHARE_LINK 等 */
+    /** 操作目标类型：取值集中在 {@link com.baiflow.audit.constant.AuditTargetType} */
     private String targetType;
 
     /** 操作目标 ID */

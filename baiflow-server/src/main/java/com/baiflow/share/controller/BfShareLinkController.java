@@ -1,5 +1,6 @@
 package com.baiflow.share.controller;
 
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.share.dto.request.CreateShareRequest;
@@ -32,22 +33,22 @@ public class BfShareLinkController {
                                                    @RequestParam(defaultValue = "1") int page,
                                                    @RequestParam(defaultValue = "20") int size,
                                                    Authentication auth) {
-        return ApiResponse.success(shareService.listShares(auth.getPrincipal().toString(), isAdmin(auth), status, page, size));
+        return ApiResponse.success(shareService.listShares(auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth), status, page, size));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<ShareLinkInfo> get(@PathVariable String id, Authentication auth) {
-        return ApiResponse.success(shareService.getShare(id, auth.getPrincipal().toString(), isAdmin(auth)));
+        return ApiResponse.success(shareService.getShare(id, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth)));
     }
 
     @PatchMapping("/{id}")
     public ApiResponse<ShareLinkInfo> update(@PathVariable String id, @RequestBody UpdateShareRequest req, Authentication auth) {
-        return ApiResponse.success(shareService.updateShare(id, req, auth.getPrincipal().toString(), isAdmin(auth)));
+        return ApiResponse.success(shareService.updateShare(id, req, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth)));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Map<String,Object>> revoke(@PathVariable String id, Authentication auth) {
-        shareService.revokeShare(id, auth.getPrincipal().toString(), isAdmin(auth));
+        shareService.revokeShare(id, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth));
         return ApiResponse.success(Map.of("result","已撤销"));
     }
 
@@ -57,11 +58,9 @@ public class BfShareLinkController {
                                                          @RequestParam(defaultValue = "1") int page,
                                                          @RequestParam(defaultValue = "20") int size,
                                                          Authentication auth) {
-        if (!isAdmin(auth)) {
+        if (!SecurityUtils.isAdmin(auth)) {
             return ApiResponse.error(ErrorCode.FORBIDDEN, "仅管理员可查看");
         }
         return ApiResponse.success(shareService.getShareAnalytics(id, page, size));
     }
-
-    private boolean isAdmin(Authentication a) { return a.getAuthorities().stream().anyMatch(g->g.getAuthority().equals("ROLE_ADMIN")); }
 }

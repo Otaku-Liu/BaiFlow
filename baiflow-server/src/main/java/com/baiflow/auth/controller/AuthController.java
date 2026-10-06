@@ -5,13 +5,13 @@ import com.baiflow.auth.dto.response.AuthSessionInfo;
 import com.baiflow.auth.dto.response.LoginResponse;
 import com.baiflow.auth.dto.response.UserDeviceInfo;
 import com.baiflow.auth.security.AuthTokens;
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.common.entity.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -70,7 +70,7 @@ public class AuthController {
     public ApiResponse<Map<String, Object>> revokeSession(@PathVariable String id,
                                                           Authentication auth,
                                                           HttpServletRequest request) {
-        authService.revokeSession(auth.getPrincipal().toString(), isAdmin(auth), id,
+        authService.revokeSession(auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth), id,
                 AuthTokens.extract(request));
         return ApiResponse.success(Map.of("result", "已强制下线"));
     }
@@ -83,14 +83,6 @@ public class AuthController {
                                                          Authentication auth) {
         authService.deleteDevice(auth.getPrincipal().toString(), deviceName);
         return ApiResponse.success(Map.of("result", "已删除"));
-    }
-
-    private boolean isAdmin(Authentication auth) {
-        if (auth == null || auth.getAuthorities() == null) return false;
-        for (GrantedAuthority ga : auth.getAuthorities()) {
-            if ("ROLE_ADMIN".equals(ga.getAuthority())) return true;
-        }
-        return false;
     }
 
     /**

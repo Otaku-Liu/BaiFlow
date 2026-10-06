@@ -1,6 +1,7 @@
 package com.baiflow.note.service.impl;
 
 import com.baiflow.auth.config.BaiflowProperties;
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.common.util.I18nUtil;
@@ -15,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -89,13 +89,12 @@ public class BfNoteMediaServiceImpl implements BfNoteMediaService {
         media.setSizeBytes(file.getSize());
         mediaMapper.insert(media);
 
-        Path dir = Path.of(properties.getStorage().getNoteMediaPath());
-        Path target = dir.resolve(media.getId() + "." + extensionFor(mime)).normalize();
-        if (!target.startsWith(dir.toAbsolutePath().normalize())) {
+        Path target = resolveMediaPath(media);
+        if (target == null) {
             throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED, "非法的媒体存储路径");
         }
         try {
-            Files.createDirectories(dir);
+            Files.createDirectories(target.getParent());
             file.transferTo(target.toFile());
         } catch (IOException e) {
             log.error("笔记媒体保存失败: userId={}, mediaId={}", userId, media.getId(), e);
@@ -106,19 +105,28 @@ public class BfNoteMediaServiceImpl implements BfNoteMediaService {
         return NoteMediaInfo.from(media);
     }
 
+    /**
+     * 解析媒体文件落盘路径：媒体目录 + {@code mediaId.扩展名}，归一化后校验未越出媒体目录。
+     * @return 合法路径；越出媒体目录时返回 null —— 由调用方决定抛异常还是跳过
+     */
+    private Path resolveMediaPath(BfNoteMedia media) {
+        Path dir = Path.of(properties.getStorage().getNoteMediaPath());
+        Path target = dir.resolve(media.getId() + "." + extensionFor(media.getMimeType())).normalize();
+        return target.startsWith(dir.toAbsolutePath().normalize()) ? target : null;
+    }
+
     @Override
     public MediaResource load(String mediaId, String userId, boolean isAdmin) {
         BfNoteMedia media = mediaMapper.selectById(mediaId);
         if (media == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "媒体不存在");
         }
-        if (!isAdmin && !userId.equals(media.getUserId())) {
+        if (!SecurityUtils.isOwnerOrAdmin(media.getUserId(), userId, isAdmin)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问此媒体");
         }
 
-        Path dir = Path.of(properties.getStorage().getNoteMediaPath());
-        Path target = dir.resolve(media.getId() + "." + extensionFor(media.getMimeType())).normalize();
-        if (!target.startsWith(dir.toAbsolutePath().normalize()) || !Files.exists(target)) {
+        Path target = resolveMediaPath(media);
+        if (target == null || !Files.exists(target)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "媒体文件不存在");
         }
         return new MediaResource(media, target.toFile());
@@ -139,12 +147,11 @@ public class BfNoteMediaServiceImpl implements BfNoteMediaService {
             }
             BfNoteMedia media = mediaMapper.selectById(id);
             // 不存在/越权跳过：客户端对该 id 回退单个下载（单个接口会返回 404/403 明确错误）
-            if (media == null || (!isAdmin && !userId.equals(media.getUserId()))) {
+            if (media == null || !SecurityUtils.isOwnerOrAdmin(media.getUserId(), userId, isAdmin)) {
                 continue;
             }
-            Path dir = Path.of(properties.getStorage().getNoteMediaPath());
-            Path target = dir.resolve(media.getId() + "." + extensionFor(media.getMimeType())).normalize();
-            if (!target.startsWith(dir.toAbsolutePath().normalize()) || !Files.exists(target)) {
+            Path target = resolveMediaPath(media);
+            if (target == null || !Files.exists(target)) {
                 continue;
             }
             // 大文件不批量（base64 内存/响应膨胀），回退单个流式下载

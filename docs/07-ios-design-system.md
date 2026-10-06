@@ -12,14 +12,16 @@ Android 客户端统一为**类 iOS 简约风**。基础是 Java + XML Views（*
 
 | 组件 | 样式 | 说明 |
 |---|---|---|
-| 按钮 | `Ios.Button` + `Primary` / `Text` / `Danger` | 全宽或常规、12dp 圆角、`#007AFF` 主变体、`#FF3B30` 危险变体 |
+| 按钮 | `Ios.Button` + `Primary` / `Text` / `DangerOutline` | 12dp 圆角、高 48dp、16sp、不大写；`Primary` = `@color/accent` 实心白字；`Text` = 透明底、15sp 强调色；`DangerOutline` = 白底 `@color/danger` 红字（危险动作） |
 | 输入框 | `Ios.TextInput` | Outlined、12dp 圆角、聚焦蓝 |
 | 标题栏 | `Ios.Header` + `.Title`（居中）+ `.BackLabel`（上一级名） | 返回 = chevron + 上一级名，无按压反馈，无阴影 |
+| 分区标题 | `Ios.SectionTitle` | 13sp、`@color/text_secondary`，`marginStart` 16dp / 上 20dp / 下 6dp；「我的」页各分组标题 |
 | 编辑器工具栏 | `Ios.ToolbarButton` / `Ios.ToolbarRow` | 随手记块编辑器，激活态由代码改文字颜色 |
 | 卡片 / 列表项 | 直接复用 drawable，不单独设样式 | `bg_card` / `bg_list_item`：白底、12dp 圆角 |
 | 空状态 / 加载 | 无独立样式 | 图标 + 文案 |
 | 开关 | `Ios.Switch` | 待补充 |
 | 分段控件 | `Ios.Segmented` | 待补充（`ui/widget/SegmentedControl`） |
+| 弹窗操作项 | `Ios.DialogAction` | 全宽 48dp、16sp、`@color/text_primary`、`gravity=center_vertical`（水平靠左是 `TextView` 默认，样式未设）、`?android:attr/selectableItemBackground` 涟漪；自定义布局弹窗内的逐行操作（打开 / 重命名 / 下载 / 删除） |
 
 **弹窗**：统一走 `MaterialAlertDialogBuilder`，由 `themes.xml` 的 `materialAlertDialogTheme`（`ThemeOverlay.BaiFlow.Dialog` + `ShapeAppearance.BaiFlow.Dialog`，16dp 圆角）全局生效；不用 appcompat `AlertDialog.Builder`（不套 shape、显直角）。注意 `materialAlertDialogTheme` 与 `alertDialogTheme` 语义不同、**不可混用**，配错即显直角。
 

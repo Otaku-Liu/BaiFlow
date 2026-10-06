@@ -1,5 +1,6 @@
 package com.baiflow.note.controller;
 
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.note.dto.request.CreateNoteRequest;
 import com.baiflow.note.dto.request.SaveNoteProgressRequest;
@@ -11,7 +12,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -38,7 +38,7 @@ public class BfNoteController {
                                                  @RequestParam(required = false) String updatedAfter,
                                                  Authentication auth) {
         return ApiResponse.success(
-                noteService.listNotes(auth.getPrincipal().toString(), isAdmin(auth), viewUserId,
+                noteService.listNotes(auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth), viewUserId,
                         keyword, page, size, updatedAfter));
     }
 
@@ -54,7 +54,7 @@ public class BfNoteController {
     @GetMapping("/{id}")
     public ApiResponse<NoteDetail> detail(@PathVariable String id, Authentication auth) {
         return ApiResponse.success(
-                noteService.getNote(id, auth.getPrincipal().toString(), isAdmin(auth)));
+                noteService.getNote(id, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth)));
     }
 
     /** 更新笔记标题/正文 */
@@ -63,14 +63,14 @@ public class BfNoteController {
                                           @Valid @RequestBody UpdateNoteRequest req,
                                           Authentication auth) {
         return ApiResponse.success(
-                noteService.updateNote(id, auth.getPrincipal().toString(), isAdmin(auth),
+                noteService.updateNote(id, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth),
                         req.title(), req.content(), req.baseUpdatedAt()));
     }
 
     /** 软删除笔记 */
     @DeleteMapping("/{id}")
     public ApiResponse<Map<String, Object>> delete(@PathVariable String id, Authentication auth) {
-        noteService.deleteNote(id, auth.getPrincipal().toString(), isAdmin(auth));
+        noteService.deleteNote(id, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth));
         return ApiResponse.success(Map.of("result", "已删除"));
     }
 
@@ -88,13 +88,5 @@ public class BfNoteController {
                                                           Authentication auth) {
         noteService.saveNoteProgress(id, auth.getPrincipal().toString(), req.positionValue());
         return ApiResponse.success(Map.of("result", "已保存"));
-    }
-
-    private boolean isAdmin(Authentication auth) {
-        if (auth == null || auth.getAuthorities() == null) return false;
-        for (GrantedAuthority ga : auth.getAuthorities()) {
-            if ("ROLE_ADMIN".equals(ga.getAuthority())) return true;
-        }
-        return false;
     }
 }

@@ -1,5 +1,8 @@
 package com.baiflow.share.service.impl;
 
+import com.baiflow.auth.security.SecurityUtils;
+import com.baiflow.auth.service.RedisLockKeyReader;
+import com.baiflow.auth.service.RedisLockKeyReader.LockKeyState;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.downloadrecord.enums.DownloadSource;
@@ -75,6 +78,8 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
     private BfUserMapper userMapper;
     @Autowired
     private StringRedisTemplate redisTemplate;
+    @Autowired
+    private RedisLockKeyReader redisLockKeyReader;
 
     @Override @Transactional
     public ShareLinkInfo createShare(CreateShareRequest req, String userId) {
@@ -159,18 +164,28 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
         return r;
     }
 
-    @Override public ShareLinkInfo getShare(String id, String userId, boolean isAdmin) {
+    /**
+     * 取出分享链接并校验属主：非管理员只能操作自己创建的分享。
+     * @param action FORBIDDEN 文案里的动作词（查看 / 修改 / 撤销）
+     */
+    private BfShareLink getOwnedShare(String id, String userId, boolean isAdmin, String action) {
         BfShareLink sl = getById(id);
-        if (sl == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "分享链接不存在"); }
-        if (!isAdmin && !sl.getCreatedBy().equals(userId)) { throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看"); }
-        return ShareLinkInfo.from(sl);
+        if (sl == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "分享链接不存在");
+        }
+        if (!SecurityUtils.isOwnerOrAdmin(sl.getCreatedBy(), userId, isAdmin)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权" + action);
+        }
+        return sl;
+    }
+
+    @Override public ShareLinkInfo getShare(String id, String userId, boolean isAdmin) {
+        return ShareLinkInfo.from(getOwnedShare(id, userId, isAdmin, "查看"));
     }
 
     @Override @Transactional
     public ShareLinkInfo updateShare(String id, UpdateShareRequest req, String userId, boolean isAdmin) {
-        BfShareLink sl = getById(id);
-        if (sl == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "分享链接不存在"); }
-        if (!isAdmin && !sl.getCreatedBy().equals(userId)) { throw new BusinessException(ErrorCode.FORBIDDEN, "无权修改"); }
+        BfShareLink sl = getOwnedShare(id, userId, isAdmin, "修改");
         if (req.status() != null) { sl.setStatus(ShareStatus.valueOf(req.status())); }
         if (req.expiresAt() != null) { sl.setExpiresAt(LocalDateTime.parse(req.expiresAt())); }
         if (req.maxViews() != null) { sl.setMaxViews(Math.max(0, req.maxViews())); }
@@ -184,9 +199,7 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
 
     @Override @Transactional
     public void revokeShare(String id, String userId, boolean isAdmin) {
-        BfShareLink sl = getById(id);
-        if (sl == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "分享链接不存在"); }
-        if (!isAdmin && !sl.getCreatedBy().equals(userId)) { throw new BusinessException(ErrorCode.FORBIDDEN, "无权撤销"); }
+        BfShareLink sl = getOwnedShare(id, userId, isAdmin, "撤销");
         sl.setStatus(ShareStatus.REVOKED);
         updateById(sl);
     }
@@ -368,14 +381,9 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
         logMapper.insert(logEntry);
     }
 
-    /** 提取码是否已被锁定（Redis 不可用时 fail-open，不阻断验证） */
+    /** 提取码是否已被锁定（Redis 不可用时按未锁处理、不阻断验证，与登录锁前置检查同一策略） */
     private boolean isCodeLocked(String shareId) {
-        try {
-            return redisTemplate.hasKey(REDIS_CODE_LOCK_KEY + shareId);
-        } catch (DataAccessException e) {
-            log.warn("Redis 不可用，跳过提取码锁定检查: {}", e.getMessage());
-            return false;
-        }
+        return redisLockKeyReader.stateOf(REDIS_CODE_LOCK_KEY, shareId) == LockKeyState.PRESENT;
     }
 
     /** 记录提取码失败（滑动窗口，错误达阈值则锁定 CODE_LOCK_MINUTES，到期自动解锁） */

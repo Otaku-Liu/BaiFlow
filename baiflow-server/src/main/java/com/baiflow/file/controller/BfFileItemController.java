@@ -1,5 +1,6 @@
 package com.baiflow.file.controller;
 
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.downloadrecord.dto.response.DownloadRecordInfo;
 import com.baiflow.downloadrecord.enums.DownloadSource;
@@ -60,7 +61,7 @@ public class BfFileItemController {
                                                   Authentication auth) {
         return ApiResponse.success(
                 fileService.listFiles(storageRootId, parentId, page, size,
-                        auth.getPrincipal().toString(), isAdmin(auth), privacyAccessToken, viewUserId, sort, dir));
+                        auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth), privacyAccessToken, viewUserId, sort, dir));
     }
 
     /**
@@ -76,7 +77,7 @@ public class BfFileItemController {
                                              @RequestParam(required = false) String viewUserId,
                                              Authentication auth) {
         String userId = auth.getPrincipal().toString();
-        String effectiveUserId = isAdmin(auth) && viewUserId != null ? viewUserId : userId;
+        String effectiveUserId = SecurityUtils.isAdmin(auth) && viewUserId != null ? viewUserId : userId;
         return ApiResponse.success(
                 fileService.uploadFile(storageRootId, parentId, file,
                         userId, effectiveUserId, privacyAccessToken));
@@ -92,7 +93,7 @@ public class BfFileItemController {
                                           required = false) String privacyAccessToken,
                                   Authentication auth) {
         return ApiResponse.success(fileService.computeSize(id, auth.getPrincipal().toString(),
-                isAdmin(auth), privacyAccessToken));
+                SecurityUtils.isAdmin(auth), privacyAccessToken));
     }
 
     /**
@@ -105,7 +106,7 @@ public class BfFileItemController {
                                                       required = false) String privacyAccessToken,
                                               Authentication auth, HttpServletRequest request) {
         Resource r = fileService.downloadFile(fileId, auth.getPrincipal().toString(),
-                isAdmin(auth), privacyAccessToken);
+                SecurityUtils.isAdmin(auth), privacyAccessToken);
         String fn = r.getFilename() != null ? r.getFilename() : "download";
         // 记录一次登录用户直接下载（异步写入），供文件中心下载次数统计与审计
         downloadRecordService.recordDownload(fileId, fn, auth.getPrincipal().toString(),
@@ -127,7 +128,7 @@ public class BfFileItemController {
                                                                  @RequestParam(defaultValue = "20") int size,
                                                                  Authentication auth) {
         return ApiResponse.success(fileService.listFileDownloads(id, auth.getPrincipal().toString(),
-                isAdmin(auth), page, size));
+                SecurityUtils.isAdmin(auth), page, size));
     }
 
     /**
@@ -141,7 +142,7 @@ public class BfFileItemController {
                                                    @RequestParam(required = false) String viewUserId,
                                                    Authentication auth) {
         String userId = auth.getPrincipal().toString();
-        String effectiveUserId = isAdmin(auth) && viewUserId != null ? viewUserId : userId;
+        String effectiveUserId = SecurityUtils.isAdmin(auth) && viewUserId != null ? viewUserId : userId;
         return ApiResponse.success(
                 fileService.createFolder(req, userId, effectiveUserId, privacyAccessToken));
     }
@@ -157,7 +158,7 @@ public class BfFileItemController {
                                                      required = false) String privacyAccessToken,
                                              Authentication auth) {
         return ApiResponse.success(
-                fileService.rename(id, req, auth.getPrincipal().toString(), isAdmin(auth), privacyAccessToken));
+                fileService.rename(id, req, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth), privacyAccessToken));
     }
 
     /**
@@ -171,7 +172,7 @@ public class BfFileItemController {
                                                    required = false) String privacyAccessToken,
                                            Authentication auth) {
         return ApiResponse.success(
-                fileService.move(id, req, auth.getPrincipal().toString(), isAdmin(auth), privacyAccessToken));
+                fileService.move(id, req, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth), privacyAccessToken));
     }
 
     /**
@@ -183,7 +184,7 @@ public class BfFileItemController {
                                                     @RequestHeader(value = "X-Privacy-Access-Token",
                                                             required = false) String privacyAccessToken,
                                                     Authentication auth) {
-        fileService.delete(id, auth.getPrincipal().toString(), isAdmin(auth), privacyAccessToken);
+        fileService.delete(id, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth), privacyAccessToken);
         return ApiResponse.success(Map.of("result", "已删除"));
     }
 
@@ -233,7 +234,7 @@ public class BfFileItemController {
                                                     required = false) String privacyAccessToken,
                                             Authentication auth) {
         Resource r = fileService.previewFile(id, auth.getPrincipal().toString(),
-                isAdmin(auth), privacyAccessToken);
+                SecurityUtils.isAdmin(auth), privacyAccessToken);
         String fn = r.getFilename() != null ? r.getFilename() : "preview";
         MediaType mediaType = resolveMediaType(fn);
         return ResponseEntity.ok()
@@ -298,9 +299,5 @@ public class BfFileItemController {
             return MediaType.TEXT_PLAIN;
         }
         return MediaType.APPLICATION_OCTET_STREAM;
-    }
-
-    private boolean isAdmin(Authentication a) {
-        return a.getAuthorities().stream().anyMatch(g -> g.getAuthority().equals("ROLE_ADMIN"));
     }
 }

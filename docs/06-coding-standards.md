@@ -11,6 +11,9 @@
 - 统一返回 `{ code, message, data, traceId }`
 - 异常通过全局异常处理器转换
 - 文件路径必须 `Path.normalize()` + Storage Root 校验
+- **认证与授权判定集中在 `com.baiflow.auth.security.SecurityUtils`**：管理员判定走 `isAdmin(Authentication)`、「属主或管理员」走 `isOwnerOrAdmin(ownerId, userId, isAdmin)`，不在控制层/服务层就地拼判定（就地版本曾同时存在两种写法：5 份带空值守卫、2 份不带（`BfFileItemController` / `BfShareLinkController`），**后者**会在认证主体为空时 NPE）。两个方法都只返回布尔，失败动作由调用点决定（抛 `40301` 或静默跳过）。注意视图范围条件（`!isAdmin || viewUserId != null`）与 MyBatis 的 `.eq(!isAdmin, …)` 是查询过滤，不属本规则
+- **不为 Redis 降级块抽跨键族的通用包装类**：`try { … } catch (DataAccessException e) { log.warn("Redis 不可用…") }` 本身只有数行，而各键族的键前缀、TTL 与降级策略各不相同，把这一层抽成通用包装属过度抽象，各自保留更划算（键前缀见 `docs/02-database.md`，锁语义见 `docs/03-api.md`）。**按键族的组件不算例外**：共享的是状态语义而非那几行 catch 时（如 `RedisLockKeyReader` 的三态、`LoginLockService` 的登录锁写侧），是把原先各写一份的策略分歧显式化，属鼓励方向
+- **审计日志的 `action` / `target_type` 取值集中在 `com.baiflow.audit.constant.AuditAction` / `AuditTargetType`**，调用处不写字符串字面量。字符串值是对外契约（DB 列值、登录日志接口 `status` 参数、Web 端 `LoginLogsView.vue` 与 XML 的 `action IN (...)` 均按字面量匹配），**只增不改**；仅登录/会话类取值会出现在管理员登录日志页，其余只入库
 
 ### 注释规范
 - Service 接口方法 → Javadoc（参数、返回值、业务含义），使用中文

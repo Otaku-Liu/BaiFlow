@@ -185,8 +185,8 @@ CREATE TABLE IF NOT EXISTS `bf_share_access_log` (
 CREATE TABLE IF NOT EXISTS `bf_audit_log` (
     `id`            VARCHAR(32)   NOT NULL COMMENT '主键，UUID',
     `actor_user_id` VARCHAR(32)   NOT NULL DEFAULT '' COMMENT '操作者用户 ID（匿名操作为空字符串）',
-    `action`        VARCHAR(64)   NOT NULL COMMENT '操作类型：LOGIN_SUCCESS / LOGIN_FAILED / FILE_DELETE / SHARE_CREATE / SHARE_ACCESS / SHARE_REVOKE 等',
-    `target_type`   VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '操作目标类型：USER / FILE / SHARE_LINK 等',
+    `action`        VARCHAR(64)   NOT NULL COMMENT '操作类型',
+    `target_type`   VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '操作目标类型',
     `target_id`     VARCHAR(128)  NOT NULL DEFAULT '' COMMENT '操作目标 ID',
     `ip_address`    VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '操作者 IP 地址',
     `user_agent`    VARCHAR(512)  NOT NULL DEFAULT '' COMMENT '操作者 User-Agent',

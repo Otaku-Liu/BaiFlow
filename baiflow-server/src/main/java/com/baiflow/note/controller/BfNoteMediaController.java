@@ -1,5 +1,6 @@
 package com.baiflow.note.controller;
 
+import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.note.dto.request.BatchMediaRequest;
 import com.baiflow.note.dto.response.NoteMediaInfo;
@@ -12,7 +13,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -45,7 +45,7 @@ public class BfNoteMediaController {
     @GetMapping("/{id}")
     public ResponseEntity<Resource> serve(@PathVariable String id, Authentication auth) {
         BfNoteMediaService.MediaResource res =
-                noteMediaService.load(id, auth.getPrincipal().toString(), isAdmin(auth));
+                noteMediaService.load(id, auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth));
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(res.media().getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -58,19 +58,11 @@ public class BfNoteMediaController {
     public ApiResponse<Map<String, String>> batch(@Valid @RequestBody BatchMediaRequest req,
                                                   Authentication auth) {
         return ApiResponse.success(
-                noteMediaService.batchBase64(auth.getPrincipal().toString(), isAdmin(auth), req.ids()));
+                noteMediaService.batchBase64(auth.getPrincipal().toString(), SecurityUtils.isAdmin(auth), req.ids()));
     }
 
     /** 文件名写入 Content-Disposition 前剔除引号/控制字符，避免破坏 quoted-string */
     private static String sanitizeFilename(String name) {
         return name == null ? "media" : name.replaceAll("[\\\"\\r\\n]", "_");
-    }
-
-    private boolean isAdmin(Authentication auth) {
-        if (auth == null || auth.getAuthorities() == null) return false;
-        for (GrantedAuthority ga : auth.getAuthorities()) {
-            if ("ROLE_ADMIN".equals(ga.getAuthority())) return true;
-        }
-        return false;
     }
 }

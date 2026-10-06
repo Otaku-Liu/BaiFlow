@@ -11,10 +11,14 @@ import com.baiflow.auth.mapper.BfAuthSessionMapper;
 import com.baiflow.auth.service.SessionTokenService;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.auth.service.BfUserDeviceService;
+import com.baiflow.auth.security.SecurityUtils;
+import com.baiflow.auth.service.LoginLockService;
+import com.baiflow.auth.service.RedisLockKeyReader;
+import com.baiflow.auth.service.RedisLockKeyReader.LockKeyState;
+import com.baiflow.audit.constant.AuditAction;
 import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
-import com.baiflow.common.util.I18nUtil;
 import com.baiflow.common.util.RequestUtil;
 import com.baiflow.user.dto.response.UserInfo;
 import com.baiflow.user.entity.BfUser;
@@ -40,7 +44,7 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * 集成登录失败限制（Redis 滑动窗口：15 分钟内连续失败 5 次锁定 15 分钟，多实例共享）：
  * 达到阈值时除写入 Redis 锁键外，还将用户状态持久化为 LOCKED；
- * 锁键到期后由 {@link LoginLockScheduler} 定时任务（及登录时的兜底判定）恢复为 NORMAL。
+ * 锁键到期后由 {@link com.baiflow.schedule.LoginLockScheduler} 定时任务（及登录时的兜底判定）恢复为 NORMAL。
  * 同时记录审计日志。
  */
 @Slf4j
@@ -67,18 +71,20 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private BfAuditLogService auditService;
     @Autowired
-    private I18nUtil i18nUtil;
-    @Autowired
     private StringRedisTemplate redisTemplate;
+    @Autowired
+    private RedisLockKeyReader redisLockKeyReader;
+    @Autowired
+    private LoginLockService loginLockService;
 
     @Override
     public LoginResponse login(LoginRequest request) {
         String ip = RequestUtil.getClientIp();
         String ua = RequestUtil.getClientUserAgent();
 
-        // 0. 检查登录失败锁定
-        if (isLocked(request.username())) {
-            auditService.log(null, "LOGIN_FAILED", "USER", request.username(), ip, ua, "账号已被临时锁定");
+        // 0. 检查登录失败锁定（此刻现状为「未锁」：锁键状态未知时放行，Redis 故障不阻断登录）
+        if (redisLockKeyReader.stateOf(LoginLockRedisKeys.LOCK, request.username()) == LockKeyState.PRESENT) {
+            auditService.log(null, AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(request.username()), ip, ua, "账号已被临时锁定");
             throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "登录失败次数过多，账号已临时锁定，请15分钟后再试");
         }
 
@@ -88,35 +94,36 @@ public class AuthServiceImpl implements AuthService {
                 .last("LIMIT 1"));
         if (user == null) {
             recordFailure(request.username(), null);
-            auditService.log(null, "LOGIN_FAILED", "USER", request.username(), ip, ua, "用户名不存在");
+            auditService.log(null, AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(request.username()), ip, ua, "用户名不存在");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
         // 2. 检查账号状态
         if (user.getStatus() == UserStatus.DISABLED) {
-            auditService.log(user.getId(), "LOGIN_FAILED", "USER", user.getId(), ip, ua, "账号已禁用");
+            auditService.log(user.getId(), AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua, "账号已禁用");
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "账号已被禁用");
         }
         if (user.getStatus() == UserStatus.LOCKED) {
-            if (isLockStillActive(user.getUsername())) {
-                auditService.log(user.getId(), "LOGIN_FAILED", "USER", user.getId(), ip, ua, "账号已锁定");
+            // 此刻现状为「已锁」：仅确证锁键不存在才解除，状态未知时维持锁定
+            if (redisLockKeyReader.stateOf(LoginLockRedisKeys.LOCK, user.getUsername()) != LockKeyState.ABSENT) {
+                auditService.log(user.getId(), AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua, "账号已锁定");
                 throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "账号已被锁定");
             }
             // 锁键已到期（Redis 确认不存在）：立即恢复状态并继续登录；定时任务 LoginLockScheduler 兜底
-            restoreToNormal(user, ip, ua);
+            loginLockService.restore(user, ip, ua);
         }
 
         // 3. 校验密码（BCrypt 比对）
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             recordFailure(user.getUsername(), user);
-            auditService.log(user.getId(), "LOGIN_FAILED", "USER", user.getId(), ip, ua,
+            auditService.log(user.getId(), AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua,
                     "密码错误（剩余尝试次数：" + remainingAttempts(request.username()) + "）");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
         // 4. 登录成功：清除失败计数，建登录会话（长会话 token）
-        clearFailures(request.username());
-        auditService.log(user.getId(), "LOGIN_SUCCESS", "USER", user.getId(), ip, ua, "登录成功");
+        loginLockService.clearLoginLock(request.username());
+        auditService.log(user.getId(), AuditAction.LOGIN_SUCCESS, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua, "登录成功");
         return issueSession(user);
     }
 
@@ -141,7 +148,7 @@ public class AuthServiceImpl implements AuthService {
         BfAuthSession session = sessionTokenService.findByToken(token);
         if (session != null) {
             sessionMapper.deleteById(session.getId());
-            auditService.log(session.getUserId(), "LOGOUT", "SESSION", session.getId(),
+            auditService.log(session.getUserId(), AuditAction.LOGOUT, BfAuditLogService.AuditTarget.session(session.getId()),
                     RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(), "登出");
             log.info("会话已登出: userId={}, sessionId={}", session.getUserId(), session.getId());
         }
@@ -198,7 +205,7 @@ public class AuthServiceImpl implements AuthService {
         if (target == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "会话不存在");
         }
-        if (!isAdmin && !userId.equals(target.getUserId())) {
+        if (!SecurityUtils.isOwnerOrAdmin(target.getUserId(), userId, isAdmin)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权下线此设备");
         }
         // 强制下线 = 撤销该设备（deviceName）的全部会话（同一设备可能有多次登录的多条活跃会话），
@@ -206,7 +213,7 @@ public class AuthServiceImpl implements AuthService {
         BfAuthSession current = currentToken != null && !currentToken.isBlank()
                 ? sessionTokenService.findByToken(currentToken) : null;
         int deleted = deleteSessionsForDevice(target.getUserId(), target.getDeviceName(), current);
-        auditService.log(userId, "FORCE_LOGOUT", "SESSION", sessionId,
+        auditService.log(userId, AuditAction.FORCE_LOGOUT, BfAuditLogService.AuditTarget.session(sessionId),
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "强制下线设备：" + target.getDeviceName() + "（目标用户 " + target.getUserId() + "）共撤销 " + deleted + " 条会话");
         log.info("会话已强制下线: targetUser={}, deviceName={}, sessions={}, by={}", target.getUserId(),
@@ -232,7 +239,7 @@ public class AuthServiceImpl implements AuthService {
         userDeviceService.remove(new LambdaQueryWrapper<BfUserDevice>()
                 .eq(BfUserDevice::getUserId, userId)
                 .eq(BfUserDevice::getDeviceName, deviceName));
-        auditService.log(userId, "DELETE_DEVICE", "DEVICE", deviceName,
+        auditService.log(userId, AuditAction.DELETE_DEVICE, BfAuditLogService.AuditTarget.device(deviceName),
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "删除登录设备：" + deviceName);
         log.info("登录设备已删除: user={}, deviceName={}", userId, deviceName);
@@ -292,23 +299,10 @@ public class AuthServiceImpl implements AuthService {
 
         // 重置密码后吊销该用户全部登录会话（所有设备强制下线重新登录，含当前设备）
         sessionTokenService.revokeAllExcept(userId, null);
-        auditService.log(userId, "PASSWORD_CHANGED", "USER", userId,
+        auditService.log(userId, AuditAction.PASSWORD_CHANGED, BfAuditLogService.AuditTarget.user(userId),
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "修改密码，吊销全部登录会话");
         log.info("密码已修改并吊销全部会话: userId={}", userId);
-    }
-
-    /**
-     * 检查账户是否被锁定（Redis 键 {@code login:lock:<username>} 存在即锁定）。
-     * <p>Redis 不可用时降级为不锁定（fail-open），保证登录可用。
-     */
-    private boolean isLocked(String username) {
-        try {
-            return redisTemplate.hasKey(LoginLockRedisKeys.LOCK + username);
-        } catch (DataAccessException e) {
-            log.warn("Redis 不可用，跳过登录锁定检查: {}", e.getMessage());
-            return false;
-        }
     }
 
     /**
@@ -316,7 +310,7 @@ public class AuthServiceImpl implements AuthService {
      * 窗口内连续失败达阈值则设置锁定键（TTL = LOCK_MINUTES，到期自动解锁，
      * 计数随窗口一并清零，不会"锁到期后一次失误又立即重锁"）。
      * <p>达到阈值时，若用户存在，同时将用户状态持久化为 LOCKED；
-     * 锁键到期后由 {@link LoginLockScheduler} 定时任务或登录时的兜底判定恢复为 NORMAL。
+     * 锁键到期后由 {@link com.baiflow.schedule.LoginLockScheduler} 定时任务或登录时的兜底判定恢复为 NORMAL。
      */
     private void recordFailure(String username, BfUser user) {
         try {
@@ -331,54 +325,13 @@ public class AuthServiceImpl implements AuthService {
                     userMapper.update(null, new LambdaUpdateWrapper<BfUser>()
                             .eq(BfUser::getId, user.getId())
                             .set(BfUser::getStatus, UserStatus.LOCKED));
-                    auditService.log(user.getId(), "ACCOUNT_LOCKED", "USER", user.getId(),
+                    auditService.log(user.getId(), AuditAction.ACCOUNT_LOCKED, BfAuditLogService.AuditTarget.user(user.getId()),
                             RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                             "登录失败" + MAX_FAILURES + "次，账号已自动锁定");
                 }
             }
         } catch (DataAccessException e) {
             log.warn("Redis 不可用，跳过登录失败计数: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * 判定锁定是否仍然生效（fail-closed）：Redis 不可用时保守视为仍锁定，
-     * 避免因 Redis 故障误将 LOCKED 状态恢复而绕过锁定。
-     */
-    private boolean isLockStillActive(String username) {
-        try {
-            return redisTemplate.hasKey(LoginLockRedisKeys.LOCK + username);
-        } catch (DataAccessException e) {
-            log.warn("Redis 不可用，保守判定为仍锁定: {}", e.getMessage());
-            return true;
-        }
-    }
-
-    /**
-     * 将用户状态从 LOCKED 恢复为 NORMAL（幂等），并记录审计日志。
-     * <p>使用条件更新（WHERE status=LOCKED）：多实例并发扫描时仅首个实例生效，避免重复审计。
-     */
-    private void restoreToNormal(BfUser user, String ip, String ua) {
-        int updated = userMapper.update(null, new LambdaUpdateWrapper<BfUser>()
-                .eq(BfUser::getId, user.getId())
-                .eq(BfUser::getStatus, UserStatus.LOCKED)
-                .set(BfUser::getStatus, UserStatus.NORMAL));
-        if (updated <= 0) {
-            return;
-        }
-        user.setStatus(UserStatus.NORMAL);
-        auditService.log(user.getId(), "ACCOUNT_UNLOCKED", "USER", user.getId(), ip, ua,
-                "登录锁定已到期，账号自动恢复为正常");
-        log.info("登录锁定已到期，账号恢复为 NORMAL: userId={}, username={}", user.getId(), user.getUsername());
-    }
-
-    /** 登录成功时清除失败记录 */
-    private void clearFailures(String username) {
-        try {
-            redisTemplate.delete(LoginLockRedisKeys.FAIL_COUNT + username);
-            redisTemplate.delete(LoginLockRedisKeys.LOCK + username);
-        } catch (DataAccessException e) {
-            log.warn("Redis 不可用，跳过清除登录失败记录: {}", e.getMessage());
         }
     }
 

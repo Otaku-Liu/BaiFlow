@@ -17,18 +17,18 @@ public class BfAuditLogServiceImpl implements BfAuditLogService {
     private BfAuditLogMapper mapper;
 
     @Override @Async
-    public void log(String actorUserId, String action, String targetType, String targetId,
+    public void log(String actorUserId, String action, AuditTarget target,
                     String ipAddress, String userAgent, String detail) {
         BfAuditLog entry = new BfAuditLog();
         entry.setActorUserId(actorUserId != null ? actorUserId : "");
         entry.setAction(action);
-        entry.setTargetType(targetType);
-        entry.setTargetId(targetId);
+        entry.setTargetType(target.type());
+        entry.setTargetId(target.id());
         entry.setIpAddress(ipAddress != null ? ipAddress : "");
         entry.setUserAgent(userAgent != null ? userAgent : "");
         entry.setDetail(detail != null ? detail : "");
         mapper.insert(entry);
-        log.debug("审计日志: action={}, target={}.{}", action, targetType, targetId);
+        log.debug("审计日志: action={}, target={}.{}", action, target.type(), target.id());
     }
 
     @Override

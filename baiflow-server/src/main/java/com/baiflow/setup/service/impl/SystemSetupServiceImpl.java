@@ -3,6 +3,7 @@ package com.baiflow.setup.service.impl;
 import com.baiflow.auth.config.BaiflowProperties;
 import com.baiflow.auth.dto.response.LoginResponse;
 import com.baiflow.auth.service.AuthService;
+import com.baiflow.audit.constant.AuditAction;
 import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
@@ -134,7 +135,7 @@ public class SystemSetupServiceImpl implements SystemSetupService {
         String expected = ensureToken();
         if (!constantTimeEquals(expected, request.setupToken())) {
             recordTokenFailure(ip);
-            auditService.log(null, "SYSTEM_SETUP_FAILED", "SYSTEM", null, ip, ua, "初始化令牌不正确");
+            auditService.log(null, AuditAction.SYSTEM_SETUP_FAILED, BfAuditLogService.AuditTarget.system(), ip, ua, "初始化令牌不正确");
             throw new BusinessException(ErrorCode.SETUP_TOKEN_INVALID, "初始化令牌不正确，请在服务器启动日志中查看");
         }
 
@@ -154,7 +155,7 @@ public class SystemSetupServiceImpl implements SystemSetupService {
 
         closeEntryAfterCommit(ip);
 
-        auditService.log(created.id(), "SYSTEM_SETUP", "USER", created.id(), ip, ua,
+        auditService.log(created.id(), AuditAction.SYSTEM_SETUP, BfAuditLogService.AuditTarget.user(created.id()), ip, ua,
                 "首次部署初始化完成，创建管理员：" + username);
         log.info("系统首次初始化完成：管理员 '{}' 已创建，初始化入口已关闭", username);
 

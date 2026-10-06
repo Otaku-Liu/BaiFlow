@@ -1,6 +1,6 @@
 package com.baiflow.user.service.impl;
 
-import com.baiflow.auth.constant.LoginLockRedisKeys;
+import com.baiflow.auth.service.LoginLockService;
 import com.baiflow.auth.config.BaiflowProperties;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
@@ -25,8 +25,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,7 +58,7 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
     @Autowired
     private BaiflowProperties baiflowProperties;
     @Autowired
-    private StringRedisTemplate redisTemplate;
+    private LoginLockService loginLockService;
 
     @Override
     public UserInfo createUser(CreateUserRequest req) {
@@ -156,18 +154,14 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
     }
 
     /**
-     * 清除用户的登录锁定 Redis 键（锁键 + 失败计数）。
+     * 清除用户的登录锁定（锁键 + 失败计数），并记一条 info 级日志。
      * <p>将锁定中的用户改为其他状态时调用，避免残留锁键在下次登录时仍拦截。
-     * Redis 不可用时降级跳过（锁键本身会随 TTL 到期），不影响状态变更。
+     * 删除动作与 Redis 降级策略见 {@link LoginLockService#clearLoginLock}；此处额外记日志，
+     * 是因为用户管理入口需要留痕，而登录成功路径不需要。
      */
     private void clearLoginLock(String username) {
-        try {
-            redisTemplate.delete(LoginLockRedisKeys.LOCK + username);
-            redisTemplate.delete(LoginLockRedisKeys.FAIL_COUNT + username);
-            log.info("已清除用户登录锁定: username={}", username);
-        } catch (DataAccessException e) {
-            log.warn("Redis 不可用，跳过清除登录锁定: username={}, error={}", username, e.getMessage());
-        }
+        loginLockService.clearLoginLock(username);
+        log.info("已清除用户登录锁定: username={}", username);
     }
 
     @Override
@@ -227,11 +221,8 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
 
     @Override
     public UserInfo me(String userId) {
-        BfUser user = getById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
-        }
-        return UserInfo.from(user);
+        // 与 getUser 完全同一操作，只是路由语义不同（/me vs /{id}）；实现只留一份
+        return getUser(userId);
     }
 
     @Override
