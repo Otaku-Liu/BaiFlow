@@ -1,6 +1,6 @@
 package com.baiflow.auth.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,8 +15,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.baiflow.auth.security.SessionAuthenticationFilter;
-import com.baiflow.common.constant.ErrorCode;
+import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.common.util.I18nUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -34,14 +35,13 @@ import org.springframework.web.servlet.LocaleResolver;
  * <p>无状态会话，禁用 CSRF，通过 {@link SessionAuthenticationFilter} 逐请求校验登录会话。
  */
 @Configuration
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Autowired
-    private SessionAuthenticationFilter sessionAuthenticationFilter;
-    @Autowired
-    private I18nUtil i18nUtil;
-    @Autowired
-    private LocaleResolver localeResolver;
+    private final SessionAuthenticationFilter sessionAuthenticationFilter;
+    private final I18nUtil i18nUtil;
+    private final LocaleResolver localeResolver;
+    private final ObjectMapper objectMapper;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -52,10 +52,10 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e.authenticationEntryPoint((request, response, authException) -> {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write(
-                            "{\"code\":" + ErrorCode.UNAUTHORIZED
-                                    + ",\"message\":\"" + i18nUtil.translate("登录已过期，请重新登录", localeResolver.resolveLocale(request))
-                                    + "\"}");
+                    // 走 ObjectMapper + ApiResponse：信封与 GlobalExceptionHandler 一致（含 traceId），
+                    // 且文案由 Jackson 转义 —— 手拼字符串遇到带引号的译文会写出坏 JSON
+                    response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.unauthorized(
+                            i18nUtil.translate("登录已过期，请重新登录", localeResolver.resolveLocale(request)))));
                 }))
                 .authorizeHttpRequests(auth -> auth
                         // 无需登录

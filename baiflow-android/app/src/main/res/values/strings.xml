@@ -193,6 +193,9 @@
     <string name="preview_download_view">下载查看</string>
     <string name="preview_playing">正在播放：%1$s</string>
     <string name="preview_audio_default">音频</string>
+    <string name="preview_toc_title">目录</string>
+    <string name="preview_toc_open">展开目录</string>
+    <string name="preview_toc_close">收起目录</string>
 
     <!-- ==================== 我的 ==================== -->
     <string name="mine_profile">修改资料</string>

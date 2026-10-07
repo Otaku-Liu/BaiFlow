@@ -5,18 +5,19 @@ import com.baiflow.audit.entity.BfAuditLog;
 import com.baiflow.audit.mapper.BfAuditLogMapper;
 import com.baiflow.audit.service.BfAuditLogService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class BfAuditLogServiceImpl implements BfAuditLogService {
-    @Autowired
-    private BfAuditLogMapper mapper;
+    private final BfAuditLogMapper mapper;
 
-    @Override @Async
+    @Override
+    @Async
     public void log(String actorUserId, String action, AuditTarget target,
                     String ipAddress, String userAgent, String detail) {
         BfAuditLog entry = new BfAuditLog();

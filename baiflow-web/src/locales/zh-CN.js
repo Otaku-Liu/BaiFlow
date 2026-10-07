@@ -294,7 +294,10 @@ export default {
   },
   preview: {
     preview: '预览',
-    unsupported: '暂不支持在线预览，请下载后查看'
+    unsupported: '暂不支持在线预览，请下载后查看',
+    tocTitle: '目录',
+    tocExpand: '展开目录',
+    tocCollapse: '收起目录',
   },
   menu: {
     logs: '操作日志',

@@ -10,7 +10,7 @@ import com.baiflow.note.dto.response.NoteSummary;
 import com.baiflow.note.service.BfNoteService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,10 +24,10 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/notes")
+@RequiredArgsConstructor
 public class BfNoteController {
 
-    @Autowired
-    private BfNoteService noteService;
+    private final BfNoteService noteService;
 
     /** 分页列出笔记；传 updatedAfter 为增量同步模式（含软删除），否则普通列表（仅 ACTIVE） */
     @GetMapping
@@ -47,7 +47,7 @@ public class BfNoteController {
     public ApiResponse<NoteDetail> create(@Valid @RequestBody CreateNoteRequest req,
                                           Authentication auth) {
         return ApiResponse.success(
-                noteService.createNote(auth.getPrincipal().toString(), req.title(), req.content()));
+                noteService.createNote(auth.getPrincipal().toString(), req.id(), req.title(), req.content()));
     }
 
     /** 查询笔记详情（含 Markdown 正文） */

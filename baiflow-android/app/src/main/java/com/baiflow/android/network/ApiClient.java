@@ -474,8 +474,12 @@ public class ApiClient {
         return getService().listNotes(null, viewUserId, page, size, updatedAfter);
     }
 
-    public Call<ApiResponse<NoteDetail>> createNote(String title, String content) {
+    public Call<ApiResponse<NoteDetail>> createNote(String id, String title, String content) {
         Map<String, String> body = new java.util.HashMap<>();
+        if (id != null && !id.isEmpty()) {
+            // 客户端幂等 id：重试复用同一个，服务端据此去重（见 LocalNote.clientId）
+            body.put("id", id);
+        }
         body.put("title", title != null ? title : "");
         body.put("content", content != null ? content : "");
         return getService().createNote(body);

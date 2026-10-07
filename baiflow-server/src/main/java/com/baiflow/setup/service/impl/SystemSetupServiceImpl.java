@@ -1,6 +1,6 @@
 package com.baiflow.setup.service.impl;
 
-import com.baiflow.auth.config.BaiflowProperties;
+import com.baiflow.common.config.BaiflowProperties;
 import com.baiflow.auth.dto.response.LoginResponse;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.audit.constant.AuditAction;
@@ -18,8 +18,8 @@ import com.baiflow.user.entity.BfUser;
 import com.baiflow.user.enums.UserRole;
 import com.baiflow.user.service.BfUserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SystemSetupServiceImpl implements SystemSetupService {
 
     /** 初始化完成标记的键名 */
@@ -66,18 +67,12 @@ public class SystemSetupServiceImpl implements SystemSetupService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    @Autowired
-    private BfSystemSettingService settingService;
-    @Autowired
-    private BfUserService userService;
-    @Autowired
-    private AuthService authService;
-    @Autowired
-    private BfAuditLogService auditService;
-    @Autowired
-    private StringRedisTemplate redisTemplate;
-    @Autowired
-    private BaiflowProperties baiflowProperties;
+    private final BfSystemSettingService settingService;
+    private final BfUserService userService;
+    private final AuthService authService;
+    private final BfAuditLogService auditService;
+    private final StringRedisTemplate redisTemplate;
+    private final BaiflowProperties baiflowProperties;
 
     /** 进程内的当前初始化令牌（启动时准备，初始化成功提交后清空） */
     private volatile String activeToken;

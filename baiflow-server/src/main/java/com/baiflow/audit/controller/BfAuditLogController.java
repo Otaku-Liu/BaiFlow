@@ -4,7 +4,7 @@ import com.baiflow.audit.dto.response.LoginLogVO;
 import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.common.entity.ApiResponse;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -12,10 +12,10 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/admin/audit-logs")
+@RequiredArgsConstructor
 public class BfAuditLogController {
 
-    @Autowired
-    private BfAuditLogService auditService;
+    private final BfAuditLogService auditService;
 
     /**
      * 分页查询登录日志，支持用户名模糊搜索、登录结果和日期范围筛选。

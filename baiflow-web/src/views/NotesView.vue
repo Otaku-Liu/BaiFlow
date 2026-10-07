@@ -71,6 +71,8 @@ const listLoading = ref(false)
 const keyword = ref('')
 const currentId = ref(null)
 const isCreating = ref(false)
+// 新建笔记的幂等 id：点「新建」时生成一次，保存重试复用同一个（服务端据此去重），创建成功后清空
+const pendingCreateId = ref('')
 
 // ---- 编辑状态 ----
 const title = ref('')
@@ -140,7 +142,7 @@ async function saveNow() {
   const body = { title: title.value, content: blocksToMarkdown(blocks.value) }
   try {
     if (isCreating.value) {
-      const { data } = await createNote(body)
+      const { data } = await createNote({ ...body, id: pendingCreateId.value })
       const detail = data?.data
       if (data?.code !== 0 || !detail) {
         notifyError(data?.message || t('notes.saveFailed'))
@@ -148,6 +150,7 @@ async function saveNow() {
       }
       currentId.value = detail.id
       isCreating.value = false
+      pendingCreateId.value = ''
       noteUpdatedAt = detail.updatedAt
     } else {
       const { data } = await updateNote(currentId.value, { ...body, baseUpdatedAt: noteUpdatedAt })
@@ -274,6 +277,7 @@ function newNote() {
   flushSave()
   currentId.value = null
   isCreating.value = true
+  pendingCreateId.value = crypto.randomUUID().replace(/-/g, '')
   title.value = ''
   setBlocksFromMd('')
   dirty = false

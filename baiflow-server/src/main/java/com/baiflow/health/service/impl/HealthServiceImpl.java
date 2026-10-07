@@ -1,7 +1,7 @@
 package com.baiflow.health.service.impl;
 
 import com.baiflow.health.service.HealthService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
@@ -14,10 +14,10 @@ import java.util.Map;
  * 健康检查服务实现 — 报告服务状态和数据库连通性。
  */
 @Service
+@RequiredArgsConstructor
 public class HealthServiceImpl implements HealthService {
 
-    @Autowired
-    private DataSource dataSource;
+    private final DataSource dataSource;
 
     @Override
     public Map<String, Object> health() {

@@ -11,7 +11,7 @@ import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.service.BfUserService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,10 +25,10 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class BfUserController {
 
-    @Autowired
-    private BfUserService userService;
+    private final BfUserService userService;
 
     /**
      * 分页查询用户列表，支持按角色、状态和展示名筛选。

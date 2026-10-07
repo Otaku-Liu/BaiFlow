@@ -39,7 +39,7 @@ public interface BfNoteService {
      * @param title   标题
      * @param content Markdown 正文
      */
-    NoteDetail createNote(String userId, String title, String content);
+    NoteDetail createNote(String userId, String id, String title, String content);
 
     /**
      * 查询笔记详情（含正文）。

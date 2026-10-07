@@ -10,7 +10,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -28,11 +28,11 @@ import java.util.stream.Collectors;
  * 下载记录服务实现。
  */
 @Service
+@RequiredArgsConstructor
 public class BfDownloadRecordServiceImpl extends ServiceImpl<BfDownloadRecordMapper, BfDownloadRecord>
         implements BfDownloadRecordService {
 
-    @Autowired
-    private BfUserMapper userMapper;
+    private final BfUserMapper userMapper;
 
     @Override
     @Async

@@ -53,11 +53,6 @@ mybatis-plus:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
-logging:
-  level:
-    root: INFO
-    com.baiflow: INFO
-
 baiflow:
   auth-session:
     web-hours: ${BAIFLOW_AUTH_WEB_HOURS:2}

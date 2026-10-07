@@ -1,7 +1,7 @@
 package com.baiflow.common.config;
 
-import com.baiflow.auth.config.BaiflowProperties;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.baiflow.common.config.BaiflowProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -12,10 +12,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * 此映射主要用于开发环境（Vite 将 /avatars 代理到后端）展示头像。仅暴露头像目录，不涉及其他存储路径。
  */
 @Configuration
+@RequiredArgsConstructor
 public class AvatarWebConfig implements WebMvcConfigurer {
 
-    @Autowired
-    private BaiflowProperties baiflowProperties;
+    private final BaiflowProperties baiflowProperties;
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

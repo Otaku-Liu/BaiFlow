@@ -1,7 +1,9 @@
 package com.baiflow.user.service.impl;
 
-import com.baiflow.auth.service.LoginLockService;
-import com.baiflow.auth.config.BaiflowProperties;
+import com.baiflow.audit.constant.AuditAction;
+import com.baiflow.audit.service.BfAuditLogService;
+import com.baiflow.auth.constant.LoginLockRedisKeys;
+import com.baiflow.common.config.BaiflowProperties;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.common.util.I18nUtil;
@@ -23,8 +25,10 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,23 +46,19 @@ import java.util.Set;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> implements BfUserService {
 
     private static final Set<String> ALLOWED_AVATAR_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
     private static final long AVATAR_MAX_SIZE = 1024 * 1024; // 1MB
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private BfFileItemMapper fileItemMapper;
-    @Autowired
-    private BfStorageRootService storageService;
-    @Autowired
-    private I18nUtil i18nUtil;
-    @Autowired
-    private BaiflowProperties baiflowProperties;
-    @Autowired
-    private LoginLockService loginLockService;
+    private final PasswordEncoder passwordEncoder;
+    private final BfFileItemMapper fileItemMapper;
+    private final BfStorageRootService storageService;
+    private final I18nUtil i18nUtil;
+    private final BaiflowProperties baiflowProperties;
+    private final StringRedisTemplate redisTemplate;
+    private final BfAuditLogService auditService;
 
     @Override
     public UserInfo createUser(CreateUserRequest req) {
@@ -153,15 +153,33 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
         log.info("批量设置用户状态完成: count={}, status={}", targets.size(), targetStatus);
     }
 
-    /**
-     * 清除用户的登录锁定（锁键 + 失败计数），并记一条 info 级日志。
-     * <p>将锁定中的用户改为其他状态时调用，避免残留锁键在下次登录时仍拦截。
-     * 删除动作与 Redis 降级策略见 {@link LoginLockService#clearLoginLock}；此处额外记日志，
-     * 是因为用户管理入口需要留痕，而登录成功路径不需要。
-     */
-    private void clearLoginLock(String username) {
-        loginLockService.clearLoginLock(username);
+    @Override
+    public void clearLoginLock(String username) {
+        try {
+            redisTemplate.delete(LoginLockRedisKeys.LOCK + username);
+            redisTemplate.delete(LoginLockRedisKeys.FAIL_COUNT + username);
+        } catch (DataAccessException e) {
+            log.warn("Redis 不可用，跳过清除登录锁定: username={}, error={}", username, e.getMessage());
+        }
         log.info("已清除用户登录锁定: username={}", username);
+    }
+
+    @Override
+    public boolean restoreLockedUser(BfUser user, String ip, String ua) {
+        // 条件更新（WHERE status=LOCKED）：多实例并发时仅首个生效，避免重复审计
+        boolean restored = update(null, new LambdaUpdateWrapper<BfUser>()
+                .eq(BfUser::getId, user.getId())
+                .eq(BfUser::getStatus, UserStatus.LOCKED)
+                .set(BfUser::getStatus, UserStatus.NORMAL));
+        if (!restored) {
+            return false;
+        }
+        user.setStatus(UserStatus.NORMAL);
+        auditService.log(user.getId(), AuditAction.ACCOUNT_UNLOCKED,
+                BfAuditLogService.AuditTarget.user(user.getId()), ip, ua,
+                "登录锁定到期，账号自动恢复为正常");
+        log.info("登录锁定到期，账号恢复为 NORMAL: userId={}, username={}", user.getId(), user.getUsername());
+        return true;
     }
 
     @Override

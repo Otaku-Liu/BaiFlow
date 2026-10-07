@@ -190,6 +190,9 @@
     <string name="preview_download_view">Download and view</string>
     <string name="preview_playing">Now playing: %1$s</string>
     <string name="preview_audio_default">Audio</string>
+    <string name="preview_toc_title">Contents</string>
+    <string name="preview_toc_open">Show contents</string>
+    <string name="preview_toc_close">Hide contents</string>
 
     <!-- ==================== Transfer records ==================== -->
     <string name="records_upload_tab">Uploads</string>

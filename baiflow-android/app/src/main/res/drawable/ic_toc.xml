@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 目录：三条递进缩进的横线，示意 h1–h3 层级（Markdown 预览的悬浮目录钮） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,5h16v2.2h-16z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,11h12v2.2h-12z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M11.5,17h8.5v2.2h-8.5z" />
+</vector>

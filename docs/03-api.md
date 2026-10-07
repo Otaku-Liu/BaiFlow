@@ -61,6 +61,7 @@
 ### 认证
 - `POST /api/auth/login` — 登录建会话，返回 `{ token, sessionId, expiresAt, user }`；设备类型/名称走 `X-Device-Type` / `X-Device-Name` 请求头（ANDROID 长期 / WEB 短期）
   - 登录失败锁定：15 分钟内连续失败 5 次返回 `42301`，用户状态持久化为 `LOCKED`；锁键到期后由定时任务（每 60s）或登录兜底判定自动恢复为 `NORMAL`
+  - Redis 不可用时遵循「不确定时不改变当前状态」：登录前置检查按未锁定放行（不阻断登录），`LOCKED` 兜底判定与定时任务按仍锁定处理（不提前解封）
 - `POST /api/auth/logout` — 吊销当前请求 token 对应的会话（立即生效）
 - `POST /api/auth/change-password` — 改密后吊销该用户全部会话（所有设备下线）
 - `GET /api/auth/sessions` — 当前用户的登录会话列表 `{ id, deviceName, deviceType, ip, lastUsedAt, createdAt, current }`
@@ -135,7 +136,7 @@
 
 ### 随手记（笔记）
 - `GET /api/notes?page=&size=&keyword=&viewUserId=&updatedAfter=` — 分页列出笔记，按更新时间倒序；`keyword` 搜标题/正文；非管理员限本人，管理员可 `viewUserId` 切换。**普通列表不含正文**；传 `updatedAfter` 为增量同步模式（返回 `updated_at` 之后更新，含软删除，且列表项**携带 `content` 正文**，供离线客户端直接合并，避免逐条拉详情）
-- `POST /api/notes` — 新建 `{ title, content }`（content 为 Markdown）
+- `POST /api/notes` — 新建 `{ id?, title, content }`（content 为 Markdown）。`id` 可选、**由客户端生成**（32 位十六进制）并在同一次新建的重试之间保持不变：服务端按它插入，撞主键即视为重发 → 返回第一次创建的那条（幂等；只对同一个人；撞上已被软删除的那条会换新 id 重建）。不带 `id` 时由服务端生成（行为同以前）
 - `GET /api/notes/{id}` — 详情（含 Markdown 正文）
 - `PATCH /api/notes/{id}` — 更新 `{ title, content, baseUpdatedAt }`，服务端刷新 `updated_at`（**毫秒精度** DATETIME(3)，无 2038 限制）。`baseUpdatedAt` **必传且可解析**（乐观并发）：缺失/格式非法返回 `40001`，早于服务端当前 `updated_at` 返回 `40901`（NOTE_CONFLICT，客户端可选覆盖/重新加载）。客户端「覆盖」须以服务端最新 `updatedAt` 为基准再保存
 - `DELETE /api/notes/{id}` — 软删除（status=DELETED；**级联删除该笔记的阅读进度行**）
@@ -153,9 +154,9 @@
 ### 审计日志（管理员）
 - `GET /api/admin/audit-logs/login` — 分页查询登录与会话操作日志（`LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED` / `ACCOUNT_LOCKED` / `ACCOUNT_UNLOCKED`），支持用户名模糊搜索、操作类型和日期范围筛选
 
-### 传输 · 通知 · 设备 · 事件
-- `GET /api/transfers` · `GET /api/transfers/{id}`
-- `GET /api/notifications` · `PATCH /api/notifications/{id}/read`
+### 事件（与设备）
+> 原 `GET /api/transfers`、`GET /api/notifications`（及 `PATCH /api/notifications/{id}/read`）已删：两张表无写入方、两端客户端也未接入，见 `docs/02-database.md`「已建未用」。
+
 - `GET /api/events`（SSE，需登录）：事件类型 `NOTE_UPDATED`（笔记跨端同步刷新）
 
 SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GET /api/events?token=<会话token>` 查询参数（后端 `SessionAuthenticationFilter` 支持 `?token=` fallback）。`NOTE_UPDATED` 只推送给笔记所有者。
@@ -165,7 +166,7 @@ SSE 鉴权：浏览器 EventSource 无法携带 `Authorization` 头，使用 `GE
 - 文件 ID 在服务端解析为受控路径，不返回 `root_path`
 - 上传文件名清洗非法字符
 - 普通用户文件视图自动限定在主目录内（`parentId` 为空时重定向到主目录）
-- 普通用户通过 user_storage_permission 校验范围
+- 普通用户文件视图限定在本人主目录内（存储权限模型尚未落地，见 `docs/02-database.md`「已建未用」）
 - 下载通道仅两条：登录用户（owner/admin，文件归属 + 隐私校验）与有效分享链接（token/过期/次数/提取码）；**不存在匿名直下端点**
 - 所有下载写入 `bf_download_record`，可追溯并按文件聚合下载次数（ADMIN 审计）
 - 公开分享接口记录访问日志

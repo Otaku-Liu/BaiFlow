@@ -729,6 +729,8 @@ public class NoteEditActivity extends BaseActivity {
             currentNote = new LocalNote();
             currentNote.serverUrl = session.getDataPartition();
             currentNote.source = SyncService.SOURCE_LOCAL_ONLY;
+            // 幂等 id：这里生成一次并随行持久化，推送 CREATE 重试时复用同一个 —— 服务端按它去重
+            currentNote.clientId = java.util.UUID.randomUUID().toString().replace("-", "");
             currentNote.createdAt = System.currentTimeMillis();
         }
         currentNote.title = title;

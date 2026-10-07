@@ -737,6 +737,13 @@ function handleHttpError(e) {
   white-space: normal;
 }
 
+/* 双击行即预览 —— 行内禁用文本选中：不禁的话双击会选中文字并弹出浏览器选区浮层，
+   那个浮层飘在预览抽屉遮罩之上，会把抽屉左边缘（拖动改宽的热区）挡到被点掉为止。
+   行内没有输入控件（重命名是独立弹窗），禁用不影响其它操作 */
+.files-view :deep(.el-table__body) {
+  user-select: none;
+}
+
 .toolbar {
   display: flex;
   align-items: center;

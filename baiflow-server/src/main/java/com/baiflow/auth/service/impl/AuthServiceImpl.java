@@ -12,9 +12,6 @@ import com.baiflow.auth.service.SessionTokenService;
 import com.baiflow.auth.service.AuthService;
 import com.baiflow.auth.service.BfUserDeviceService;
 import com.baiflow.auth.security.SecurityUtils;
-import com.baiflow.auth.service.LoginLockService;
-import com.baiflow.auth.service.RedisLockKeyReader;
-import com.baiflow.auth.service.RedisLockKeyReader.LockKeyState;
 import com.baiflow.audit.constant.AuditAction;
 import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.common.constant.ErrorCode;
@@ -27,8 +24,8 @@ import com.baiflow.user.mapper.BfUserMapper;
 import com.baiflow.user.service.BfUserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,6 +46,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     /** 最大登录失败次数 */
@@ -56,34 +54,28 @@ public class AuthServiceImpl implements AuthService {
     /** 锁定时长（分钟）——同时作为失败计数的滑动窗口 */
     private static final int LOCK_MINUTES = 15;
 
-    @Autowired
-    private BfUserMapper userMapper;
-    @Autowired
-    private BfUserService userService;
-    @Autowired
-    private SessionTokenService sessionTokenService;
-    @Autowired
-    private BfUserDeviceService userDeviceService;
-    @Autowired
-    private BfAuthSessionMapper sessionMapper;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private BfAuditLogService auditService;
-    @Autowired
-    private StringRedisTemplate redisTemplate;
-    @Autowired
-    private RedisLockKeyReader redisLockKeyReader;
-    @Autowired
-    private LoginLockService loginLockService;
+    private final BfUserMapper userMapper;
+    private final BfUserService userService;
+    private final SessionTokenService sessionTokenService;
+    private final BfUserDeviceService userDeviceService;
+    private final BfAuthSessionMapper sessionMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final BfAuditLogService auditService;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public LoginResponse login(LoginRequest request) {
         String ip = RequestUtil.getClientIp();
         String ua = RequestUtil.getClientUserAgent();
 
-        // 0. 检查登录失败锁定（此刻现状为「未锁」：锁键状态未知时放行，Redis 故障不阻断登录）
-        if (redisLockKeyReader.stateOf(LoginLockRedisKeys.LOCK, request.username()) == LockKeyState.PRESENT) {
+        // 0. 检查登录失败锁定（此刻现状为「未锁」：Redis 不可用时按未锁定放行，故障不阻断登录）
+        boolean loginLocked = false;
+        try {
+            loginLocked = Boolean.TRUE.equals(redisTemplate.hasKey(LoginLockRedisKeys.LOCK + request.username()));
+        } catch (DataAccessException e) {
+            log.warn("Redis 不可用，登录锁定检查按未锁定放行: username={}, error={}", request.username(), e.getMessage());
+        }
+        if (loginLocked) {
             auditService.log(null, AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(request.username()), ip, ua, "账号已被临时锁定");
             throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "登录失败次数过多，账号已临时锁定，请15分钟后再试");
         }
@@ -104,13 +96,19 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "账号已被禁用");
         }
         if (user.getStatus() == UserStatus.LOCKED) {
-            // 此刻现状为「已锁」：仅确证锁键不存在才解除，状态未知时维持锁定
-            if (redisLockKeyReader.stateOf(LoginLockRedisKeys.LOCK, user.getUsername()) != LockKeyState.ABSENT) {
+            // 此刻现状为「已锁」：仅确证锁键不存在才解除，Redis 不可用时维持锁定
+            boolean lockKeyGone = false;
+            try {
+                lockKeyGone = Boolean.FALSE.equals(redisTemplate.hasKey(LoginLockRedisKeys.LOCK + user.getUsername()));
+            } catch (DataAccessException e) {
+                log.warn("Redis 不可用，登录锁定维持不解除: username={}, error={}", user.getUsername(), e.getMessage());
+            }
+            if (!lockKeyGone) {
                 auditService.log(user.getId(), AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua, "账号已锁定");
                 throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "账号已被锁定");
             }
             // 锁键已到期（Redis 确认不存在）：立即恢复状态并继续登录；定时任务 LoginLockScheduler 兜底
-            loginLockService.restore(user, ip, ua);
+            userService.restoreLockedUser(user, ip, ua);
         }
 
         // 3. 校验密码（BCrypt 比对）
@@ -121,8 +119,8 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
-        // 4. 登录成功：清除失败计数，建登录会话（长会话 token）
-        loginLockService.clearLoginLock(request.username());
+        // 4. 登录成功：清除失败计数与锁键，建登录会话（长会话 token）
+        userService.clearLoginLock(request.username());
         auditService.log(user.getId(), AuditAction.LOGIN_SUCCESS, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua, "登录成功");
         return issueSession(user);
     }

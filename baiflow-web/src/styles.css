@@ -1,6 +1,6 @@
 /* ================================================================
    BaiFlow Design Tokens · Apple 风格 (iOS 11-14)
-   对应文档: docs/12-design-tokens.md · ADR: docs/11-adr-apple-design.md
+   对应文档: docs/04-frontend.md「视觉风格 · Apple 风格 (iOS 11-14)」
    ================================================================ */
 
 /* ---- 字体引入 ---- */
@@ -336,6 +336,19 @@ body {
 .el-drawer {
   border-radius: var(--baiflow-radius-lg) 0 0 var(--baiflow-radius-lg);
 }
+
+/* 预览抽屉的拖动下限：Element 内置拖动只夹到 4px，这里兜住「不小于 40% 屏宽」。
+   min-width 优先级高于内联 width，所以是拖不破的那条线。
+   类名落在抽屉 div 自己身上：drawer 组件是 inheritAttrs:false，把 $attrs merge 到了
+   `.el-drawer` 那个 div 上（`mergeProps(..., $attrs, { class: [ns.b(), direction, ...] })`），
+   所以这里直接写类名即可，不需要后代选择器 */
+.el-drawer.baiflow-preview-drawer {
+  min-width: 40vw;
+  /* 拖动热区加宽到 12px（悬停那条提示线仍是 3px，只是好抓）：抽屉最左侧 20px 是 body 内边距，
+     加宽不会压到正文 */
+  --el-drawer-dragger-size: 12px;
+}
+
 
 /* ---- 弹出框 ---- */
 .el-popover {

@@ -1,6 +1,6 @@
 package com.baiflow;
 
-import com.baiflow.auth.config.BaiflowProperties;
+import com.baiflow.common.config.BaiflowProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

@@ -45,13 +45,35 @@ baiflow-android/app/src/main/java/
   - 上传到**隐私文件夹**透传 `effectivePrivacyToken()`
 - **下载**：落公共 Download 文件夹——API 29+ 走 `MediaStore.Downloads`（作用域存储，免权限，系统「下载」/文件管理器可见）；API 26-28 写 `Environment.DIRECTORY_DOWNLOADS`，下载前申请 `WRITE_EXTERNAL_STORAGE`；下载计次由后端记录（见 `docs/02-database.md`、`docs/03-api.md`）
 - **不支持预览的文件**：点按弹「暂不支持在线预览」对话框（含「下载」按钮），**不自动下载**，手动点「下载」才下载
-- **预览渲染**：视频/音频用 Media3 ExoPlayer（视频 `PlayerView`、音频 `PlayerControlView`，正确处理旋转元数据、宽高比、控制器时长）；横屏视频按「旋转 90/270 或有效宽高为横」自动转横屏，**离开时若强制过横屏则恢复传感器方向**（让旋转发生在预览页自身，避免带回文件列表触发其重建）
+- **预览渲染**：视频/音频用 Media3 ExoPlayer（视频 `PlayerView`、音频 `PlayerControlView`，正确处理旋转元数据、宽高比、控制器时长）；横屏视频按「旋转 90/270 或有效宽高为横」自动转横屏，**离开时若强制过横屏则恢复传感器方向**（让旋转发生在预览页自身，避免带回文件列表触发其重建）；Markdown 白底铺满 + 右下悬浮目录钮，见「Markdown 预览」
 
 ## 浏览进度（跨端同步）
 
 - 文件预览：视频/音频存 **SECONDS**（10s 定时 + 退出时保存）；文本/Markdown 存 **SCROLL_PERCENT**（滚动防抖 2s，回顶保存 0 清历史）；打开时自动 seek/滚动到记录位置并 Toast「已恢复到上次观看位置」
 - 随手记：编辑器滚动防抖 800ms 上报 SCROLL_PERCENT，打开时自动滚动到记录位置；短笔记（不足一屏）不记录
 - 与 Web 共用服务端 `bf_playback_progress` / `bf_note_progress`，按用户存、不记设备；视频/音频仅在播放过（played）后才允许存 0，避免未播放关闭时误清历史
+
+## Markdown 预览
+
+`.md` 文件用 Markwon 渲染进 `TextView`，**白底铺满预览区**（无外边距、无边框；其余预览类型仍是页面灰底 `#F5F5F7`）。
+
+### 目录
+
+手机屏幕小，**不做常驻目录栏**（Web 是预览抽屉内左侧常驻可折叠栏）——这是两端有意的差异，其余规则与 Web 对齐：
+
+- **右下角悬浮圆钮**（48dp 圆形、白底 + 投影 + 列表图标，距右下各 16dp），**仅在 Markdown 且文档含 ≥1 个 h1–h3 标题时显示**；其他类型、无标题的文档不显示。白圆钮落在白纸上，故 `bg_toc_fab` 带 1dp `@color/divider` 描边
+- 点击 → **右侧滑入面板**：从右侧滑入（200ms）+ 全屏遮罩淡入（`@color/scrim`），面板为白底卡片 + `elevation` 阴影 + 可滚列表（目录再长也不会溢出屏幕），宽 78% 屏宽且 ≤320dp，贴右边、只圆左侧两角；头部是「目录」标题 + 右侧 chevron 收起钮，点遮罩或收起钮都能关。h1–h3 按层级缩进（每级 +12dp），**当前章节高亮** `@color/accent` + 加粗
+- **点击目录项 → 自动关闭面板 → 滚动到目标章节**（面板占着右半屏，不关就看不到跳到了哪）
+- **当前章节高亮复用 `ScrollView` 上已有的 `setOnScrollChangeListener`**（原本只做 `SCROLL_PERCENT` 防抖上报），不另加监听
+- **空标题不进目录**（如标题里只有图片）：与 Web 一致，否则会出现点不动的空行
+- 目录与按钮文案走 `@string`；不新增后端接口、不新增表
+
+### 实现要点
+
+- **标题从渲染结果抓，不是正则扫 Markdown 源**：`Markwon.setMarkdown()` 后从 `TextView` 取 `Spanned`，用 `getSpans(0, len, HeadingSpan.class)` 拿标题、`HeadingSpan.getLevel()` 拿层级（`io.noties.markwon.core.spans.HeadingSpan` 是 Markwon 4.6.2 的 public API）。与 Web 语义一致：认得 setext 标题（`标题` 换行 `===`）、不把围栏代码块里的 `#` 误判为标题。**不复用** `editor/MarkdownParser`（它的 `HEADING` 只认 `#`–`###` 且漏 setext）
+- **跳转 y 偏移**：`tv.getTop() + tv.getPaddingTop() + layout.getLineTop(layout.getLineForOffset(spanStart))`，再减 8dp 呼吸位（标题不贴内容区顶边，与 Web 一致）→ `sv.scrollTo(0, y)`
+- **不引 Material FAB / BottomSheet**：悬浮钮与面板由 Activity 程序化构建（`PreviewActivity` 全文都是 `new TextView/ImageView` + `dp()`，无 XML 布局可挂 `@style`），用新 drawable（`ic_toc`/`bg_toc_fab`/`bg_toc_panel`）+ 现有色资源（`@color/divider`/`@color/white`/`@color/accent`/`@color/scrim`），**无硬编码色值**；尺寸（48dp 圆钮、34dp 关闭钮、13/14sp 文字）随该文件的程序化惯例写在代码里
+- **不改 `DropdownMenu`**：它是固定 160dp 宽、`WRAP_CONTENT` 高、**不可滚**的 `PopupWindow`（`widget/DropdownMenu.java`），承载不了任意长度的目录；目录面板是新写的可滚面板
 
 ## 页面
 
@@ -104,6 +126,7 @@ baiflow-android/app/src/main/java/
 - 全功能，笔记同步
 - Room 表 `bf_local_note` 按 `server_url` 分区（**缓存绑定服务器**）：登出清空对应分区防串号；升级前遗留的本地分区数据（LOCAL 键）独立保留，首次登录后**上传前询问**（「有 N 条本地笔记，是否上传」）
 - 同步：outbox（`dirty` + tombstone）先推 create/update（带 `baseUpdatedAt`）/delete，再 `GET /api/notes?updatedAfter=` 增量拉取合并（增量模式列表携带正文，直接合并，无 N+1）；**另有 SSE 长连接**（`NoteSseClient`，手写解析 `/api/events`，收到 `NOTE_UPDATED` 立即触发一次增量同步）——实时 + 周期兜底；WorkManager 后台周期 + 网络恢复触发 + 手动「同步」按钮
+- **推送 CREATE 的幂等**：本地新建笔记时生成 `LocalNote.clientId`（32 位十六进制，**新建时生成一次并随行持久化**，不是推送时生成），推送时随 body 带给服务端；服务端按它插入，撞主键即视为重发 → 返回第一次创建的那条。这样「服务端已创建但响应丢包」的重试不会产生重复笔记。`clientId` 列入 Room（`AppDatabase` 版本 2 + `Migration(1,2)`）；服务端镜像下来的笔记该字段为 null（不会作为 create 推送）
 - **冲突**：乐观并发（`baseUpdatedAt` 必传，缺失 40001 / 早于服务端 40901）；冲突弹窗**先拉服务端版本做块级差异预览**（本地改动 N 块 / 服务端改动 M 块 + 前 3 块预览），用户再选「覆盖」（以服务端最新 updatedAt 为基准重推）或「重新加载」
 - **同步状态可见性**：笔记列表项右侧**徽标**（冲突=红 / 待推=灰，`LocalNote.dirty/conflict`）；「我的」页同步区显示「待同步 N 条 · 冲突 M 条」（`LocalNoteDao.countDirty/countConflict`，有未同步改动时显示）
 - 媒体：本地新建媒体先上传回填服务端 URL；服务器媒体按需下载缓存到 `filesDir/note_media_cache/<id>`（**批量接口 + 有界并发**：`POST /api/notes/media/batch` 每批 ≤10、3 批并行；服务端跳过的大文件/失败项回退单个流式下载）。**缓存管理**：「我的」页「存储」分组——「清理缓存」行（右侧显示大小，二次确认后清空 `note_media_cache/`，清除后需重新下载）+「缓存上限」行（SeekBar 50–2000MB 默认 300MB）；写完媒体自动按上限 LRU 清理（`MediaFiles.enforceLimit`）；本地新建媒体 `note_media/`（可能未上传）**永不自动清理**

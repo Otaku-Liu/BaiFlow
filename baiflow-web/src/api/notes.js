@@ -8,9 +8,13 @@ export function listNotes({ page = 1, size = 50, keyword }, viewUserId) {
   return http.get('/notes', { params })
 }
 
-/** 新建笔记 */
-export function createNote({ title, content }) {
-  return http.post('/notes', { title, content })
+/**
+ * 新建笔记。
+ * `id` 由前端生成（32 位十六进制）并在**同一次新建的重试之间保持不变**：
+ * 服务端按它插入，撞主键即视为重发 —— 返回第一次创建的那条，不会产生重复笔记。
+ */
+export function createNote({ id, title, content }) {
+  return http.post('/notes', { id, title, content })
 }
 
 /** 查询笔记详情（含 Markdown 正文） */

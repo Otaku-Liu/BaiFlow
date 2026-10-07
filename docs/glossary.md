@@ -29,6 +29,8 @@ BaiFlow 涉及的关键术语速查。按字母序。
 
 ## D
 
+- **DB 往返（Round Trip）**
+  一次数据库查询/更新所需的网络来回。BaiFlow 的开发环境连远端 MySQL，单次往返 40–75ms，因此 **DB 耗时 ≈ 查询次数 × 单次往返**，往返次数是本项目首要的性能指标（索引与执行计划不是）。编码纪律见 `docs/06-coding-standards.md`「数据库往返」，度量手段见 `docs/01-architecture.md`「SQL 计时日志」。
 - **设计系统（Design System）**
   集中的样式/组件规范，一处定义、全局复用。BaiFlow Android 用 `styles_ios.xml` + 主题 + drawable 集中定义 iOS 风组件样式，布局通过 `@style/Ios.*` 引用继承。见 `docs/07-ios-design-system.md`。
 
@@ -53,7 +55,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 ## M
 
 - **Markdown**
-  笔记正文格式。Web/Android 均为块编辑器（块存「行内 markdown 源」、存储仍是 Markdown）；.md 文件预览用 showdown 渲染。
+  笔记正文格式。Web/Android 均为块编辑器（块存「行内 markdown 源」、存储仍是 Markdown）；.md 文件预览用 showdown 渲染（Web），预览目录见「TOC」。
 - **MaterialAlertDialogBuilder**
   Material Components 的 AlertDialog 构建器（`com.google.android.material.dialog`）：从 `materialAlertDialogTheme` 解析 shape，用 `ShapeAppearanceDrawable` **程序化设置弹窗背景**，圆角一定生效。BaiFlow Android 全项目弹窗统一用它构建（不再用 appcompat `AlertDialog.Builder`）。见 `docs/07-ios-design-system.md`。
 - **materialAlertDialogTheme / alertDialogTheme**
@@ -109,6 +111,11 @@ BaiFlow 涉及的关键术语速查。按字母序。
   首次部署创建管理员所需的一次性凭据：服务器未初始化时启动生成（32 字节随机），打印到启动日志并落盘 `setup-token.txt`（仅属主可读），初始化成功即作废。用于堵住「公开初始化入口被扫描抢注管理员」的窗口。见 `docs/03-api.md`「系统」。
 - **System Setup（系统初始化 / 首次部署向导）**
   首次部署创建第一个管理员的过程：Web 端 `/setup` 页面（Android 只识别未初始化并引导去浏览器）。是否初始化由 `bf_system_setting.initialized_at` **单向标记**判定，写入后入口永久关闭；初始化成功直接签发登录会话，不用再输密码。见 `docs/04-frontend.md`「首次部署向导」。
+
+## T
+
+- **TOC（Markdown 预览目录）**
+  长 Markdown 的章节目录：收 **h1–h3**、按层级缩进、当前章节高亮、点击跳转。**两端形态不同（有意）**：Web 是预览抽屉内的左侧常驻可折叠栏（自身不可拖，要调正文/目录比例就拖整个抽屉），Android 屏幕小、改为右下悬浮钮 + 右侧滑入面板。见 `docs/04-frontend.md`「Markdown 预览」、`docs/05-android.md`「Markdown 预览」。
 
 ## U
 

@@ -8,7 +8,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,12 +29,11 @@ import java.util.List;
  * 校验：记录存在 && 未过期；ANDROID/WEB 会话滑动续期（节流 1h 写库）；role 取用户表当前值。
  */
 @Component
+@RequiredArgsConstructor
 public class SessionAuthenticationFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private SessionTokenService sessionTokenService;
-    @Autowired
-    private BfUserMapper userMapper;
+    private final SessionTokenService sessionTokenService;
+    private final BfUserMapper userMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -47,6 +46,8 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
                     && session.getExpiresAt() != null && session.getExpiresAt().isAfter(now)) {
                 BfUser user = userMapper.selectById(session.getUserId());
                 if (user != null) {
+                    // 本请求已读到这一行，挂进请求供下游复用（同一行不查两次，见 docs/06「数据库往返」）
+                    RequestUserHolder.bind(user);
                     // 滑动续期：距上次续期超过 1 小时则写库顺延（ANDROID / WEB 通用）
                     if (session.getLastUsedAt() != null
                             && Duration.between(session.getLastUsedAt(), now)

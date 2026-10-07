@@ -1,8 +1,8 @@
 package com.baiflow.schedule;
 
 import com.baiflow.storage.service.BfStorageRootService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -28,15 +28,15 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "baiflow.nas.health-check-enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "baiflow.nas.health-check-enabled", havingValue = "true", matchIfMissing = false)
+@RequiredArgsConstructor
 public class NasHealthScheduler {
 
-    @Autowired
-    private BfStorageRootService storageService;
+    private final BfStorageRootService storageService;
 
     /**
      * 每 60 秒执行一次 NAS 健康检查。
-     * 仅在 {@code baiflow.nas.health-check-enabled} 为 true 时执行（默认 true）。
+     * 仅在 {@code baiflow.nas.health-check-enabled} 为 true 时执行（默认关闭）。
      */
     @Scheduled(fixedRateString = "${baiflow.nas.health-check-interval-ms:60000}",
                initialDelayString = "${baiflow.nas.health-check-initial-delay-ms:10000}")

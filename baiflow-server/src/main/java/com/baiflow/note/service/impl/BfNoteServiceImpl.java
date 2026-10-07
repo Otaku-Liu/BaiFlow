@@ -17,8 +17,9 @@ import com.baiflow.note.service.BfNoteService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,16 +33,13 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class BfNoteServiceImpl implements BfNoteService {
 
-    @Autowired
-    private BfNoteMapper noteMapper;
-    @Autowired
-    private BfNoteProgressMapper progressMapper;
-    @Autowired
-    private BfNoteProgressService noteProgressService;
-    @Autowired
-    private SseService sseService;
+    private final BfNoteMapper noteMapper;
+    private final BfNoteProgressMapper progressMapper;
+    private final BfNoteProgressService noteProgressService;
+    private final SseService sseService;
 
     @Override
     public IPage<NoteSummary> listNotes(String userId, boolean isAdmin, String viewUserId,
@@ -73,17 +71,49 @@ public class BfNoteServiceImpl implements BfNoteService {
 
     @Override
     @Transactional
-    public NoteDetail createNote(String userId, String title, String content) {
+    public NoteDetail createNote(String userId, String id, String title, String content) {
         BfNote note = new BfNote();
         note.setUserId(userId);
         note.setTitle(title != null ? title : "");
         note.setContent(content != null ? content : "");
         note.setStatus(NoteStatus.ACTIVE);
-        noteMapper.insert(note);
+        if (id != null && !id.isBlank()) {
+            // 客户端给了 id：先按它插（不先查 —— 先查后插在并发下会双双插进去）
+            note.setId(id);
+        }
+        try {
+            noteMapper.insert(note);
+        } catch (DuplicateKeyException e) {
+            // 同 id 已存在 = 同一次创建的重发：返回第一次的结果，而不是再建一条（幂等）
+            return existingByIdempotentId(userId, id, note, e);
+        }
         // 重新查询以回填数据库生成的时间戳（created_at/updated_at）
         BfNote saved = noteMapper.selectById(note.getId());
         publishUpdated(userId, saved);
         return NoteDetail.from(saved);
+    }
+
+    /**
+     * 客户端 id 撞主键时的处理：只有**同一个人**的笔记才当作重发返回；
+     * 撞上别人的 id 说明客户端生成有误（或有人在猜 id），不能把别人的笔记返回给调用方。
+     */
+    private NoteDetail existingByIdempotentId(String userId, String id, BfNote note, DuplicateKeyException cause) {
+        BfNote existing = id == null ? null : noteMapper.selectById(id);
+        if (existing == null) {
+            throw cause;   // 撞的不是笔记表主键，交回上层
+        }
+        if (!userId.equals(existing.getUserId())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "笔记 ID 已被占用，请重新创建");
+        }
+        if (existing.getStatus() != NoteStatus.ACTIVE) {
+            // 服务端这条已被删除（客户端那侧要「重建」）：这是合法新建，不能把已删除的当作重发结果返回
+            note.setId(null);
+            noteMapper.insert(note);
+            BfNote recreated = noteMapper.selectById(note.getId());
+            publishUpdated(userId, recreated);
+            return NoteDetail.from(recreated);
+        }
+        return NoteDetail.from(existing);
     }
 
     @Override

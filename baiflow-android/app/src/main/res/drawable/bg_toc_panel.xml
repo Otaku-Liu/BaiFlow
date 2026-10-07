@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 目录面板背景：白底卡片，贴屏幕右侧边，只圆左侧两角（投影由 elevation 提供） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/white" />
+    <corners
+        android:topLeftRadius="12dp"
+        android:bottomLeftRadius="12dp" />
+</shape>

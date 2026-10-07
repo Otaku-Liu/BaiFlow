@@ -28,7 +28,8 @@ Android 客户端统一为**类 iOS 简约风**。基础是 Java + XML Views（*
 ## drawable
 
 - 卡片 / 列表：`bg_card`、`bg_list_item`、`bg_avatar`、`bg_role_tag`
-- 弹层：`bg_dropdown_rounded`；图标：`ic_back_chevron`、`ic_folder`、`ic_nav_*`、`ic_type_*`
+- 弹层：`bg_dropdown_rounded`；Markdown 目录：`bg_toc_fab`（白圆钮 + 1dp 描边）、`bg_toc_panel`（白底、只圆左侧两角）
+- 图标：`ic_back_chevron`、`ic_folder`、`ic_nav_*`、`ic_type_*`、`ic_toc`（目录，三条递进缩进的横线示意 h1–h3）
 - 点击涟漪：单卡片 `bg_ripple_rounded`（四角圆角）；多行卡片按行位置选——首行 `bg_ripple_top`（上圆下直）、末行 `bg_ripple_bottom`（下圆上直），若出现中间行需新增全直角 `bg_ripple_middle`。保证点击高亮与卡片圆角曲率一致
 
 ## 自定义组件（`ui/widget/`）

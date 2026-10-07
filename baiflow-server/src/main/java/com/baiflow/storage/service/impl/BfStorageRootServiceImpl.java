@@ -15,7 +15,7 @@ import com.baiflow.storage.service.BfStorageRootService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
@@ -26,10 +26,10 @@ import java.util.List;
  * 存储根目录管理服务实现。
  */
 @Service
+@RequiredArgsConstructor
 public class BfStorageRootServiceImpl extends ServiceImpl<BfStorageRootMapper, BfStorageRoot> implements BfStorageRootService {
 
-    @Autowired
-    private I18nUtil i18nUtil;
+    private final I18nUtil i18nUtil;
 
     @Override
     public StorageRootInfo createRoot(CreateStorageRootRequest req) {

@@ -6,7 +6,7 @@ import com.baiflow.note.dto.request.BatchMediaRequest;
 import com.baiflow.note.dto.response.NoteMediaInfo;
 import com.baiflow.note.service.BfNoteMediaService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -27,10 +27,10 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/notes/media")
+@RequiredArgsConstructor
 public class BfNoteMediaController {
 
-    @Autowired
-    private BfNoteMediaService noteMediaService;
+    private final BfNoteMediaService noteMediaService;
 
     /** 上传笔记媒体（multipart），返回含访问 URL 的信息 */
     @PostMapping

@@ -64,8 +64,10 @@ CREATE TABLE IF NOT EXISTS `bf_file_item` (
     `updated_at`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `last_opened_at`        DATETIME     NULL COMMENT '上次打开时间（文件预览/下载、进入目录时更新；不含分享下载）',
     `deleted_at`            DATETIME     NULL COMMENT '软删除时间（NULL 表示未删除）',
+    `path_hash`             CHAR(64)      GENERATED ALWAYS AS (IF(`status` = 'ACTIVE', SHA2(`relative_path`, 256), NULL)) STORED COMMENT 'ACTIVE 行的 relative_path 哈希（软删除行为 NULL）：只供下面那条唯一索引使用，代码不读写',
     PRIMARY KEY (`id`),
     KEY `idx_file_item_storage_parent` (`storage_root_id`, `parent_id`),
+    UNIQUE KEY `uk_file_item_active_path` (`storage_root_id`, `path_hash`),
     KEY `idx_file_item_storage_path` (`storage_root_id`, `relative_path`(255)),
     KEY `idx_file_item_owner` (`owner_user_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件项表（存储文件和目录的元数据，文件本体落磁盘）';
@@ -84,7 +86,7 @@ CREATE TABLE IF NOT EXISTS `bf_user_storage_permission` (
     `updated_at`      DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_usp_user_root` (`user_id`, `storage_root_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户存储权限表（定义用户对存储根目录或文件/文件夹的访问级别）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户存储权限表（定义用户对存储根目录或文件/文件夹的访问级别）；已建未用：权限模型提前设计未落地，代码已删，表保留';
 
 -- -----------------------------------------------------------
 -- 隐私文件夹访问会话表
@@ -118,7 +120,7 @@ CREATE TABLE IF NOT EXISTS `bf_transfer_task` (
     PRIMARY KEY (`id`),
     KEY `idx_tt_user_status` (`created_by`, `status`, `created_at`),
     KEY `idx_tt_type_status` (`task_type`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='传输任务表（上传、下载、设备流转）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='传输任务表（上传、下载、设备流转）；已建未用：无写入方，代码已删，表保留';
 
 -- -----------------------------------------------------------
 -- 用户通知表
@@ -134,7 +136,7 @@ CREATE TABLE IF NOT EXISTS `bf_notification` (
     `read_at`     DATETIME     NULL COMMENT '标记已读的时间',
     PRIMARY KEY (`id`),
     KEY `idx_notif_user_read` (`user_id`, `read_status`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户通知表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户通知表；已建未用：无创建入口，代码已删，表保留';
 
 -- -----------------------------------------------------------
 -- 分享链接表

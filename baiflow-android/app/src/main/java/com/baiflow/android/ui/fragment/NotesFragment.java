@@ -179,7 +179,8 @@ public class NotesFragment extends Fragment {
 
         void setItems(List<LocalNote> items) { this.items = items; notifyDataSetChanged(); }
 
-        @NonNull @Override
+        @NonNull
+        @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_note, parent, false);
             return new ViewHolder(v);

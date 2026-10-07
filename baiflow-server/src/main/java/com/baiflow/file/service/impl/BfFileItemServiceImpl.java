@@ -1,5 +1,6 @@
 package com.baiflow.file.service.impl;
 
+import com.baiflow.auth.security.RequestUserHolder;
 import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
@@ -22,15 +23,13 @@ import com.baiflow.file.enums.FileItemStatus;
 import com.baiflow.file.enums.ItemType;
 import com.baiflow.file.enums.PrivacyMode;
 import com.baiflow.file.mapper.BfFileItemMapper;
-import com.baiflow.file.service.FileConvertService;
+import com.baiflow.file.service.LastOpenedBuffer;
 import com.baiflow.file.service.BfFileItemService;
 import com.baiflow.file.service.BfPlaybackProgressService;
 import com.baiflow.file.service.BfPrivateFolderAccessService;
 import com.baiflow.storage.entity.BfStorageRoot;
-import com.baiflow.storage.entity.BfUserStoragePermission;
 import com.baiflow.storage.enums.StorageRootStatus;
 import com.baiflow.storage.service.BfStorageRootService;
-import com.baiflow.storage.service.BfUserStoragePermissionService;
 import com.baiflow.user.entity.BfUser;
 import com.baiflow.user.enums.UserRole;
 import com.baiflow.user.mapper.BfUserMapper;
@@ -38,10 +37,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,10 +56,13 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -70,32 +73,24 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileItem> implements BfFileItemService {
 
     private static final int ACCESS_TOKEN_BYTES = 32;
     /** 隐私文件夹访问会话有效期（分钟） */
     private static final int ACCESS_SESSION_MINUTES = 30;
+    /** 批量落库时单条 UPDATE 的 id 上限 */
+    private static final int BATCH_UPDATE_SIZE = 500;
 
-    @Autowired
-    private I18nUtil i18nUtil;
-    @Autowired
-    private BfStorageRootService storageService;
-    @Autowired
-    private BfUserStoragePermissionService userStoragePermissionService;
-    @Autowired
-    private BfPrivateFolderAccessService privateFolderAccessService;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private BfUserMapper userMapper;
-    @Autowired
-    private BfPlaybackProgressService playbackProgressService;
-    @Autowired
-    private BfDownloadRecordService downloadRecordService;
-    @Autowired
-    private BfUploadRecordService uploadRecordService;
-    @Autowired
-    private FileConvertService convertService;
+    private final I18nUtil i18nUtil;
+    private final BfStorageRootService storageService;
+    private final BfPrivateFolderAccessService privateFolderAccessService;
+    private final PasswordEncoder passwordEncoder;
+    private final BfUserMapper userMapper;
+    private final BfPlaybackProgressService playbackProgressService;
+    private final BfDownloadRecordService downloadRecordService;
+    private final BfUploadRecordService uploadRecordService;
+    private final LastOpenedBuffer lastOpenedBuffer;
 
     @Override
     public IPage<FileItemInfo> listFiles(String rootId, String parentId, int page, int size,
@@ -111,10 +106,10 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
 
         // 非管理员：只能看自己的文件，且以主目录为根
         String effectiveOwner = isAdmin && viewUserId != null ? viewUserId : userId;
-        boolean openedFolder = parentId != null && !parentId.isBlank();
         if (!isAdmin || viewUserId != null) {
-            // 确保用户存在
-            BfUser u = userMapper.selectById(effectiveOwner);
+            // 确保用户存在：看自己的文件时，鉴权过滤器本请求刚读过这一行，直接复用（不再查库）
+            BfUser u = RequestUserHolder.getOrLoad(effectiveOwner,
+                    () -> userMapper.selectById(effectiveOwner));
             if (u == null) {
                 throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
             }
@@ -125,14 +120,17 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
             }
         }
 
-        // 进入文件夹前检查隐私保护
-        checkPrivacyAccess(parentId, userId, privacyAccessToken);
-
-        // 进入具体文件夹时记录该目录的上次打开时间（root 视图 parentId 为空不记录）
-        if (openedFolder) {
-            touchFolderOpen(parentId, userId, isAdmin);
+        // 进入具体文件夹：一次取回该目录实体，隐私校验与「上次打开」共用（同一行不查两次）
+        if (parentId != null && !parentId.isBlank()) {
+            BfFileItem opened = getById(parentId);
+            checkPrivacyAccess(opened, userId, privacyAccessToken);
+            touchFolderOpen(opened, userId, isAdmin);
         }
 
+        // 一次取回本目录全部子项再在内存里切片：**刻意不用 page()** —— MyBatis-Plus 的分页
+        // 默认先发一条 COUNT 再发分页查询，等于多一次往返；而这里从 list 的 size 就拿到了 total。
+        // 远端库下往返次数优先，个人规模的目录（几十~几百项）这样更划算。
+        // 目录极大时（数千项）这份内存与传输量是已知代价，届时再评估分页/削列。
         List<BfFileItem> items;
         if (!isAdmin || viewUserId != null) {
             // 限定到指定用户的文件
@@ -260,7 +258,7 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
             throw new BusinessException(ErrorCode.NOT_FOUND, "磁盘文件不存在");
         }
         // 记录上次打开时间（预览复用本方法，故预览/下载都会更新）
-        touchLastOpened(f.getId());
+        lastOpenedBuffer.touch(f.getId());
         return new FileSystemResource(fp);
     }
 
@@ -551,13 +549,6 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
      *
      * @return 有效 parentId（非管理员且原 parentId 为空时返回主目录 ID）
      */
-    /**
-     * 将用户文件操作限定到其主目录内。
-     * <p>所有用户（包括 ADMIN）在 parentId 为空时默认定位到自己的 home 目录，
-     * 避免文件直接落在存储根层级。导航到具体子目录后则以实际 parentId 为准。</p>
-     *
-     * @return 有效 parentId（原 parentId 为空时返回当前用户的主目录 ID）
-     */
     private String scopeToHome(String rootId, String userId, String parentId) {
         BfUser u = userMapper.selectById(userId);
         String username = u != null ? u.getUsername() : userId;
@@ -568,19 +559,6 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
         return parentId;
     }
 
-    /**
-     * 校验用户对指定存储根目录的访问权限。
-     * 非管理员必须持有对应 {@code user_storage_permission} 记录。
-     */
-    private void verifyAccess(String userId, String rootId) {
-        if (userStoragePermissionService.getOne(new LambdaQueryWrapper<BfUserStoragePermission>()
-                .eq(BfUserStoragePermission::getUserId, userId)
-                .eq(BfUserStoragePermission::getStorageRootId, rootId)
-                .isNull(BfUserStoragePermission::getFileItemId)
-                .last("LIMIT 1")) == null) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问此存储");
-        }
-    }
 
     /**
      * 校验存储根目录是否可用于写入操作。
@@ -601,40 +579,106 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
      * 访问令牌通过 {@code X-Privacy-Access-Token} 头传入，
      * 其哈希值与 {@code private_folder_access} 表中的记录比对。
      * <p>
-     * ADMIN 用户仍需通过隐私验证（设计决策：管理员也不应绕过隐私密码）。
+     * 管理员访问隐私空间/隐私文件夹**免密码**（与 docs/01 一致；此处此前误写为"管理员也需验证"）。
      *
      * @param fileItemId  当前要访问的文件项 ID（可为 null，表示根层级）
      * @param userId      访问用户 ID
      * @param accessToken 隐私访问令牌（可为 null 或空字符串）
-     * @throws BusinessException PRIVATE_PASSWORD_REQUIRED 需要隐私密码但未提供访问令牌
-     * @throws BusinessException PRIVATE_PASSWORD_INVALID 访问令牌无效或已过期
+     *
+     * <p>只拿到 id 的入口：先取该行，再交给下面那个实体版重载（调用方已有实体时用实体版，省一次往返）。
      */
     private void checkPrivacyAccess(String fileItemId, String userId, String accessToken) {
-        // 向上遍历父目录链，查找隐私文件夹
-        String cursorId = fileItemId;
-        while (cursorId != null) {
-            BfFileItem cursor = getById(cursorId);
-            if (cursor == null) {
-                break;
-            }
-            if (cursor.getPrivacyMode() == PrivacyMode.PRIVATE) {
-                // 管理员访问隐私空间/隐私文件夹免密码
-                BfUser caller = userMapper.selectById(userId);
-                if (caller != null && caller.getRole() == UserRole.ADMIN) {
-                    return;
-                }
-                // 隐私空间尚未设置密码：要求先设置（首访流程）
-                String hash = cursor.getPrivacyPasswordHash();
-                if (hash == null || hash.isEmpty()) {
-                    throw new BusinessException(ErrorCode.PRIVATE_SETUP_REQUIRED,
-                            "隐私空间尚未设置密码，请先设置隐私密码");
-                }
-                // 发现隐私文件夹——要求提供有效访问令牌
-                requireValidAccessToken(cursor.getId(), userId, accessToken);
-                return; // 找到第一个隐私文件夹即返回（不需要继续向上）
-            }
-            cursorId = cursor.getParentId();
+        if (fileItemId == null || fileItemId.isBlank()) {
+            return;
         }
+        checkPrivacyAccess(getById(fileItemId), userId, accessToken);
+    }
+
+    /**
+     * 隐私校验：取回整条祖先链（含自身）后，看有没有命中 PRIVATE。
+     * <p>
+     * 祖先链用**一条 IN 查询**拿回：按相对路径推出各级祖先路径即可，不必逐级 {@code getById}
+     * —— 走几层就是几次往返，远端库下每次 40–75ms（见 {@code docs/06-coding-standards.md}「数据库往返」）。
+     * 从 target 往上找到**第一个**命中的隐私文件夹即返回（与逐级遍历的语义一致）。
+     */
+    private void checkPrivacyAccess(BfFileItem target, String userId, String accessToken) {
+        if (target == null) {
+            return;
+        }
+        List<String> paths = ancestorPaths(target.getRelativePath());   // 含自身，由浅到深
+        if (paths.isEmpty()) {
+            return;
+        }
+        // 自身先判：调用方已经拿到这一行，不必再查
+        if (privacyHit(target, userId, accessToken)) {
+            return;
+        }
+        // 其余祖先一条 IN 取回，再按由深到浅走（SQL 返回的行序不保证，不能当下标用）
+        List<String> ancestors = paths.subList(0, paths.size() - 1);
+        if (ancestors.isEmpty()) {
+            return;
+        }
+        Map<String, BfFileItem> byPath = ancestorsOf(target, ancestors).stream()
+                .collect(Collectors.toMap(BfFileItem::getRelativePath, f -> f, (a, b) -> a));
+        for (int i = ancestors.size() - 1; i >= 0; i--) {
+            if (privacyHit(byPath.get(ancestors.get(i)), userId, accessToken)) {
+                return;
+            }
+        }
+    }
+
+    /** 命中隐私文件夹则校验访问令牌并返回 true；与逐级遍历一致，找到第一个即返回 */
+    private boolean privacyHit(BfFileItem item, String userId, String accessToken) {
+        if (item == null || item.getPrivacyMode() != PrivacyMode.PRIVATE) {
+            return false;
+        }
+        // 管理员访问隐私空间/隐私文件夹免密码（role 取本次请求已读到的用户，不再查库）
+        BfUser caller = RequestUserHolder.getOrLoad(userId, () -> userMapper.selectById(userId));
+        if (caller != null && caller.getRole() == UserRole.ADMIN) {
+            return true;
+        }
+        // 隐私空间尚未设置密码：要求先设置（首访流程）
+        String hash = item.getPrivacyPasswordHash();
+        if (hash == null || hash.isEmpty()) {
+            throw new BusinessException(ErrorCode.PRIVATE_SETUP_REQUIRED,
+                    "隐私空间尚未设置密码，请先设置隐私密码");
+        }
+        // 发现隐私文件夹——要求提供有效访问令牌
+        requireValidAccessToken(item.getId(), userId, accessToken);
+        return true;
+    }
+
+    /**
+     * 取目标及其各级祖先（含自身），**一条** IN 查询。
+     * <p>祖先路径由目标自身的 {@code relative_path} 按 {@code /} 推出来，
+     * 命中索引 {@code idx_file_item_storage_path}；路径不可信的脏数据只会少返回几行，
+     * 与逐级遍历时中途取不到行而中断的语义一致。
+     */
+    private List<BfFileItem> ancestorsOf(BfFileItem target, List<String> paths) {
+        return list(new LambdaQueryWrapper<BfFileItem>()
+                .eq(BfFileItem::getStorageRootId, target.getStorageRootId())
+                .eq(BfFileItem::getStatus, FileItemStatus.ACTIVE.name())
+                .in(BfFileItem::getRelativePath, paths));
+    }
+
+    /** {@code admin/学习资料/123} → {@code [admin, admin/学习资料, admin/学习资料/123]} */
+    private List<String> ancestorPaths(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return List.of();
+        }
+        List<String> paths = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        for (String segment : relativePath.split("/")) {
+            if (segment.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('/');
+            }
+            sb.append(segment);
+            paths.add(sb.toString());
+        }
+        return paths;
     }
 
     /**
@@ -772,27 +816,39 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
         return result;
     }
 
-    /** 记录「上次打开时间」：显式 SET updated_at = updated_at，利用 MySQL ON UPDATE CURRENT_TIMESTAMP「显式赋值当前值时不触发」的规则，避免打开≠修改 */
-    private void touchLastOpened(String fileItemId) {
-        lambdaUpdate().eq(BfFileItem::getId, fileItemId)
-                .set(BfFileItem::getLastOpenedAt, LocalDateTime.now())
-                .setSql("updated_at = updated_at")
-                .update();
-    }
-
-    /** 进入目录时记录「上次打开时间」：仅当目标确为目录且调用者有权访问（无权静默跳过，不改变现有列表行为） */
-    private void touchFolderOpen(String folderId, String userId, boolean isAdmin) {
-        if (folderId == null) {
+    @Override
+    public void touchLastOpenedBatch(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
             return;
         }
-        BfFileItem folder = getById(folderId);
+        // 统一取刷库时间：这些目录的打开都发生在最近一个周期内，精度够用，
+        // 换来「一条 UPDATE 写完整批」（逐条给不同时间戳就得 N 条或手拼 CASE SQL）
+        LocalDateTime now = LocalDateTime.now();
+        List<String> all = new ArrayList<>(ids);
+        // 按 BATCH_UPDATE_SIZE 分批，避免单条 IN 过长
+        for (int i = 0; i < all.size(); i += BATCH_UPDATE_SIZE) {
+            List<String> batch = all.subList(i, Math.min(i + BATCH_UPDATE_SIZE, all.size()));
+            lambdaUpdate().in(BfFileItem::getId, batch)
+                    .set(BfFileItem::getLastOpenedAt, now)
+                    // 打开目录不改「更新时间」：保持原语义（原实现同样刻意不动 updated_at）
+                    .setSql("updated_at = updated_at")
+                    .update();
+        }
+    }
+
+    /**
+     * 进入目录时记录「上次打开时间」：仅当目标确为目录且调用者有权访问（无权静默跳过，不改变现有列表行为）。
+     * 只写内存缓冲，由 {@code LastOpenedFlushScheduler} 批量落库 —— 进目录是一次 GET，
+     * 不能在这里同步 UPDATE（多一次往返 + 读路径上的行锁）。
+     */
+    private void touchFolderOpen(BfFileItem folder, String userId, boolean isAdmin) {
         if (folder == null || folder.getItemType() != ItemType.DIRECTORY) {
             return;
         }
         if (!SecurityUtils.isOwnerOrAdmin(folder.getOwnerUserId(), userId, isAdmin)) {
             return;
         }
-        touchLastOpened(folderId);
+        lastOpenedBuffer.touch(folder.getId());
     }
 
     /**
@@ -827,70 +883,84 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
         }
     }
 
-    /**
-     * 获取或创建用户的个人主目录（如百度网盘的"我的文件"）。
-     * <p>
-     * 在主目录下以用户名创建一个文件夹，作为该用户在文件中心的入口。
-     * 已存在则不重复创建。
-     *
-     * @param rootId   存储根目录 ID
-     * @param userId   用户 ID
-     * @param username 用户名（用作主目录名称）
-     * @return 主目录的 BfFileItem ID
-     */
     /** 隐私空间固定文件夹名（主目录直接子目录，用户不可在其路径下新建同名文件夹） */
     private static final String PRIVACY_SPACE_NAME = "隐私空间";
 
+    /**
+     * 确保用户有主目录与它下面的「隐私空间」，返回主目录 id。
+     * <p>
+     * 两行**一条查询**取回（按相对路径 IN）：每次进入文件中心都会走到这里，分开查就是白花一次往返；
+     * 缺哪个建哪个。
+     */
     private String getOrCreateHomeFolder(String rootId, String userId, String username) {
-        String relativePath = username;
-        BfFileItem home = findByPath(rootId, relativePath);
-        if (home == null || home.getStatus() != FileItemStatus.ACTIVE) {
+        String spacePath = username + "/" + PRIVACY_SPACE_NAME;
+        List<BfFileItem> found = list(new LambdaQueryWrapper<BfFileItem>()
+                .eq(BfFileItem::getStorageRootId, rootId)
+                .eq(BfFileItem::getStatus, FileItemStatus.ACTIVE.name())
+                .in(BfFileItem::getRelativePath, List.of(username, spacePath)));
+
+        BfFileItem home = found.stream()
+                .filter(f -> username.equals(f.getRelativePath()))
+                .findFirst()
+                .orElse(null);
+        String existingHomeId = home == null ? null : home.getId();
+        boolean hasPrivacySpace = existingHomeId != null && found.stream()
+                .anyMatch(f -> spacePath.equals(f.getRelativePath()) && existingHomeId.equals(f.getParentId()));
+
+        if (home == null || !hasPrivacySpace) {
+            // 只有真要建东西时才取存储根，且两个 create 共用同一次查询
+            // （原先各取一次 = 冷启动同一行查两次，见 docs/06「数据库往返」）
             BfStorageRoot root = storageService.getByIdOrThrow(rootId);
-            Path homePath = storageService.resolveRootPath(root).resolve(relativePath).normalize();
-            storageService.verifyPathInRoot(root, homePath);
-
-            try {
-                Files.createDirectories(homePath);
-            } catch (IOException e) {
-                throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
-                        i18nUtil.translate("无法创建用户主目录：") + e.getMessage());
+            if (home == null) {
+                home = createHomeFolder(root, userId, username);
             }
-
-            home = new BfFileItem();
-            home.setStorageRootId(rootId);
-            home.setParentId(null);
-            home.setOwnerUserId(userId);
-            home.setName(username);
-            home.setRelativePath(relativePath);
-            home.setItemType(ItemType.DIRECTORY);
-            home.setSizeBytes(0L);
-            home.setPrivacyMode(PrivacyMode.NORMAL);
-            home.setStatus(FileItemStatus.ACTIVE);
-            save(home);
-
-            log.info("已为用户 {} 创建主目录: {} (root={})", username, relativePath, rootId);
+            if (!hasPrivacySpace) {
+                createPrivacySpace(root, userId, home, spacePath);
+            }
         }
-
-        // 同时确保该用户存在「隐私空间」（PRIVATE、密码未设置，首访时设置）
-        ensurePrivacySpace(rootId, home, userId);
         return home.getId();
     }
 
-    /** 确保用户主目录下有「隐私空间」子目录；已存在则跳过 */
-    private void ensurePrivacySpace(String rootId, BfFileItem home, String userId) {
-        String homeId = home.getId();
-        BfFileItem space = getOne(new LambdaQueryWrapper<BfFileItem>()
-                .eq(BfFileItem::getStorageRootId, rootId)
-                .eq(BfFileItem::getParentId, homeId)
-                .eq(BfFileItem::getName, PRIVACY_SPACE_NAME)
-                .eq(BfFileItem::getStatus, FileItemStatus.ACTIVE)
-                .last("LIMIT 1"));
-        if (space != null) {
-            return;
+    private BfFileItem createHomeFolder(BfStorageRoot root, String userId, String username) {
+        Path homePath = storageService.resolveRootPath(root).resolve(username).normalize();
+        storageService.verifyPathInRoot(root, homePath);
+
+        try {
+            Files.createDirectories(homePath);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.FILE_OPERATION_FAILED,
+                    i18nUtil.translate("无法创建用户主目录：") + e.getMessage());
         }
 
-        BfStorageRoot root = storageService.getByIdOrThrow(rootId);
-        String rel = home.getRelativePath() + "/" + PRIVACY_SPACE_NAME;
+        BfFileItem home = new BfFileItem();
+        home.setStorageRootId(root.getId());
+        home.setParentId(null);
+        home.setOwnerUserId(userId);
+        home.setName(username);
+        home.setRelativePath(username);
+        home.setItemType(ItemType.DIRECTORY);
+        home.setSizeBytes(0L);
+        home.setPrivacyMode(PrivacyMode.NORMAL);
+        home.setStatus(FileItemStatus.ACTIVE);
+        try {
+            save(home);
+        } catch (DuplicateKeyException e) {
+            // 并发首访：另一个请求刚建好同一路径（uk_file_item_active_path 拦下）→ 用它的
+            BfFileItem created = findByPath(root.getId(), username);
+            if (created != null) {
+                return created;
+            }
+            throw e;
+        }
+
+        log.info("已为用户 {} 创建主目录: {}", username, username);
+        return home;
+    }
+
+    /** 确保用户主目录下有「隐私空间」子目录；已存在则跳过 */
+    /** 创建「隐私空间」目录（是否已存在由调用方的批量查询判断，这里只负责建） */
+    private void createPrivacySpace(BfStorageRoot root, String userId, BfFileItem home, String rel) {
+        String homeId = home.getId();
         Path spacePath = storageService.resolveRootPath(root).resolve(rel).normalize();
         storageService.verifyPathInRoot(root, spacePath);
         try {
@@ -901,7 +971,7 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
         }
 
         BfFileItem spaceItem = new BfFileItem();
-        spaceItem.setStorageRootId(rootId);
+        spaceItem.setStorageRootId(root.getId());
         spaceItem.setParentId(homeId);
         spaceItem.setOwnerUserId(userId);
         spaceItem.setName(PRIVACY_SPACE_NAME);
@@ -912,7 +982,13 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
         spaceItem.setPrivacyMode(PrivacyMode.PRIVATE);
         spaceItem.setPrivacyPasswordHash("");
         spaceItem.setStatus(FileItemStatus.ACTIVE);
-        save(spaceItem);
+        try {
+            save(spaceItem);
+        } catch (DuplicateKeyException e) {
+            // 并发首访：另一个请求刚建好 → 忽略，返回即可（getOrCreate 的语义）
+            log.debug("隐私空间已被并发创建，忽略: {}", rel);
+            return;
+        }
 
         log.info("已为用户 {} 创建隐私空间: {}", userId, rel);
     }
@@ -947,18 +1023,10 @@ public class BfFileItemServiceImpl extends ServiceImpl<BfFileItemMapper, BfFileI
 
     @Override
     public Resource previewFile(String fileId, String userId, boolean isAdmin, String privacyAccessToken) {
-        // 复用 downloadFile 的校验逻辑（存在性、类型、权限、路径穿越）
-        Resource original = downloadFile(fileId, userId, isAdmin, privacyAccessToken);
-
-        // Office 文件自动转换为 PDF 后返回
-        BfFileItem file = getById(fileId);
-        if (file != null && convertService.needsConversion(file)) {
-            Path pdfPath = convertService.convertToPdf(file);
-            if (pdfPath != null && Files.exists(pdfPath)) {
-                return new FileSystemResource(pdfPath);
-            }
-        }
-        return original;
+        // 复用 downloadFile 的校验逻辑（存在性、类型、权限、路径穿越）。
+        // 原先这里还会再 getById 一次做「Office 转 PDF」，已删：运行镜像没装 libreoffice，
+        // 该分支恒失败；且文档写明 Office 不支持在线预览。顺带省掉一次多余的查询。
+        return downloadFile(fileId, userId, isAdmin, privacyAccessToken);
     }
 
     @Override

@@ -1,6 +1,6 @@
 package com.baiflow.common.util;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
@@ -17,10 +17,10 @@ import java.util.Locale;
  * </p>
  */
 @Component
+@RequiredArgsConstructor
 public class I18nUtil {
 
-    @Autowired
-    private MessageSource messageSource;
+    private final MessageSource messageSource;
 
     /**
      * 翻译消息。传入中文默认文案，返回当前请求语言对应的译文；

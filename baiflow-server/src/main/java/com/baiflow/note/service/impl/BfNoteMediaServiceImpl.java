@@ -1,6 +1,6 @@
 package com.baiflow.note.service.impl;
 
-import com.baiflow.auth.config.BaiflowProperties;
+import com.baiflow.common.config.BaiflowProperties;
 import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
@@ -10,8 +10,8 @@ import com.baiflow.note.entity.BfNoteMedia;
 import com.baiflow.note.enums.NoteMediaType;
 import com.baiflow.note.mapper.BfNoteMediaMapper;
 import com.baiflow.note.service.BfNoteMediaService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,6 +34,7 @@ import java.util.Set;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class BfNoteMediaServiceImpl implements BfNoteMediaService {
 
     /** 媒体文件大小上限：20MB（图片/短录音/画画均远小于此） */
@@ -58,12 +59,9 @@ public class BfNoteMediaServiceImpl implements BfNoteMediaService {
             "audio/mpeg", "mp3", "audio/mp4", "m4a", "audio/x-m4a", "m4a",
             "audio/3gpp", "3gp", "audio/ogg", "ogg", "audio/wav", "wav");
 
-    @Autowired
-    private BfNoteMediaMapper mediaMapper;
-    @Autowired
-    private BaiflowProperties properties;
-    @Autowired
-    private I18nUtil i18nUtil;
+    private final BfNoteMediaMapper mediaMapper;
+    private final BaiflowProperties properties;
+    private final I18nUtil i18nUtil;
 
     @Override
     @Transactional

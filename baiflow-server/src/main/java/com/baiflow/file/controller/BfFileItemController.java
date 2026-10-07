@@ -15,7 +15,7 @@ import com.baiflow.file.service.BfFileItemService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -31,18 +31,17 @@ import java.util.Map;
 /**
  * 文件管理接口控制器 — 处理文件浏览、上传、下载、文件夹创建、重命名、移动、删除和隐私文件夹管理。
  * <p>
- * 所有接口要求认证。非 ADMIN 用户需通过 {@code user_storage_permission} 校验存储访问权限。
+ * 所有接口要求认证。非 ADMIN 用户的文件视图限定在本人主目录内（存储权限模型未落地）。
  * 隐私文件夹（PRIVATE 模式）要求提供 {@code X-Privacy-Access-Token} 头，
  * 通过 {@code POST /api/files/{id}/privacy/verify} 获取短期访问令牌后可免重复输入密码。
  */
 @RestController
 @RequestMapping("/api/files")
+@RequiredArgsConstructor
 public class BfFileItemController {
 
-    @Autowired
-    private BfFileItemService fileService;
-    @Autowired
-    private BfDownloadRecordService downloadRecordService;
+    private final BfFileItemService fileService;
+    private final BfDownloadRecordService downloadRecordService;
 
     /**
      * 列出指定存储根目录或文件夹下的子文件/子目录（目录优先排序）。

@@ -5,7 +5,7 @@ import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.uploadrecord.dto.response.UploadRecordInfo;
 import com.baiflow.uploadrecord.service.BfUploadRecordService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +18,10 @@ import java.time.LocalDate;
  */
 @RestController
 @RequestMapping("/api/upload-records")
+@RequiredArgsConstructor
 public class BfUploadRecordController {
 
-    @Autowired
-    private BfUploadRecordService uploadRecordService;
+    private final BfUploadRecordService uploadRecordService;
 
     @GetMapping
     public ApiResponse<IPage<UploadRecordInfo>> list(

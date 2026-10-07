@@ -17,6 +17,12 @@ public class LocalNote {
     public long id;
     /** 服务端笔记 ID（null = 尚未上传） */
     public String serverId;
+    /**
+     * 客户端生成的笔记 ID（32 位十六进制）：**新建时生成一次**，推送 CREATE 重试之间保持不变 ——
+     * 服务端按它插入，重发即幂等（返回第一次创建的那条），不会因响应丢包而产生重复笔记。
+     * 服务端已存在、本地镜像的笔记为 null（不会作为 create 推送）。
+     */
+    public String clientId;
     /** 缓存分区键（服务器地址 或 "LOCAL"） */
     public String serverUrl;
     public String title;

@@ -28,6 +28,20 @@ public class HttpLoggingFilter extends OncePerRequestFilter {
     private static final Set<String> SENSITIVE_HEADERS = Set.of(
             "authorization", "cookie", "set-cookie");
 
+    /**
+     * 下载/预览会流式返回大文件、SSE 是长连接、头像是一次性小文件：本过滤器用
+     * {@code ContentCachingResponseWrapper} 缓存整个响应体（下面还要 {@code copyBodyToResponse} 写回一份），
+     * 这些路径不该被包住 —— 下一个 1GB 的视频等于把整份内容放进堆内存。
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return uri.startsWith("/api/events")
+                || uri.startsWith("/avatars")
+                || uri.endsWith("/download")
+                || uri.endsWith("/preview");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
@@ -55,7 +69,7 @@ public class HttpLoggingFilter extends OncePerRequestFilter {
         String queryParams = request.getQueryString();
         String body = getRequestBody(request);
 
-        log.info("HTTP 请求 → {} {}\n  请求头 : {}\n  查询参数: {}\n  请求体 : {}",
+        log.info("==> HTTP 请求 {} {}\n    请求头 : {}\n    查询参数: {}\n    请求体 : {}",
                 method, fullUrl,
                 headers.isEmpty() ? "(无)" : headers,
                 queryParams != null ? queryParams : "(无)",
@@ -69,7 +83,7 @@ public class HttpLoggingFilter extends OncePerRequestFilter {
         Map<String, String> headers = filterSensitive(responseHeaders(response));
         String body = getResponseBody(response);
 
-        log.info("HTTP 响应 ← {} ({}ms)\n  响应头: {}\n  响应体: {}",
+        log.info("<== HTTP 响应 {} ({}ms)\n    响应头: {}\n    响应体: {}",
                 status, elapsedMs,
                 headers.isEmpty() ? "(无)" : headers,
                 !body.isEmpty() ? body : "(无)");

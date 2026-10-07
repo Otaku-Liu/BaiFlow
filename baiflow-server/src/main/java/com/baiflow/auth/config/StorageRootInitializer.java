@@ -1,12 +1,13 @@
 package com.baiflow.auth.config;
 
+import com.baiflow.common.config.BaiflowProperties;
 import com.baiflow.storage.entity.BfStorageRoot;
 import com.baiflow.storage.enums.StorageRootStatus;
 import com.baiflow.storage.enums.StorageRootType;
 import com.baiflow.storage.mapper.BfStorageRootMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -25,13 +26,12 @@ import java.nio.file.Path;
 @Slf4j
 @Component
 @Order(1)
+@RequiredArgsConstructor
 public class StorageRootInitializer implements CommandLineRunner {
 
-    @Autowired
-    private BfStorageRootMapper storageRootMapper;
+    private final BfStorageRootMapper storageRootMapper;
 
-    @Autowired
-    private BaiflowProperties baiflowProperties;
+    private final BaiflowProperties baiflowProperties;
 
     @Override
     public void run(String... args) {

@@ -8,7 +8,7 @@ import com.baiflow.storage.dto.response.StorageRootInfo;
 import com.baiflow.storage.service.BfStorageRootService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,10 +18,10 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/storage-roots")
+@RequiredArgsConstructor
 public class BfStorageRootController {
 
-    @Autowired
-    private BfStorageRootService storageService;
+    private final BfStorageRootService storageService;
 
     /**
      * 分页列出所有存储根目录。

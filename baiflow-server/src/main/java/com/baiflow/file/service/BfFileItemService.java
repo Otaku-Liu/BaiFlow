@@ -10,6 +10,8 @@ import com.baiflow.file.dto.response.FileItemInfo;
 import com.baiflow.file.entity.BfFileItem;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+
+import java.util.Collection;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -23,13 +25,19 @@ import java.util.Map;
  * 所有方法确保以下安全约束：
  * <ul>
  *   <li>每次磁盘操作都在目标存储根目录范围内（路径穿越防护）。</li>
- *   <li>非 ADMIN 调用者必须对存储根目录持有 {@code user_storage_permission} 授权。</li>
+ *   <li>非 ADMIN 调用者的文件视图限定在本人主目录内（存储权限模型未落地：表已建、代码未接入）。</li>
  *   <li>元数据在磁盘操作成功后写入（软删除除外——为安全考虑先标记元数据再删磁盘）。</li>
  *   <li>隐私文件夹（PRIVATE 模式）要求提供有效的 {@code privacyAccessToken}，
  *       即使对 ADMIN 和已授权用户也不豁免。</li>
  * </ul>
  */
 public interface BfFileItemService extends IService<BfFileItem> {
+
+    /**
+     * 批量更新「上次打开时间」（由 {@code LastOpenedFlushScheduler} 周期调用）。
+     * 一次一条 UPDATE 写完整批 —— 进入目录的入口是 GET，不能在那里同步写库。
+     */
+    void touchLastOpenedBatch(Collection<String> ids);
 
     /**
      * 列出指定存储根目录或文件夹下的子文件/子目录。目录排在文件前面。

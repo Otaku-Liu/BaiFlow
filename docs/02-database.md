@@ -30,6 +30,8 @@
 ### user_storage_permission — 用户存储权限
 `id, user_id, storage_root_id, file_item_id, permission(READ/WRITE/MANAGE), created_by, created_at, updated_at`
 
+> **已建未用**：存储权限模型是提前设计、分阶段落地的一部分，代码从未接入（原 `verifyAccess` 及其配套 service/mapper/entity/enum 已删）。表保留，将来真正做权限时再实现。
+
 ### storage_root — 存储根目录
 `id, name, type(LOCAL/NAS_MOUNT), root_path, status(ACTIVE/OFFLINE/DISABLED), readonly, created_at, updated_at`
 
@@ -43,6 +45,11 @@
 **`last_opened_at`**：上次打开时间。文件预览/下载时刷新、进入目录时刷新该目录；分享下载不更新所有者文件的打开时间。刷新时保持 `updated_at` 不变（打开操作不改变「修改时间」）。
 
 **`child_count`**：目录的直接活跃子项数（文件 + 子文件夹），由 `listFiles` 按 `parent_id` 派生统计，**非存储列**；隐私目录返回 null 不展示。
+
+**`path_hash`（生成列，代码不读写）**：`IF(status='ACTIVE', SHA2(relative_path,256), NULL)`，只为唯一索引 `uk_file_item_active_path(storage_root_id, path_hash)` 服务 —— 保证**同一存储根内活跃路径唯一**，给并发下的 get-or-create、同名上传兜底。两点必须知道：
+
+- **只有 ACTIVE 行参与唯一**（软删除行算出 NULL，而 MySQL 唯一索引忽略 NULL）→ 删掉文件后可以再传同名文件，不会撞唯一键
+- `relative_path` 是 `VARCHAR(1024)` utf8mb4，**超出索引键长上限**，所以不能直接对列建唯一索引，改对 SHA-256 建（精确等价，且没有前缀索引「按前 N 字符判重」的误判）
 
 ### private_folder_access — 隐私访问会话
 `id, user_id, file_item_id, access_token_hash, expires_at, created_at`
@@ -68,8 +75,12 @@
 ### transfer_task — 传输任务
 `id, created_by, task_type(UPLOAD/DOWNLOAD/DEVICE_SEND), status(WAITING/RUNNING/PAUSED/FAILED/COMPLETED), progress, error_message, created_at, updated_at`
 
+> **已建未用**：无任何写入方，两端客户端也没接入，对应 controller/service/mapper/entity 已删。表保留。
+
 ### notification — 通知
 `id, user_id, level(INFO/WARN/ERROR), title, content, read_status, created_at, read_at`
+
+> **已建未用**：同上 —— 通知从来没有创建入口，对应 controller/service/mapper/entity 已删。表保留。
 
 ### audit_log — 操作审计
 `id, actor_user_id, action, target_type, target_id, ip_address, user_agent, detail, created_at`
@@ -115,6 +126,20 @@ Android 富文本编辑器的图片/录音/画画媒体元数据。文件本体�
 
 > 以上 6 张表统一由可重复迁移 `db/R__V1_init.sql` 创建（**项目约定：新表一律追加进 `R__V1_init.sql`，不单独建迁移脚本**；可重复迁移文件有改动即自动重新执行，全表 `IF NOT EXISTS` 幂等），**所有表与字段均带 COMMENT 注释**，便于管理与理解。
 
+## Redis 键
+
+Redis 只存**计数器与锁标记**这类可丢失的临时状态——**不存任何需要持久化的业务数据**（丢了顶多是滑动窗口重置、锁提前失效，不影响一致性）。锁与失败计数键均带 TTL、到期自动清理；`share:view:` 例外，它由定时任务定期落库后清零。
+
+| 键前缀 | 值 | TTL | 用途 |
+|---|---|---|---|
+| `login:fail:<username>` | 失败次数（String 递增） | 15 分钟（每次失败刷新） | 登录失败滑动窗口计数 |
+| `login:lock:<username>` | `"1"` | 15 分钟 | 登录锁定标记；到期即解锁，用户状态由定时任务/登录兜底判定恢复为 `NORMAL` |
+| `share:code:fail:<shareId>` | 失败次数（String 递增） | 15 分钟（每次失败刷新） | 分享提取码错误计数 |
+| `share:code:lock:<shareId>` | `"1"` | 15 分钟 | 提取码锁定标记 |
+| `share:view:<shareId>` | 访问次数（String 递增） | — | 分享访问量，由定时任务（每 60s）落库到 `bf_share_link.view_count` 后清零 |
+
+登录锁的前两个键由 `LoginLockRedisKeys` 统一定义前缀；**Redis 不可用时统一遵循「不确定时不改变当前状态」**——判定时现状未锁则保持未锁（放行登录）、现状已锁则保持已锁（不解除），详见 `docs/03-api.md`。
+
 ## 常用查询
 
 ### 文件/文件夹大小（递归汇总）
@@ -134,8 +159,9 @@ WHERE id IN (SELECT id FROM sub_tree) AND item_type = 'FILE'
 ## 主要索引
 
 - `user(username)` UNIQUE
-- `file_item(storage_root_id, parent_id, deleted)`
-- `file_item(storage_root_id, relative_path)` UNIQUE
+- `file_item(storage_root_id, parent_id)`（普通索引，列表按父目录查）
+- `file_item(storage_root_id, relative_path(255))`（**前缀**普通索引，按路径查；不是唯一索引，1024 字符超索引键长）
+- `file_item(storage_root_id, path_hash)` UNIQUE（`path_hash` 是 ACTIVE 行的 relative_path 哈希生成列，保证活跃路径唯一，见上文）
 - `share_link(token_hash)` UNIQUE
 - `share_link(created_by, status, created_at)`
 - `notification(user_id, read_status, created_at)`
@@ -146,3 +172,14 @@ WHERE id IN (SELECT id FROM sub_tree) AND item_type = 'FILE'
 - 下载完成后创建 file_item 记录
 - 隐私密码更新后清理已有 private_folder_access
 - 分享过期/撤销/超次后不可访问
+
+## 幂等性
+
+**没有统一的幂等层**（无 `Idempotency-Key`、无请求指纹表），幂等按接口各自处理，分三类：
+
+- **天然幂等**：读接口；进度类 upsert（`bf_playback_progress` 有 `uk_user_file`、`bf_note_progress` 用 `ON DUPLICATE KEY UPDATE`）；设备登记（`uk_user_device`）；`last_opened_at` 设值
+- **靠唯一索引兜底**（重发报错而非写坏）：系统初始化（`uk_setting_key` —— 「入口永久关闭」就是靠它）、用户名、会话 token、**文件路径 `uk_file_item_active_path`**
+- **靠客户端 id 幂等**：**新建笔记**。`POST /api/notes` 的 `id` 可选、由客户端生成并在重试之间保持不变；撞主键即视为重发 → 返回第一次创建的那条（同一个人；撞别人的 id 直接报错；撞到已被软删除的那条则换新 id 重建）
+- **不幂等（按设计）**：下载记录与分享访问计数每次请求各写一条；登录每次新建会话；创建分享链接每次生成新 token
+
+乐观并发（笔记 `baseUpdatedAt` → `40901`）是**拒绝陈旧写**，不是幂等。

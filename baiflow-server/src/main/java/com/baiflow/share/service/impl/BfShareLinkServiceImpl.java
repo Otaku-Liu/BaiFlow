@@ -1,8 +1,6 @@
 package com.baiflow.share.service.impl;
 
 import com.baiflow.auth.security.SecurityUtils;
-import com.baiflow.auth.service.RedisLockKeyReader;
-import com.baiflow.auth.service.RedisLockKeyReader.LockKeyState;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
 import com.baiflow.downloadrecord.enums.DownloadSource;
@@ -33,8 +31,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataAccessException;
@@ -52,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfShareLink> implements BfShareLinkService {
     private static final String REDIS_SHARE_VIEW_KEY = "share:view:";
 
@@ -64,24 +63,16 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
     /** Redis 键前缀：提取码锁定标记 */
     private static final String REDIS_CODE_LOCK_KEY = "share:code:lock:";
 
-    @Autowired
-    private BfShareAccessLogMapper logMapper;
-    @Autowired
-    private BfDownloadRecordService downloadRecordService;
-    @Autowired
-    private BfFileItemService fileService;
-    @Autowired
-    private BfStorageRootService storageService;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private BfUserMapper userMapper;
-    @Autowired
-    private StringRedisTemplate redisTemplate;
-    @Autowired
-    private RedisLockKeyReader redisLockKeyReader;
+    private final BfShareAccessLogMapper logMapper;
+    private final BfDownloadRecordService downloadRecordService;
+    private final BfFileItemService fileService;
+    private final BfStorageRootService storageService;
+    private final PasswordEncoder passwordEncoder;
+    private final BfUserMapper userMapper;
+    private final StringRedisTemplate redisTemplate;
 
-    @Override @Transactional
+    @Override
+    @Transactional
     public ShareLinkInfo createShare(CreateShareRequest req, String userId) {
         // 校验用户存在且为活跃状态
         BfUser user = userMapper.selectById(userId);
@@ -183,7 +174,8 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
         return ShareLinkInfo.from(getOwnedShare(id, userId, isAdmin, "查看"));
     }
 
-    @Override @Transactional
+    @Override
+    @Transactional
     public ShareLinkInfo updateShare(String id, UpdateShareRequest req, String userId, boolean isAdmin) {
         BfShareLink sl = getOwnedShare(id, userId, isAdmin, "修改");
         if (req.status() != null) { sl.setStatus(ShareStatus.valueOf(req.status())); }
@@ -197,7 +189,8 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
         return ShareLinkInfo.from(sl);
     }
 
-    @Override @Transactional
+    @Override
+    @Transactional
     public void revokeShare(String id, String userId, boolean isAdmin) {
         BfShareLink sl = getOwnedShare(id, userId, isAdmin, "撤销");
         sl.setStatus(ShareStatus.REVOKED);
@@ -206,7 +199,8 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
 
     // ===================== 公开访问 =====================
 
-    @Override @Transactional
+    @Override
+    @Transactional
     public ShareLinkInfo viewByToken(String token, HttpServletRequest request) {
         BfShareLink sl = validateAndLog(token, "VIEW", request);
         // 如果设置了提取码则要求先校验
@@ -217,14 +211,21 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
         return ShareLinkInfo.from(sl);
     }
 
-    @Override @Transactional
+    @Override
+    @Transactional
     public Map<String, Object> verifyExtractionCode(String token, String code, HttpServletRequest request) {
         BfShareLink sl = validateAndLog(token, "VERIFY_CODE", request);
         if (sl.getExtractionCodeHash() == null || sl.getExtractionCodeHash().isEmpty()) {
             return Map.of("valid", true, "message", "无需提取码");
         }
-        // 提取码错误次数过多锁定检查（Redis 计数，多实例共享）
-        if (isCodeLocked(sl.getId())) {
+        // 提取码错误次数过多锁定检查（Redis 计数，多实例共享；Redis 不可用时按未锁定处理，不阻断验证）
+        boolean codeLocked = false;
+        try {
+            codeLocked = Boolean.TRUE.equals(redisTemplate.hasKey(REDIS_CODE_LOCK_KEY + sl.getId()));
+        } catch (DataAccessException e) {
+            log.warn("Redis 不可用，提取码锁定检查按未锁定处理: shareId={}, error={}", sl.getId(), e.getMessage());
+        }
+        if (codeLocked) {
             recordLog(sl, "VERIFY_CODE", request, false, "提取码锁定");
             throw new BusinessException(ErrorCode.EXTRACTION_CODE_INVALID,
                     "提取码错误次数过多，请" + CODE_LOCK_MINUTES + "分钟后再试");
@@ -240,7 +241,8 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
         return Map.of("valid", true, "message", "提取码验证成功");
     }
 
-    @Override @Transactional
+    @Override
+    @Transactional
     public Map<String, Object> verifyPrivatePassword(String token, String password, HttpServletRequest request) {
         BfShareLink sl = validateAndLog(token, "VERIFY_CODE", request);
         if (!sl.getRequirePrivatePassword()) {
@@ -379,11 +381,6 @@ public class BfShareLinkServiceImpl extends ServiceImpl<BfShareLinkMapper, BfSha
         logEntry.setSuccess(success);
         logEntry.setFailureReason(reason);
         logMapper.insert(logEntry);
-    }
-
-    /** 提取码是否已被锁定（Redis 不可用时按未锁处理、不阻断验证，与登录锁前置检查同一策略） */
-    private boolean isCodeLocked(String shareId) {
-        return redisLockKeyReader.stateOf(REDIS_CODE_LOCK_KEY, shareId) == LockKeyState.PRESENT;
     }
 
     /** 记录提取码失败（滑动窗口，错误达阈值则锁定 CODE_LOCK_MINUTES，到期自动解锁） */

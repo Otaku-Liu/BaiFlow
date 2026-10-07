@@ -5,7 +5,7 @@ import com.baiflow.common.entity.ApiResponse;
 import com.baiflow.downloadrecord.dto.response.DownloadRecordInfo;
 import com.baiflow.downloadrecord.service.BfDownloadRecordService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +18,10 @@ import java.time.LocalDate;
  */
 @RestController
 @RequestMapping("/api/download-records")
+@RequiredArgsConstructor
 public class BfDownloadRecordController {
 
-    @Autowired
-    private BfDownloadRecordService downloadRecordService;
+    private final BfDownloadRecordService downloadRecordService;
 
     @GetMapping
     public ApiResponse<IPage<DownloadRecordInfo>> list(

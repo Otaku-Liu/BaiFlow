@@ -2,12 +2,15 @@ package com.baiflow.schedule;
 
 import com.baiflow.share.entity.BfShareLink;
 import com.baiflow.share.mapper.BfShareLinkMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -18,19 +21,28 @@ import java.util.Set;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ViewCountSyncScheduler {
 
     private static final String REDIS_SHARE_VIEW_KEY = "share:view:";
 
-    @Autowired
-    private StringRedisTemplate redisTemplate;
-    @Autowired
-    private BfShareLinkMapper shareMapper;
+    private final StringRedisTemplate redisTemplate;
+    private final BfShareLinkMapper shareMapper;
 
     @Scheduled(fixedRate = 60_000)
     public void syncViewCounts() {
-        Set<String> keys = redisTemplate.keys(REDIS_SHARE_VIEW_KEY + "*");
-        if (keys == null || keys.isEmpty()) {
+        // 用 SCAN 而不是 KEYS：KEYS 会阻塞 Redis（O(keyspace)），生产上不该出现
+        Set<String> keys = new HashSet<>();
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(REDIS_SHARE_VIEW_KEY + "*")
+                .count(100)
+                .build();
+        try (Cursor<String> cursor = redisTemplate.scan(options)) {
+            while (cursor.hasNext()) {
+                keys.add(cursor.next());
+            }
+        }
+        if (keys.isEmpty()) {
             return;
         }
 

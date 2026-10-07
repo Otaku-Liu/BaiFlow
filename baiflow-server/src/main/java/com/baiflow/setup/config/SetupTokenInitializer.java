@@ -1,9 +1,9 @@
 package com.baiflow.setup.config;
 
-import com.baiflow.auth.config.BaiflowProperties;
+import com.baiflow.common.config.BaiflowProperties;
 import com.baiflow.setup.service.SystemSetupService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -20,13 +20,12 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Order(0)
+@RequiredArgsConstructor
 public class SetupTokenInitializer implements CommandLineRunner {
 
-    @Autowired
-    private SystemSetupService systemSetupService;
+    private final SystemSetupService systemSetupService;
 
-    @Autowired
-    private BaiflowProperties baiflowProperties;
+    private final BaiflowProperties baiflowProperties;
 
     @Override
     public void run(String... args) {

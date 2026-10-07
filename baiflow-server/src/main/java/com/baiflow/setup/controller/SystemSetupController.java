@@ -6,7 +6,7 @@ import com.baiflow.setup.dto.request.SystemSetupRequest;
 import com.baiflow.setup.dto.response.SystemSetupStatus;
 import com.baiflow.setup.service.SystemSetupService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,10 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/setup")
+@RequiredArgsConstructor
 public class SystemSetupController {
 
-    @Autowired
-    private SystemSetupService systemSetupService;
+    private final SystemSetupService systemSetupService;
 
     /**
      * 查询系统是否已完成首次初始化（供 Web 端路由守卫判断是否强制跳转向导）。

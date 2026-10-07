@@ -8,7 +8,7 @@ import com.baiflow.share.service.BfShareLinkService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -16,9 +16,9 @@ import java.util.Map;
 /** 公开分享访问接口 — 无需登录，通过 share token 和 URL 路径访问 */
 @RestController
 @RequestMapping("/api/public/shares")
+@RequiredArgsConstructor
 public class PublicShareController {
-    @Autowired
-    private BfShareLinkService shareService;
+    private final BfShareLinkService shareService;
 
     /** 查看分享元信息 */
     @GetMapping("/{token}")

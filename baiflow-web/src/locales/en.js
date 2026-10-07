@@ -294,7 +294,10 @@ export default {
   },
   preview: {
     preview: 'Preview',
-    unsupported: 'Preview not supported, please download to view'
+    unsupported: 'Preview not supported, please download to view',
+    tocTitle: 'Contents',
+    tocExpand: 'Show contents',
+    tocCollapse: 'Hide contents',
   },
   menu: {
     logs: 'Audit Logs',

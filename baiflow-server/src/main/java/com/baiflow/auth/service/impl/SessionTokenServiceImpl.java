@@ -1,11 +1,11 @@
 package com.baiflow.auth.service.impl;
 
-import com.baiflow.auth.config.BaiflowProperties;
+import com.baiflow.common.config.BaiflowProperties;
 import com.baiflow.auth.entity.BfAuthSession;
 import com.baiflow.auth.service.SessionTokenService;
 import com.baiflow.auth.service.BfAuthSessionService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -20,6 +20,7 @@ import java.util.Base64;
  * 会话 token 服务实现 — 见 {@link SessionTokenService} 接口说明。
  */
 @Service
+@RequiredArgsConstructor
 public class SessionTokenServiceImpl implements SessionTokenService {
 
     /** 会话 token 随机长度：32 字节（256-bit） */
@@ -28,10 +29,8 @@ public class SessionTokenServiceImpl implements SessionTokenService {
     /** 滑动续期写库节流：距上次续期超过 1 小时才更新（ANDROID / WEB 通用） */
     private static final Duration TOUCH_INTERVAL = Duration.ofHours(1);
 
-    @Autowired
-    private BfAuthSessionService authSessionService;
-    @Autowired
-    private BaiflowProperties properties;
+    private final BfAuthSessionService authSessionService;
+    private final BaiflowProperties properties;
 
     @Override
     public CreatedSession create(String userId, String deviceType, String deviceName,

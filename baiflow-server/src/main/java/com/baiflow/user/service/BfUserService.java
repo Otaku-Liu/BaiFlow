@@ -73,6 +73,28 @@ public interface BfUserService extends IService<BfUser> {
     void batchUpdateStatus(List<String> ids, UserStatus status);
 
     /**
+     * 将登录锁定到期的用户状态由 {@code LOCKED} 恢复为 {@code NORMAL}（幂等），并写审计日志。
+     * <p>仅做「已确证锁定到期」之后的恢复动作，<b>不含 Redis 判定</b>：锁键是否还在、Redis
+     * 不可用时怎么办由调用点各自判断（登录兜底路径与定时任务的降级方向不同）。
+     * 使用条件更新（WHERE status=LOCKED）：多实例并发时仅首个生效，避免重复审计。
+     *
+     * @param user 目标用户
+     * @param ip   触发方 IP（定时任务无请求上下文时传 null）
+     * @param ua   触发方 User-Agent（同上）
+     * @return 本次是否真的恢复了（未更新到任何行时返回 false）
+     */
+    boolean restoreLockedUser(BfUser user, String ip, String ua);
+
+    /**
+     * 清除用户的登录锁定（Redis 锁键 + 失败计数），并记一条 info 级日志。
+     * <p>登录成功、以及管理员把锁定中的用户改为其他状态时调用，避免残留锁键在下次登录时仍拦截。
+     * Redis 不可用时跳过（锁键本身会随 TTL 到期，不影响状态变更）。
+     *
+     * @param username 目标用户名
+     */
+    void clearLoginLock(String username);
+
+    /**
      * 重置用户密码（BCrypt 哈希存储）。
      *
      * @param id      目标用户 ID

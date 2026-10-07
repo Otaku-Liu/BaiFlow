@@ -38,6 +38,8 @@
     <!-- 头像底部「编辑」色带：半透明黑（照片隐约透出）+ 白字 -->
     <color name="avatar_edit_bg">#99000000</color>
     <color name="avatar_edit_text">#FFFFFF</color>
+    <!-- 浮层面板背后的遮罩（Markdown 目录面板等） -->
+    <color name="scrim">#66000000</color>
 
     <!-- 富文本编辑器专用（代码块/行内代码底色） -->
     <color name="code_bg">#F2F2F7</color>

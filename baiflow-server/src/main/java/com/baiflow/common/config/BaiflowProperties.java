@@ -1,4 +1,4 @@
-package com.baiflow.auth.config;
+package com.baiflow.common.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

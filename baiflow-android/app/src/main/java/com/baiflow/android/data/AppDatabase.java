@@ -5,10 +5,20 @@ import android.content.Context;
 import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
+import androidx.room.migration.Migration;
+import androidx.sqlite.db.SupportSQLiteDatabase;
 
 /** 本地 Room 数据库 — 笔记存储（在线同步的本地镜像）。 */
-@Database(entities = {LocalNote.class}, version = 1, exportSchema = false)
+@Database(entities = {LocalNote.class}, version = 2, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
+
+    /** v2：LocalNote 增加 clientId（推送 CREATE 的幂等 id） */
+    private static final Migration MIGRATION_1_2 = new Migration(1, 2) {
+        @Override
+        public void migrate(SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE bf_local_note ADD COLUMN clientId TEXT");
+        }
+    };
 
     private static volatile AppDatabase INSTANCE;
 
@@ -23,6 +33,7 @@ public abstract class AppDatabase extends RoomDatabase {
                     INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
                                     AppDatabase.class, "baiflow.db")
                             .allowMainThreadQueries()
+                            .addMigrations(MIGRATION_1_2)
                             .build();
                 }
             }

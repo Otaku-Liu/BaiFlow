@@ -19,7 +19,7 @@ Vue 3 Web 管理台          Android Java App
                   |
                   v
      Spring Boot 3 API Server
-     (认证/文件/传输/通知/设备)
+     (认证/文件/笔记/下载记录/审计)
          |          |            |
          v          v            v
       MySQL 8    Redis 7      后台任务
@@ -41,6 +41,92 @@ Vue 3 Web 管理台          Android Java App
 - `GET /api/events`（text/event-stream）长连接推送，需登录（EventSource 用 `?token=` 查询参数鉴权）
 - `SseService` 维护"用户 → 连接"注册表，定时心跳保活并清理失效连接
 - SSE 事件：`NOTE_UPDATED`（笔记跨端同步刷新）
+
+## 数据库连接与往返成本
+
+**开发环境连接远端 MySQL**（便于本地直连服务器上的真实数据），因此**每次数据库往返要 40–75ms**（实测），且公网偶发丢包会造成 200–400ms 的重传停顿。
+
+这决定了后端性能的基本盘：**DB 耗时 ≈ 查询次数 × 单次往返**，应用侧逻辑（映射、过滤、组装）耗时可忽略。所以本项目的性能优化**只盯两件事**：把每个接口的**往返次数**降下来、把响应体里**用不到的字段**去掉。索引与执行计划不是重点（服务端执行本身接近 0ms）。
+
+具体纪律见 `docs/06-coding-standards.md`「数据库往返」。
+
+日志相关的约定（HTTP 请求日志的形状与脱敏、SQL 计时、链路 id）统一放在「日志与可观测性」一章。
+
+### `last_opened_at` 异步落库
+
+「进入目录时记录上次打开时间」原本是 **GET 里的 UPDATE**：每次进目录多一次往返，还在读路径上拿行锁。现改为**异步批量**：先写内存缓冲（一个 id 集合，同一目录反复进只留一份；落库时间统一取刷库时刻），由 `schedule` 包每 5 秒用**一条** `UPDATE bf_file_item SET last_opened_at = ? WHERE id IN (...)` 落库（同一批统一取刷库时刻 —— 这些目录的打开都发生在最近一个周期内，精度够用，换来一条语句写完整批），应用关闭前补刷一次。
+
+**代价**：长摁弹窗里的「上次打开时间」最多滞后一个刷库周期（`LastOpenedFlushScheduler.FLUSH_INTERVAL_MS` = 5 秒，常量），进程被强杀时最多丢一个周期的记录 —— 该字段是参考信息，不参与任何判定。
+
+## 日志与可观测性
+
+框架自己打的每一条都**带箭头**：出向 `==>`、回向 `<==`（与 MyBatis 的 `==>  Preparing:` / `<==      Total:` 同一套词汇），不再混用 `→` / `←`。不引入额外的观测栈（无 APM / Micrometer），排查所需的信息全部由日志给出。
+
+### HTTP 请求日志（`HttpLoggingFilter`）
+
+每个请求两行，第二行起是缩进详情：
+
+```
+==> HTTP 请求 GET http://host/api/files?…
+    请求头 : {host=…, authorization=***, user-agent=…}
+    查询参数: storageRootId=…&page=1&size=50
+    请求体 : (无)
+<== HTTP 响应 200 (381ms)
+    响应头: (无)
+    响应体: {"code":0,…（截断 1024 字符）
+```
+
+- **只对 `Authorization` / `Cookie` / `Set-Cookie` 请求头打码**，其余（查询串、请求体、响应体）**原样记录**：这是为了排查方便而**有意为之** —— 代价是**日志里会含会话 token 与密码**（登录响应体、`?token=` 的 URL），所以**日志文件不得外发**
+- **这些路径不走本过滤器**（`shouldNotFilter`：实现见 `HttpLoggingFilter`）：`/api/files/**/download`、`/api/files/**/preview`、`/api/events`、`/avatars/**`。过滤器用 `ContentCachingResponseWrapper` 缓存整个响应体，下载大文件等于把整份内容放进堆内存；SSE 是长连接，更不该被包住
+- 响应体只留前 1024 字符（超出标 `…(截断)`）
+
+### 失败留痕
+
+`GlobalExceptionHandler` 对三类失败都打 warn —— **这是「为什么这个请求被拒」在服务端的唯一线索**：
+
+- **业务异常**：`code + 方法 + URI + message`（如「密码错误（剩余尝试次数：N）」「账号已被锁定」）
+- **参数校验失败**：字段名 + 约束（**不含字段值** —— 报的是哪个字段不合法，不是它是什么）
+- **权限拒绝**：方法 + URI
+- **唯一键冲突**（并发下同时创建同一个东西）：方法 + URI + 提示「请刷新后重试」，避免偶发竞态变成 500
+
+与上面的请求日志互补：**请求日志给入参，这里给判定结果**，两者用 traceId 对上。
+
+### SQL 计时日志
+
+用于随时验证「数据库连接与往返成本」那条公式：**每条 SQL 执行完，紧跟 MyBatis 自己那几行 SQL 内容
+（`Preparing` / `Parameters` / `Total`）之后另起一行**输出
+
+```
+... c.b.f.m.BfFileItemMapper.selectById - ==>  Preparing: SELECT … WHERE id=?
+... c.b.f.m.BfFileItemMapper.selectById - ==> Parameters: 41339036…(String)
+... c.b.f.m.BfFileItemMapper.selectById - <==      Total: 1
+... c.b.f.m.BfFileItemMapper.selectById - ==> 执行时间：42ms
+```
+
+**logger 名取 statement id**，与 MyBatis 打 SQL 内容用的是**同一个 logger**：左边那一列与相邻三行完全对齐，方法名就在行首，消息里只放 `==> 执行时间：xxms`。这样一份 `logback-spring.xml` 同时管住内容与计时（各 mapper 包分别开了 DEBUG）；若改用拦截器自己类的 logger，既对不齐、又会出现「有 SQL 内容、没执行时间」——两处开关对不上。
+
+**不做请求级汇总**（刻意）：要数一次请求发了几条、各花多久，直接数这段时间里的 `执行时间` 行即可
+（`grep -c "执行时间"`），汇总行反而多一层需要解释的口径。
+
+实现要点：
+
+- 一个 MyBatis `Interceptor`（`@Intercepts` 挂 `Executor.query` / `Executor.update`），
+  **注册为独立 `@Bean`** —— 不能塞进 `MybatisPlusConfig` 里的 `MybatisPlusInterceptor`，
+  那是 MyBatis-Plus 自己的内部链，看不到 XML 里的原生 SQL
+- 挂在 `Executor` 上才能看到所有语句（含 XML 原生 SQL 与批量）
+
+### 链路 id（traceId）
+
+**入站带 `X-Trace-Id` 就沿用**（便于多端/多服务对齐同一次操作），没带就生成一个 → 写入 MDC（日志 pattern 带上 `%X{traceId}`）→ 由 `ApiResponse` 统一回填进响应体，**成功与失败都有值**（此前只有异常链填，成功响应恒为 `null`，与 `docs/03-api.md` 的信封约定不符）。
+
+**只有这一个 id 来源**：`TraceIdFilter` 写 MDC，`ApiResponse` 的所有工厂从 MDC 回填 —— 日志、`X-Trace-Id` 响应头、响应体三处必定一致（此前异常链另有一个从请求头取、兜底生成 32 位随机串的口径，已删）。入站长于 64 字符的 id 视为无效并重新生成。
+
+有了它，一次请求的 HTTP 日志、每条 SQL 计时、异常日志可以用同一个 id 串起来。
+
+### 环境区分
+
+- **SQL 语句日志**（MyBatis 的 `Preparing/Parameters/Total` 与每条的耗时行）走 DEBUG，且**只在 dev profile 默认打开**（`logback-spring.xml` 用 `<springProfile name="dev">` 包住那些 logger）→ 生产默认不打印 SQL
+- **`HttpLoggingFilter` 的请求/响应详情是 INFO**：它在生产同样输出 —— 这也是"日志含密码/token、不得外发"的来源（见上）
 
 ## MVP 功能
 
@@ -69,8 +155,8 @@ Vue 3 Web 管理台          Android Java App
 - 下载通道仅两条：登录用户（owner/admin）或有效分享链接，无匿名直下端点
 
 ### 传输与通知
-- 统一上传/下载任务展示
-- Web 内通知中心
+- **未实现**：原计划的「统一上传/下载任务展示」「Web 内通知中心」没有落地 —— `bf_transfer_task` / `bf_notification` 两张表已建但无写入方、两端客户端也未接入，对应的 controller / service 已删（见 `docs/02-database.md`、`docs/03-api.md`）
+- 传输进度目前由 Android 端前台通知承担（见 `docs/05-android.md`）；上传/下载的**记录**由 `bf_upload_record` / `bf_download_record` 两张表承担
 
 ### Android
 - 登录、文件列表、上传、下载
@@ -121,6 +207,7 @@ Vue 3 Web 管理台          Android Java App
 - MySQL 不暴露公网
 - Spring Boot 管理端点不暴露公网
 - 防火墙只开放必要端口
+- **开发环境直连远端 MySQL 是例外**（见「数据库连接与往返成本」）：该端口**必须只对白名单 IP 开放**，不应对整个互联网可达
 
 ### 认证与鉴权
 - 受保护 API 必须携带会话 token：`Authorization: Bearer <token>` 或 `?token=`（后者供 `<img>/<video>`、SSE 等浏览器直接请求）

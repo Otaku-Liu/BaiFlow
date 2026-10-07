@@ -118,7 +118,7 @@ public final class SyncService {
                 // 其它错误（网络/4xx）：保持 dirty 下次重试
             }
             if (needCreate) {
-                Response<ApiResponse<NoteDetail>> resp = client.createNote(n.title, n.content).execute();
+                Response<ApiResponse<NoteDetail>> resp = client.createNote(n.clientId, n.title, n.content).execute();
                 if (resp.isSuccessful() && resp.body() != null && resp.body().isOk()
                         && resp.body().getData() != null) {
                     NoteDetail d = resp.body().getData();

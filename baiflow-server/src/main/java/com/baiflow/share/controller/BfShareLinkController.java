@@ -10,7 +10,7 @@ import com.baiflow.share.entity.BfShareAccessLog;
 import com.baiflow.share.service.BfShareLinkService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,9 +19,9 @@ import java.util.Map;
 /** 分享管理接口 — 需要登录，管理员可管理全部 */
 @RestController
 @RequestMapping("/api/shares")
+@RequiredArgsConstructor
 public class BfShareLinkController {
-    @Autowired
-    private BfShareLinkService shareService;
+    private final BfShareLinkService shareService;
 
     @PostMapping
     public ApiResponse<ShareLinkInfo> create(@Valid @RequestBody CreateShareRequest req, Authentication auth) {
