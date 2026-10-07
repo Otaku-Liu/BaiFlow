@@ -1,6 +1,7 @@
 package com.baiflow.user.service.impl;
 
 import com.baiflow.audit.constant.AuditAction;
+import com.baiflow.audit.constant.AuditTargetType;
 import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.auth.constant.LoginLockRedisKeys;
 import com.baiflow.common.config.BaiflowProperties;
@@ -176,7 +177,7 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
         }
         user.setStatus(UserStatus.NORMAL);
         auditService.log(user.getId(), AuditAction.ACCOUNT_UNLOCKED,
-                BfAuditLogService.AuditTarget.user(user.getId()), ip, ua,
+                AuditTargetType.USER, user.getId(), ip, ua,
                 "登录锁定到期，账号自动恢复为正常");
         log.info("登录锁定到期，账号恢复为 NORMAL: userId={}, username={}", user.getId(), user.getUsername());
         return true;

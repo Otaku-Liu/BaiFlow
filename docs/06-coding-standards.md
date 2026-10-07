@@ -14,6 +14,7 @@
 - **认证与授权判定集中在 `com.baiflow.auth.security.SecurityUtils`**：管理员判定走 `isAdmin(Authentication)`、「属主或管理员」走 `isOwnerOrAdmin(ownerId, userId, isAdmin)`，不在控制层/服务层就地拼判定（就地版本曾同时存在两种写法：5 份带空值守卫、2 份不带（`BfFileItemController` / `BfShareLinkController`），**后者**会在认证主体为空时 NPE）。两个方法都只返回布尔，失败动作由调用点决定（抛 `40301` 或静默跳过）。注意视图范围条件（`!isAdmin || viewUserId != null`）与 MyBatis 的 `.eq(!isAdmin, …)` 是查询过滤，不属本规则
 - **不为 Redis 降级块抽通用包装类**：`try { … } catch (DataAccessException e) { log.warn("Redis 不可用…") }` 本身只有数行，而各键族的键前缀、TTL 与降级策略各不相同，把这一层抽成通用包装属过度抽象，各自保留更划算。**「键是否存在」这类判定尤其不抽公共类**：各调用点的降级方向本就相反（登录前置检查放行、解锁判定维持、定时任务跳过），抽成三态组件后仍要由调用点决定方向，只是多一层间接。其余跨键族的复用按具体场景单独讨论；**不涉及键判定的多行逻辑仍照常提取，且归到拥有该数据的服务上**（如登录锁 LOCKED→NORMAL 恢复改的是 `BfUser` 的状态，收在 `BfUserService.restoreLockedUser`，遵循本节「代码风格」的多行提取规则）。键前缀见 `docs/02-database.md`，锁语义见 `docs/03-api.md`
 - **审计日志的 `action` / `target_type` 取值集中在 `com.baiflow.audit.constant.AuditAction` / `AuditTargetType`**，调用处不写字符串字面量。字符串值是对外契约（DB 列值、登录日志接口 `status` 参数、Web 端 `LoginLogsView.vue` 与 XML 的 `action IN (...)` 均按字面量匹配），**只增不改**；仅登录/会话类取值会出现在管理员登录日志页，其余只入库
+- **审计目标直传 `targetType` + `targetId` 两个参数（`log(actorUserId, action, targetType, targetId, ip, userAgent, detail)`），不为目标引入值对象**：四类目标就是 `AuditTargetType` 的四个常量，包一层工厂类等于把同一组概念写两遍（曾存在工厂类 `BfAuditLogService.AuditTarget`，其 `user/session/device/system` 与常量一一对应，已删除）；唯一不变量是「`SYSTEM` 无 ID」，由调用处传 `null` 表达，语义见接口 Javadoc
 
 ### 注释规范
 - Service 接口方法 → Javadoc（参数、返回值、业务含义），使用中文

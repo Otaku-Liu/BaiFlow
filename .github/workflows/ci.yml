@@ -66,8 +66,10 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      # 接受 SDK 许可并补齐 compileSdk 34 对应的平台/构建工具
-      - uses: android-actions/setup-android@v3
+      # 接受 SDK 许可并提供 cmdline-tools（平台/构建工具由下一步显式安装）。
+      # 固定用 v4：v3 的 packages 默认值含已被 Google 下架的 legacy `tools` 包，sdkmanager 会以
+      # "Failed to find package 'tools'" 退出 1；v4 默认改为 platform-tools，并额外过滤 tools 请求。
+      - uses: android-actions/setup-android@v4
 
       - name: 安装 Android SDK 组件
         run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0"

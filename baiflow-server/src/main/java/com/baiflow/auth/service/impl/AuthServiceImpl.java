@@ -13,6 +13,7 @@ import com.baiflow.auth.service.AuthService;
 import com.baiflow.auth.service.BfUserDeviceService;
 import com.baiflow.auth.security.SecurityUtils;
 import com.baiflow.audit.constant.AuditAction;
+import com.baiflow.audit.constant.AuditTargetType;
 import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.common.constant.ErrorCode;
 import com.baiflow.common.exception.BusinessException;
@@ -76,7 +77,7 @@ public class AuthServiceImpl implements AuthService {
             log.warn("Redis 不可用，登录锁定检查按未锁定放行: username={}, error={}", request.username(), e.getMessage());
         }
         if (loginLocked) {
-            auditService.log(null, AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(request.username()), ip, ua, "账号已被临时锁定");
+            auditService.log(null, AuditAction.LOGIN_FAILED, AuditTargetType.USER, request.username(), ip, ua, "账号已被临时锁定");
             throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "登录失败次数过多，账号已临时锁定，请15分钟后再试");
         }
 
@@ -86,13 +87,13 @@ public class AuthServiceImpl implements AuthService {
                 .last("LIMIT 1"));
         if (user == null) {
             recordFailure(request.username(), null);
-            auditService.log(null, AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(request.username()), ip, ua, "用户名不存在");
+            auditService.log(null, AuditAction.LOGIN_FAILED, AuditTargetType.USER, request.username(), ip, ua, "用户名不存在");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
         // 2. 检查账号状态
         if (user.getStatus() == UserStatus.DISABLED) {
-            auditService.log(user.getId(), AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua, "账号已禁用");
+            auditService.log(user.getId(), AuditAction.LOGIN_FAILED, AuditTargetType.USER, user.getId(), ip, ua, "账号已禁用");
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "账号已被禁用");
         }
         if (user.getStatus() == UserStatus.LOCKED) {
@@ -104,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
                 log.warn("Redis 不可用，登录锁定维持不解除: username={}, error={}", user.getUsername(), e.getMessage());
             }
             if (!lockKeyGone) {
-                auditService.log(user.getId(), AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua, "账号已锁定");
+                auditService.log(user.getId(), AuditAction.LOGIN_FAILED, AuditTargetType.USER, user.getId(), ip, ua, "账号已锁定");
                 throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "账号已被锁定");
             }
             // 锁键已到期（Redis 确认不存在）：立即恢复状态并继续登录；定时任务 LoginLockScheduler 兜底
@@ -114,14 +115,14 @@ public class AuthServiceImpl implements AuthService {
         // 3. 校验密码（BCrypt 比对）
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             recordFailure(user.getUsername(), user);
-            auditService.log(user.getId(), AuditAction.LOGIN_FAILED, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua,
+            auditService.log(user.getId(), AuditAction.LOGIN_FAILED, AuditTargetType.USER, user.getId(), ip, ua,
                     "密码错误（剩余尝试次数：" + remainingAttempts(request.username()) + "）");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
         // 4. 登录成功：清除失败计数与锁键，建登录会话（长会话 token）
         userService.clearLoginLock(request.username());
-        auditService.log(user.getId(), AuditAction.LOGIN_SUCCESS, BfAuditLogService.AuditTarget.user(user.getId()), ip, ua, "登录成功");
+        auditService.log(user.getId(), AuditAction.LOGIN_SUCCESS, AuditTargetType.USER, user.getId(), ip, ua, "登录成功");
         return issueSession(user);
     }
 
@@ -146,7 +147,7 @@ public class AuthServiceImpl implements AuthService {
         BfAuthSession session = sessionTokenService.findByToken(token);
         if (session != null) {
             sessionMapper.deleteById(session.getId());
-            auditService.log(session.getUserId(), AuditAction.LOGOUT, BfAuditLogService.AuditTarget.session(session.getId()),
+            auditService.log(session.getUserId(), AuditAction.LOGOUT, AuditTargetType.SESSION, session.getId(),
                     RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(), "登出");
             log.info("会话已登出: userId={}, sessionId={}", session.getUserId(), session.getId());
         }
@@ -211,7 +212,7 @@ public class AuthServiceImpl implements AuthService {
         BfAuthSession current = currentToken != null && !currentToken.isBlank()
                 ? sessionTokenService.findByToken(currentToken) : null;
         int deleted = deleteSessionsForDevice(target.getUserId(), target.getDeviceName(), current);
-        auditService.log(userId, AuditAction.FORCE_LOGOUT, BfAuditLogService.AuditTarget.session(sessionId),
+        auditService.log(userId, AuditAction.FORCE_LOGOUT, AuditTargetType.SESSION, sessionId,
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "强制下线设备：" + target.getDeviceName() + "（目标用户 " + target.getUserId() + "）共撤销 " + deleted + " 条会话");
         log.info("会话已强制下线: targetUser={}, deviceName={}, sessions={}, by={}", target.getUserId(),
@@ -237,7 +238,7 @@ public class AuthServiceImpl implements AuthService {
         userDeviceService.remove(new LambdaQueryWrapper<BfUserDevice>()
                 .eq(BfUserDevice::getUserId, userId)
                 .eq(BfUserDevice::getDeviceName, deviceName));
-        auditService.log(userId, AuditAction.DELETE_DEVICE, BfAuditLogService.AuditTarget.device(deviceName),
+        auditService.log(userId, AuditAction.DELETE_DEVICE, AuditTargetType.DEVICE, deviceName,
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "删除登录设备：" + deviceName);
         log.info("登录设备已删除: user={}, deviceName={}", userId, deviceName);
@@ -297,7 +298,7 @@ public class AuthServiceImpl implements AuthService {
 
         // 重置密码后吊销该用户全部登录会话（所有设备强制下线重新登录，含当前设备）
         sessionTokenService.revokeAllExcept(userId, null);
-        auditService.log(userId, AuditAction.PASSWORD_CHANGED, BfAuditLogService.AuditTarget.user(userId),
+        auditService.log(userId, AuditAction.PASSWORD_CHANGED, AuditTargetType.USER, userId,
                 RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                 "修改密码，吊销全部登录会话");
         log.info("密码已修改并吊销全部会话: userId={}", userId);
@@ -323,7 +324,7 @@ public class AuthServiceImpl implements AuthService {
                     userMapper.update(null, new LambdaUpdateWrapper<BfUser>()
                             .eq(BfUser::getId, user.getId())
                             .set(BfUser::getStatus, UserStatus.LOCKED));
-                    auditService.log(user.getId(), AuditAction.ACCOUNT_LOCKED, BfAuditLogService.AuditTarget.user(user.getId()),
+                    auditService.log(user.getId(), AuditAction.ACCOUNT_LOCKED, AuditTargetType.USER, user.getId(),
                             RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
                             "登录失败" + MAX_FAILURES + "次，账号已自动锁定");
                 }
