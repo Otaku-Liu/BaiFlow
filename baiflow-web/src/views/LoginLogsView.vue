@@ -77,8 +77,7 @@ const actionOptions = computed(() => [
   { value: 'LOGOUT', label: t('loginLog.action.logout') },
   { value: 'FORCE_LOGOUT', label: t('loginLog.action.forceLogout') },
   { value: 'PASSWORD_CHANGED', label: t('loginLog.action.passwordChanged') },
-  { value: 'ACCOUNT_LOCKED', label: t('loginLog.action.accountLocked') },
-  { value: 'ACCOUNT_UNLOCKED', label: t('loginLog.action.accountUnlocked') }
+  { value: 'ACCOUNT_LOCKED', label: t('loginLog.action.accountLocked') }
 ])
 
 /** 审计动作 → 展示文案 */
@@ -89,8 +88,7 @@ function actionLabel(action) {
     LOGOUT: t('loginLog.action.logout'),
     FORCE_LOGOUT: t('loginLog.action.forceLogout'),
     PASSWORD_CHANGED: t('loginLog.action.passwordChanged'),
-    ACCOUNT_LOCKED: t('loginLog.action.accountLocked'),
-    ACCOUNT_UNLOCKED: t('loginLog.action.accountUnlocked')
+    ACCOUNT_LOCKED: t('loginLog.action.accountLocked')
   }
   return map[action] || action
 }
@@ -103,8 +101,7 @@ function actionTagType(action) {
     LOGOUT: 'info',
     FORCE_LOGOUT: 'warning',
     PASSWORD_CHANGED: 'warning',
-    ACCOUNT_LOCKED: 'danger',
-    ACCOUNT_UNLOCKED: 'success'
+    ACCOUNT_LOCKED: 'danger'
   }[action] || 'info'
 }
 

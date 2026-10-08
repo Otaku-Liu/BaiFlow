@@ -1,8 +1,5 @@
 package com.baiflow.user.service.impl;
 
-import com.baiflow.audit.constant.AuditAction;
-import com.baiflow.audit.constant.AuditTargetType;
-import com.baiflow.audit.service.BfAuditLogService;
 import com.baiflow.auth.constant.LoginLockRedisKeys;
 import com.baiflow.common.config.BaiflowProperties;
 import com.baiflow.common.constant.ErrorCode;
@@ -59,7 +56,6 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
     private final I18nUtil i18nUtil;
     private final BaiflowProperties baiflowProperties;
     private final StringRedisTemplate redisTemplate;
-    private final BfAuditLogService auditService;
 
     @Override
     public UserInfo createUser(CreateUserRequest req) {
@@ -104,19 +100,15 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
     public UserInfo updateUser(String id, UpdateUserRequest req) {
         BfUser u = getById(id);
         if (u == null) { throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"); }
-        // 管理员不支持手动锁定：LOCKED 状态仅由登录失败自动锁定维护，锁键到期后自动恢复
-        if (req.status() == UserStatus.LOCKED) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
-                    i18nUtil.translate("不允许手动锁定用户，仅支持禁用或恢复"));
-        }
         UserStatus oldStatus = u.getStatus();
         // 仅更新实际传入的字段
         if (req.displayName() != null) { u.setDisplayName(req.displayName()); }
         if (req.role() != null) { u.setRole(req.role()); }
         if (req.status() != null) { u.setStatus(req.status()); }
         updateById(u);
-        // 从锁定状态改为其他状态（如禁用）时，清除 Redis 锁键与失败计数，避免残留锁定
-        if (oldStatus == UserStatus.LOCKED && u.getStatus() != UserStatus.LOCKED) {
+        // 状态由禁用改回正常（＝重新启用）时清除 Redis 锁键与失败计数：
+        // 「启用」意味着给这个账号一个干净的登录状态，否则残留锁键会在启用后继续拦截到 TTL 结束
+        if (oldStatus != UserStatus.NORMAL && u.getStatus() == UserStatus.NORMAL) {
             clearLoginLock(u.getUsername());
         }
         return UserInfo.from(u);
@@ -125,11 +117,6 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
     @Override
     @Transactional
     public void batchUpdateStatus(List<String> ids, UserStatus targetStatus) {
-        // 不支持手动锁定
-        if (targetStatus == UserStatus.LOCKED) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
-                    i18nUtil.translate("不允许手动锁定用户，仅支持禁用或恢复"));
-        }
         // 先整体校验：目标必须存在且仅限 USER 角色，避免中途失败产生部分更新
         List<BfUser> targets = new ArrayList<>();
         for (String id : ids) {
@@ -147,7 +134,8 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
             UserStatus oldStatus = u.getStatus();
             u.setStatus(targetStatus);
             updateById(u);
-            if (oldStatus == UserStatus.LOCKED && targetStatus != UserStatus.LOCKED) {
+            // 批量启用时同上：清除 Redis 锁键与失败计数
+            if (oldStatus != UserStatus.NORMAL && targetStatus == UserStatus.NORMAL) {
                 clearLoginLock(u.getUsername());
             }
         }
@@ -163,24 +151,6 @@ public class BfUserServiceImpl extends ServiceImpl<BfUserMapper, BfUser> impleme
             log.warn("Redis 不可用，跳过清除登录锁定: username={}, error={}", username, e.getMessage());
         }
         log.info("已清除用户登录锁定: username={}", username);
-    }
-
-    @Override
-    public boolean restoreLockedUser(BfUser user, String ip, String ua) {
-        // 条件更新（WHERE status=LOCKED）：多实例并发时仅首个生效，避免重复审计
-        boolean restored = update(null, new LambdaUpdateWrapper<BfUser>()
-                .eq(BfUser::getId, user.getId())
-                .eq(BfUser::getStatus, UserStatus.LOCKED)
-                .set(BfUser::getStatus, UserStatus.NORMAL));
-        if (!restored) {
-            return false;
-        }
-        user.setStatus(UserStatus.NORMAL);
-        auditService.log(user.getId(), AuditAction.ACCOUNT_UNLOCKED,
-                AuditTargetType.USER, user.getId(), ip, ua,
-                "登录锁定到期，账号自动恢复为正常");
-        log.info("登录锁定到期，账号恢复为 NORMAL: userId={}, username={}", user.getId(), user.getUsername());
-        return true;
     }
 
     @Override

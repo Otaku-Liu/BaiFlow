@@ -41,7 +41,7 @@
 | 40901 | 笔记已被其他设备修改（乐观并发冲突） |
 | 40902 | 用户名已存在 |
 | 41001 | 分享链接已过期 |
-| 42301 | 账号已被锁定 |
+| 42301 | 账号已被临时锁定（登录失败次数过多） |
 | 42302 | 账号已被禁用 |
 | 42901 | 分享访问或下载次数已达上限 |
 | 42902 | 初始化令牌错误次数过多 |
@@ -60,8 +60,9 @@
 
 ### 认证
 - `POST /api/auth/login` — 登录建会话，返回 `{ token, sessionId, expiresAt, user }`；设备类型/名称走 `X-Device-Type` / `X-Device-Name` 请求头（ANDROID 长期 / WEB 短期）
-  - 登录失败锁定：15 分钟内连续失败 5 次返回 `42301`，用户状态持久化为 `LOCKED`；锁键到期后由定时任务（每 60s）或登录兜底判定自动恢复为 `NORMAL`
-  - Redis 不可用时遵循「不确定时不改变当前状态」：登录前置检查按未锁定放行（不阻断登录），`LOCKED` 兜底判定与定时任务按仍锁定处理（不提前解封）
+  - 登录失败锁定：15 分钟内连续失败 5 次，此后返回 `42301`；锁定状态**只存在 Redis 锁键** `login:lock:<username>`（TTL 15 分钟，到期自动解除），不写用户状态
+  - 计数与锁定只认用户名，**不区分该用户名是否存在**：拿不存在的用户名爆破同样被限速，达阈值同样写 `ACCOUNT_LOCKED` 审计（`target` 为该用户名）
+  - Redis 不可用时按未锁定放行（不阻断登录）——这是单向的：登录锁定没有库里的副本，Redis 读不到就等于没有锁定
 - `POST /api/auth/logout` — 吊销当前请求 token 对应的会话（立即生效）
 - `POST /api/auth/change-password` — 改密后吊销该用户全部会话（所有设备下线）
 - `GET /api/auth/sessions` — 当前用户的登录会话列表 `{ id, deviceName, deviceType, ip, lastUsedAt, createdAt, current }`
@@ -72,10 +73,10 @@
 ### 用户（管理员）
 - `GET/POST /api/users` · `PATCH /api/users/{id}` · `POST /api/users/{id}/reset-password`
 - `DELETE /api/users?ids=id1,id2`（批量删除）
-- `PATCH /api/users?ids=id1,id2&status=DISABLED`（批量禁用/启用，仅 ADMIN，目标仅限 USER 角色；拒绝 `LOCKED` 目标）
+- `PATCH /api/users?ids=id1,id2&status=DISABLED`（批量禁用/启用，仅 ADMIN，目标仅限 USER 角色）
 - `GET/PUT /api/users/{id}/permissions`
-- 用户状态仅支持 `NORMAL` / `DISABLED`（管理员禁用）；`LOCKED` 由登录失败自动锁定维护，不可手动设置，锁键到期自动恢复
-- 将锁定中的用户改为其他状态（如禁用）时，服务端会清除其 Redis 登录锁定键，避免残留锁键拦截登录
+- 用户状态仅支持 `NORMAL` / `DISABLED`（人工禁用/恢复）；状态筛选同样只有这两个取值——**登录锁定不落库，因此列表里看不到、也筛不出锁定中的账号**（锁定记录只在登录日志的 `ACCOUNT_LOCKED` 里）
+- 状态改回 `NORMAL`（启用）时，服务端会清除该用户的 Redis 锁键与失败计数——「启用」意味着给这个账号一个干净的登录状态；保持 `NORMAL` 不变（例如只改昵称）不会清除
 
 ### 用户（当前用户自服务，任何登录用户）
 - `GET /api/users/me` — 当前已登录用户信息
@@ -152,7 +153,7 @@
 笔记独立于文件系统，不受存储根目录/隐私文件夹约束。Android 离线增量同步（`updatedAfter`）已落地。笔记媒体独立存储，不进文件中心列表；孤儿媒体不清理（笔记软删除不影响媒体）。
 
 ### 审计日志（管理员）
-- `GET /api/admin/audit-logs/login` — 分页查询登录与会话操作日志（`LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED` / `ACCOUNT_LOCKED` / `ACCOUNT_UNLOCKED`），支持用户名模糊搜索、操作类型和日期范围筛选
+- `GET /api/admin/audit-logs/login` — 分页查询登录与会话操作日志（`LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGOUT` / `FORCE_LOGOUT` / `PASSWORD_CHANGED` / `ACCOUNT_LOCKED`），支持用户名模糊搜索、操作类型和日期范围筛选；凡是被锁定的用户名（含不存在的用户名）都在 `ACCOUNT_LOCKED` 里留痕——这是「谁被爆破过」的唯一入口
 
 ### 事件（与设备）
 > 原 `GET /api/transfers`、`GET /api/notifications`（及 `PATCH /api/notifications/{id}/read`）已删：两张表无写入方、两端客户端也未接入，见 `docs/02-database.md`「已建未用」。

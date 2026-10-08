@@ -48,7 +48,7 @@ BaiFlow 涉及的关键术语速查。按字母序。
 - **乐观并发（Optimistic Concurrency）**
   保存**必须**携带 `baseUpdatedAt`（缺失 → `40001`；早于服务端 `updated_at`（DATETIME(3) 毫秒）→ `40901`）。冲突时先展示双方块级差异，再选「覆盖」（以服务端最新 `updatedAt` 为基准重推）或「重新加载」。见 `docs/05-android.md`。
 - **登录失败锁定（Login Lock）**
-  Redis 滑动窗口防暴力破解：15 分钟内连续失败 5 次锁定 15 分钟，达阈值持久化 `LOCKED`、到期自动恢复 `NORMAL`（`LOCKED` 仅自动维护，管理员仅禁用）；Redis 不可用时统一遵循**不确定时不改变当前状态**——判定时现状未锁则保持未锁（放行登录）、现状已锁则保持已锁（不解除），即 Redis 故障既不阻断登录、也不提前解封。见 `docs/01-architecture.md`。
+  Redis 滑动窗口防暴力破解：15 分钟内连续失败 5 次锁定 15 分钟，**锁定的唯一权威是锁键 `login:lock:<username>`**（TTL 15 分钟，到期自动解除，无恢复任务）；账号状态 `bf_user.status` 只表达人工管理的 `NORMAL` / `DISABLED`，**不承载锁定**，因此不存在两份状态失配的可能。计数与锁定只认用户名（不区分账号是否存在）。Redis 不可用时按未锁定放行（不阻断登录）——锁定没有库里的副本，读不到就等于没锁。管理员不能在后台看到或解除锁定（仅能通过「改禁用再改回正常」清掉锁键），锁定记录只在登录日志的 `ACCOUNT_LOCKED`。见 `docs/01-architecture.md`、`docs/03-api.md`。
 - **lastOpenedAt（上次打开时间）**
   `bf_file_item.last_opened_at`：文件预览/下载、进入目录时更新（分享下载不更新），Android 长摁弹窗展示。见 `docs/02-database.md`。
 

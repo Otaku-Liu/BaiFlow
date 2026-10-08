@@ -111,8 +111,7 @@ export default {
       logout: 'Logout',
       forceLogout: 'Force logout',
       passwordChanged: 'Password changed',
-      accountLocked: 'Account locked',
-      accountUnlocked: 'Account unlocked'
+      accountLocked: 'Account locked'
     }
   },
   files: {
@@ -270,10 +269,8 @@ export default {
     loadFailed: 'Failed to load user list',
     status: {
       normal: 'Normal',
-      disabled: 'Disabled',
-      locked: 'Locked'
+      disabled: 'Disabled'
     },
-    lockedAutoHint: 'This account was locked automatically after repeated login failures. You may disable it, or it will restore automatically after the lock period',
     disable: 'Disable',
     enable: 'Enable',
     batchDisable: 'Batch Disable',

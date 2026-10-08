@@ -1,7 +1,7 @@
 package com.baiflow.auth.constant;
 
 /**
- * 登录锁定相关的 Redis 键前缀 — 供认证服务、定时任务与用户管理共享。
+ * 登录锁定相关的 Redis 键前缀 — 供认证服务与用户管理共享（锁定的唯一权威，账号状态不落库）。
  * <p>键均以用户名后缀，如 {@code login:lock:<username>}。
  */
 public final class LoginLockRedisKeys {

@@ -16,14 +16,14 @@ public interface AuthService {
     /**
      * 验证用户名和密码进行登录。
      * <p>
-     * 校验账号状态（禁用/锁定），对比 BCrypt 密码哈希。登录成功后更新最后登录时间，
+     * 校验登录锁定（Redis 锁键）与账号状态（禁用），对比 BCrypt 密码哈希。登录成功后更新最后登录时间，
      * 建登录会话（长会话 token），返回会话 token 和用户基本信息。
      *
      * @param request 登录凭据（用户名、密码）
      * @return 会话 token、会话信息与用户信息
      * @throws com.baiflow.common.exception.BusinessException INVALID_CREDENTIALS 用户名或密码错误
      * @throws com.baiflow.common.exception.BusinessException ACCOUNT_DISABLED   账号已被禁用
-     * @throws com.baiflow.common.exception.BusinessException ACCOUNT_LOCKED    账号已被锁定
+     * @throws com.baiflow.common.exception.BusinessException ACCOUNT_LOCKED    该账号登录失败次数过多，被临时锁定（Redis，TTL 到期自动解除）
      */
     LoginResponse login(LoginRequest request);
 

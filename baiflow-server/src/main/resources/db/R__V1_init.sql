@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS `bf_user` (
     `password_hash` VARCHAR(255) NOT NULL COMMENT 'BCrypt 哈希后的密码，绝不存明文',
     `display_name`  VARCHAR(128) NOT NULL DEFAULT '' COMMENT '显示名称',
     `role`          VARCHAR(16)  NOT NULL DEFAULT 'USER' COMMENT '角色：ADMIN / USER / GUEST',
-    `status`        VARCHAR(16)  NOT NULL DEFAULT 'NORMAL' COMMENT '状态：NORMAL（正常）/ DISABLED（禁用）/ LOCKED（锁定）',
+    `status`        VARCHAR(16)  NOT NULL DEFAULT 'NORMAL' COMMENT '状态：NORMAL（正常）/ DISABLED（禁用，管理员设置）；登录失败锁定不落库，只在 Redis 锁键',
     `avatar_url`    VARCHAR(512) NOT NULL DEFAULT '' COMMENT '头像访问 URL（nginx 静态文件链接）',
     `last_login_at` DATETIME    NULL COMMENT '最后登录时间',
     `created_at`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

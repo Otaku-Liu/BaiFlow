@@ -111,8 +111,7 @@ export default {
       logout: '登出',
       forceLogout: '强制下线',
       passwordChanged: '修改密码',
-      accountLocked: '账号锁定',
-      accountUnlocked: '账号解锁'
+      accountLocked: '账号锁定'
     }
   },
   files: {
@@ -270,10 +269,8 @@ export default {
     loadFailed: '加载用户列表失败',
     status: {
       normal: '正常',
-      disabled: '已禁用',
-      locked: '已锁定'
+      disabled: '已禁用'
     },
-    lockedAutoHint: '该账号因登录失败次数过多被自动锁定：可改为禁用；不操作则锁定期结束后自动恢复',
     disable: '禁用',
     enable: '启用',
     batchDisable: '批量禁用',

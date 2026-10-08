@@ -32,7 +32,7 @@ public class BfUser {
     /** 角色：ADMIN / USER / GUEST */
     private UserRole role;
 
-    /** 状态：NORMAL（正常）/ DISABLED（禁用）/ LOCKED（锁定） */
+    /** 状态：NORMAL（正常）/ DISABLED（禁用）；登录失败锁定不落库，只在 Redis 锁键 */
     private UserStatus status;
 
     /** 最后登录时间 */

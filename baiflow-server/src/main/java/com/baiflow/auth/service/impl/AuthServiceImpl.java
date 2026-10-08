@@ -24,7 +24,6 @@ import com.baiflow.user.enums.UserStatus;
 import com.baiflow.user.mapper.BfUserMapper;
 import com.baiflow.user.service.BfUserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -41,8 +40,9 @@ import java.util.concurrent.TimeUnit;
  * 认证服务实现 — 处理登录令牌签发和当前用户信息查询。
  * <p>
  * 集成登录失败限制（Redis 滑动窗口：15 分钟内连续失败 5 次锁定 15 分钟，多实例共享）：
- * 达到阈值时除写入 Redis 锁键外，还将用户状态持久化为 LOCKED；
- * 锁键到期后由 {@link com.baiflow.schedule.LoginLockScheduler} 定时任务（及登录时的兜底判定）恢复为 NORMAL。
+ * 达到阈值时写入 Redis 锁键 {@code login:lock:<username>}，<b>锁状态只有 Redis 这一份</b>——
+ * 不落库、不写用户状态，TTL 到期即自动解除，无需任何恢复任务；
+ * 账号状态 {@code bf_user.status} 只管人工设置的禁用（见 {@code UserStatus}）。
  * 同时记录审计日志。
  */
 @Slf4j
@@ -69,7 +69,7 @@ public class AuthServiceImpl implements AuthService {
         String ip = RequestUtil.getClientIp();
         String ua = RequestUtil.getClientUserAgent();
 
-        // 0. 检查登录失败锁定（此刻现状为「未锁」：Redis 不可用时按未锁定放行，故障不阻断登录）
+        // 0. 检查登录失败锁定（Redis 不可用时按未锁定放行：故障不阻断登录）
         boolean loginLocked = false;
         try {
             loginLocked = Boolean.TRUE.equals(redisTemplate.hasKey(LoginLockRedisKeys.LOCK + request.username()));
@@ -86,35 +86,20 @@ public class AuthServiceImpl implements AuthService {
                 .eq(BfUser::getUsername, request.username())
                 .last("LIMIT 1"));
         if (user == null) {
-            recordFailure(request.username(), null);
+            recordFailure(request.username());
             auditService.log(null, AuditAction.LOGIN_FAILED, AuditTargetType.USER, request.username(), ip, ua, "用户名不存在");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
-        // 2. 检查账号状态
+        // 2. 检查账号状态（仅人工设置的禁用；登录锁定只由上面的 Redis 锁键判定）
         if (user.getStatus() == UserStatus.DISABLED) {
             auditService.log(user.getId(), AuditAction.LOGIN_FAILED, AuditTargetType.USER, user.getId(), ip, ua, "账号已禁用");
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "账号已被禁用");
         }
-        if (user.getStatus() == UserStatus.LOCKED) {
-            // 此刻现状为「已锁」：仅确证锁键不存在才解除，Redis 不可用时维持锁定
-            boolean lockKeyGone = false;
-            try {
-                lockKeyGone = Boolean.FALSE.equals(redisTemplate.hasKey(LoginLockRedisKeys.LOCK + user.getUsername()));
-            } catch (DataAccessException e) {
-                log.warn("Redis 不可用，登录锁定维持不解除: username={}, error={}", user.getUsername(), e.getMessage());
-            }
-            if (!lockKeyGone) {
-                auditService.log(user.getId(), AuditAction.LOGIN_FAILED, AuditTargetType.USER, user.getId(), ip, ua, "账号已锁定");
-                throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, "账号已被锁定");
-            }
-            // 锁键已到期（Redis 确认不存在）：立即恢复状态并继续登录；定时任务 LoginLockScheduler 兜底
-            userService.restoreLockedUser(user, ip, ua);
-        }
 
         // 3. 校验密码（BCrypt 比对）
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            recordFailure(user.getUsername(), user);
+            recordFailure(user.getUsername());
             auditService.log(user.getId(), AuditAction.LOGIN_FAILED, AuditTargetType.USER, user.getId(), ip, ua,
                     "密码错误（剩余尝试次数：" + remainingAttempts(request.username()) + "）");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误");
@@ -308,10 +293,10 @@ public class AuthServiceImpl implements AuthService {
      * 记录登录失败（滑动窗口）：失败次数 INCR，每次失败刷新窗口 TTL；
      * 窗口内连续失败达阈值则设置锁定键（TTL = LOCK_MINUTES，到期自动解锁，
      * 计数随窗口一并清零，不会"锁到期后一次失误又立即重锁"）。
-     * <p>达到阈值时，若用户存在，同时将用户状态持久化为 LOCKED；
-     * 锁键到期后由 {@link com.baiflow.schedule.LoginLockScheduler} 定时任务或登录时的兜底判定恢复为 NORMAL。
+     * <p>计数与锁定都只认用户名，不区分该用户名是否存在：用户名不存在的爆破同样会被限速，
+     * 且达阈值时一并写审计（{@code ACCOUNT_LOCKED}），避免「拿不存在的用户名打」在后台无痕。
      */
-    private void recordFailure(String username, BfUser user) {
+    private void recordFailure(String username) {
         try {
             String failKey = LoginLockRedisKeys.FAIL_COUNT + username;
             Long count = redisTemplate.opsForValue().increment(failKey);
@@ -320,14 +305,9 @@ public class AuthServiceImpl implements AuthService {
             if (count != null && count >= MAX_FAILURES) {
                 redisTemplate.opsForValue().set(
                         LoginLockRedisKeys.LOCK + username, "1", LOCK_MINUTES, TimeUnit.MINUTES);
-                if (user != null) {
-                    userMapper.update(null, new LambdaUpdateWrapper<BfUser>()
-                            .eq(BfUser::getId, user.getId())
-                            .set(BfUser::getStatus, UserStatus.LOCKED));
-                    auditService.log(user.getId(), AuditAction.ACCOUNT_LOCKED, AuditTargetType.USER, user.getId(),
-                            RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
-                            "登录失败" + MAX_FAILURES + "次，账号已自动锁定");
-                }
+                auditService.log(null, AuditAction.ACCOUNT_LOCKED, AuditTargetType.USER, username,
+                        RequestUtil.getClientIp(), RequestUtil.getClientUserAgent(),
+                        "登录失败" + MAX_FAILURES + "次，账号已自动锁定");
             }
         } catch (DataAccessException e) {
             log.warn("Redis 不可用，跳过登录失败计数: {}", e.getMessage());

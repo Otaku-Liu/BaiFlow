@@ -10,9 +10,14 @@ package com.baiflow.audit.constant;
  *   <li>{@code GET /api/admin/audit-logs/login} 的 {@code status} 查询参数</li>
  *   <li>Web 端 {@code LoginLogsView.vue} 的筛选下拉、文案与标签颜色映射</li>
  * </ul>
- * 改名或改值会同时打断入库、查询过滤与前端展示，只能新增取值。
+ * 改名或改值会同时打断入库、查询过滤与前端展示，因此只增不改值、不改名。
  * <p>
- * 仅登录与会话相关的 7 个取值（标注「登录日志可见」）会出现在管理员登录日志页；
+ * 删除一个已不再写入的取值也可以，但前提是那批历史行可以不再可查：取值移出
+ * {@code action IN (...)} 过滤名单后，库里带该值的历史行在登录日志页再也查不出来。
+ * 所以删之前要么清掉这些行、要么确认它们不需要再查（删 {@code ACCOUNT_UNLOCKED} 时
+ * 以整库重来为前提，未做数据清理）。
+ * <p>
+ * 仅登录与会话相关的 6 个取值（标注「登录日志可见」）会出现在管理员登录日志页；
  * 其余只入库、不在该页展示。
  */
 public final class AuditAction {
@@ -22,7 +27,7 @@ public final class AuditAction {
     /** 登录成功（登录日志可见） */
     public static final String LOGIN_SUCCESS = "LOGIN_SUCCESS";
 
-    /** 登录失败：账号已锁定 / 用户名不存在 / 已禁用 / 已锁定 / 密码错误（登录日志可见） */
+    /** 登录失败：账号已被临时锁定 / 用户名不存在 / 账号已禁用 / 密码错误（登录日志可见） */
     public static final String LOGIN_FAILED = "LOGIN_FAILED";
 
     /** 登出（登录日志可见） */
@@ -34,11 +39,8 @@ public final class AuditAction {
     /** 修改密码并吊销全部登录会话（登录日志可见） */
     public static final String PASSWORD_CHANGED = "PASSWORD_CHANGED";
 
-    /** 登录失败次数达阈值，账号自动锁定（登录日志可见） */
+    /** 登录失败次数达阈值，该用户名被临时锁定（target 为用户名，可能并不存在该账号；登录日志可见） */
     public static final String ACCOUNT_LOCKED = "ACCOUNT_LOCKED";
-
-    /** 锁定到期，账号自动恢复为正常（登录日志可见） */
-    public static final String ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED";
 
     /** 删除离线登录设备（仅入库，登录日志页不展示） */
     public static final String DELETE_DEVICE = "DELETE_DEVICE";

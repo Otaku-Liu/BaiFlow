@@ -20,12 +20,12 @@
 ## 核心表
 
 ### user — 系统用户
-`id, username, password_hash, display_name, avatar_url, role(ADMIN/USER/GUEST), status(NORMAL/DISABLED/LOCKED), last_login_at, created_at, updated_at`
+`id, username, password_hash, display_name, avatar_url, role(ADMIN/USER/GUEST), status(NORMAL/DISABLED), last_login_at, created_at, updated_at`
 
 > `status` 说明：
-> - `NORMAL` 正常 · `DISABLED` 禁用（管理员可设置）· `LOCKED` 锁定
-> - `LOCKED` 仅由登录失败自动锁定维护（15 分钟内连续失败 5 次），同时写入 Redis 锁键 `login:lock:<username>`（TTL 15 分钟）；锁键到期后由定时任务/登录兜底判定自动恢复为 `NORMAL`
-> - 管理员仅支持设置 `NORMAL` / `DISABLED`，不支持手动锁定
+> - `NORMAL` 正常 · `DISABLED` 禁用（管理员设置，可恢复）
+> - **只表达人工管理的账号生命周期，不承载任何自动失效的临时状态**：登录失败锁定（15 分钟内连续失败 5 次锁 15 分钟）**不落库**，权威状态只在 Redis 锁键 `login:lock:<username>`（TTL 15 分钟，到期自动解除，无需恢复任务）
+> - 因此本列没有「锁定」取值，管理员也无法手动锁定；不存在「库里的锁状态与锁键不一致」的可能
 
 ### user_storage_permission — 用户存储权限
 `id, user_id, storage_root_id, file_item_id, permission(READ/WRITE/MANAGE), created_by, created_at, updated_at`
@@ -133,12 +133,12 @@ Redis 只存**计数器与锁标记**这类可丢失的临时状态——**不�
 | 键前缀 | 值 | TTL | 用途 |
 |---|---|---|---|
 | `login:fail:<username>` | 失败次数（String 递增） | 15 分钟（每次失败刷新） | 登录失败滑动窗口计数 |
-| `login:lock:<username>` | `"1"` | 15 分钟 | 登录锁定标记；到期即解锁，用户状态由定时任务/登录兜底判定恢复为 `NORMAL` |
+| `login:lock:<username>` | `"1"` | 15 分钟 | 登录锁定标记（**登录锁定的唯一权威**，账号状态不落库）；到期即解锁 |
 | `share:code:fail:<shareId>` | 失败次数（String 递增） | 15 分钟（每次失败刷新） | 分享提取码错误计数 |
 | `share:code:lock:<shareId>` | `"1"` | 15 分钟 | 提取码锁定标记 |
 | `share:view:<shareId>` | 访问次数（String 递增） | — | 分享访问量，由定时任务（每 60s）落库到 `bf_share_link.view_count` 后清零 |
 
-登录锁的前两个键由 `LoginLockRedisKeys` 统一定义前缀；**Redis 不可用时统一遵循「不确定时不改变当前状态」**——判定时现状未锁则保持未锁（放行登录）、现状已锁则保持已锁（不解除），详见 `docs/03-api.md`。
+登录锁的前两个键由 `LoginLockRedisKeys` 统一定义前缀；**Redis 不可用时按未锁定放行**（不阻断登录）——登录锁定没有库里的副本，读不到就等于没锁，详见 `docs/03-api.md`。
 
 ## 常用查询
 

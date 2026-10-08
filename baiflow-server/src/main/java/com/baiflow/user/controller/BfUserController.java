@@ -68,7 +68,7 @@ public class BfUserController {
 
     /**
      * 批量设置用户状态（禁用/启用）— 仅支持 NORMAL / DISABLED，目标仅限 USER 角色。
-     * 将锁定中的用户改为其他状态时，服务端会清除其 Redis 登录锁定。
+     * 启用（NORMAL）时服务端会清除其 Redis 登录锁定与失败计数。
      */
     @PatchMapping
     public ApiResponse<Map<String, Object>> batchUpdateStatus(@RequestParam String ids,

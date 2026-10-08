@@ -15,7 +15,7 @@
         FROM `bf_audit_log` a
                  LEFT JOIN `bf_user` u ON a.actor_user_id = u.id
         WHERE a.action IN ('LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'FORCE_LOGOUT',
-                           'PASSWORD_CHANGED', 'ACCOUNT_LOCKED', 'ACCOUNT_UNLOCKED')
+                           'PASSWORD_CHANGED', 'ACCOUNT_LOCKED')
         <if test="username != null and username != ''">
             AND (u.username LIKE CONCAT('%', #{username}, '%')
                      OR (a.actor_user_id = '' AND a.target_id LIKE CONCAT('%', #{username}, '%')))
