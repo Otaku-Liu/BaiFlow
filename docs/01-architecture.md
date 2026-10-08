@@ -7,7 +7,6 @@
 | 后端 | JDK 17, Spring Boot 3.x, MyBatis Plus, Lombok, MySQL 8, Redis 7 |
 | Web | Vue 3, Vite, Vue Router, Pinia, Axios, Element Plus |
 | Android | Java, Retrofit, OkHttp, WorkManager, Foreground Service |
-| 部署 | Ubuntu 24, Docker Compose, Nginx |
 
 ## 总体架构
 
@@ -35,7 +34,6 @@ Vue 3 Web 管理台          Android Java App
 - **数据访问层**：实体 Service（IService）承载单表查询（`lambdaQuery()` 等），Mapper 保持纯 `BaseMapper`；仅多表 JOIN / 特殊 SQL 留在 XML Mapper（见 `docs/06-coding-standards.md`）
 - **baiflow-web**：Web 管理台，只通过 REST API 通信。
 - **baiflow-android**：移动端文件查看、上传、下载、随手记（仅在线模式；**服务器地址在 App 内运行时设置**，见 `docs/05-android.md`「登录态」）。
-- **deploy**：Docker Compose、Nginx、环境变量。
 
 ### SSE 事件（`com.baiflow.event`）
 - `GET /api/events`（text/event-stream）长连接推送，需登录（EventSource 用 `?token=` 查询参数鉴权）
@@ -173,34 +171,6 @@ Vue 3 Web 管理台          Android Java App
 - 随手记不做标签/置顶/分类、回收站、笔记间链接、实时协同编辑（SSE 仅做刷新通知）与笔记分享
 - 登录会话不做多设备登录冲突提示/挤线（各设备独立会话，自行管理）
 
-## 部署
-
-```
-/data/baiflow/
-  files/         # 文件存储根
-  avatars/       # 头像（Nginx 直接 serve）
-  notes-media/   # 笔记媒体
-```
-
-### Docker Compose（server + web 容器化）
-- `deploy/docker-compose.yml`：`server`（Spring Boot，宿主机 8080）+ `web`（Nginx，宿主机 8088），host 网络直连服务器上**已有的 MySQL/Redis 容器**（不重建、不动数据）
-- 镜像从 GHCR 拉取，服务器上不编译源码；命名空间与版本都在 `deploy/.env`（`BAIFLOW_IMAGE_NAMESPACE` / `BAIFLOW_IMAGE_TAG`，发版时由 `release.yml` 自动写入），仓库里不写死账号名
-- 回滚 = 把 `BAIFLOW_IMAGE_TAG` 改成上一版号再 `docker compose pull`
-- 连接信息与管理员密码配在 `deploy/.env`（模板 `deploy/.env.example`）；数据目录默认 `/data/baiflow`（`BAIFLOW_DATA_DIR`）bind mount 进容器
-- 首次启动自动建表（Flyway `R__V1_init.sql`）与创建存储根目录；**不再预置管理员账号**——第一个管理员由 Web 端 `/setup` 向导创建（需启动日志里的一次性初始化令牌，见「安全基线 · 初始化入口」）
-- 启动：`cd deploy && docker compose pull && docker compose up -d`；重启 server/web：`docker compose restart`（MySQL/Redis 为服务器既有容器，独立管理，不随 compose 重启）
-- 本地从源码构建验证（不拉镜像）：`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`
-
-### 镜像构建与发布（GitHub Actions）
-- `baiflow-server/Dockerfile`：Maven 多阶段 → Temurin JRE；`baiflow-web/Dockerfile`：Node 构建 → Nginx（`baiflow-web/nginx.conf` 容器版配置）
-- `.github/workflows/ci.yml`：push main 与 PR 触发，三端并行校验——后端 `mvn package`、前端 `npm ci && npm run build`、Android `testDebugUnitTest + assembleDebug`（debug APK 作为构建产物上传）；不依赖任何 Secret
-- `.github/workflows/release.yml`：推 `v*` tag 触发，构建 server/web 镜像推 GHCR（打 `v1.2.3` / `sha-<短哈希>` / `latest` 三个 tag），随后 SSH 登服务器把版本号写进 `.env`、`docker compose pull && up -d`，最后探 `/api/health` 确认就绪（失败则输出容器状态与日志并让工作流失败）
-- 镜像在 GHCR 上设为公开，服务器拉取无需登录；首次推送后需在 GitHub 包设置里手动改为 Public
-- 部署用的服务器地址、SSH 用户与私钥、仓库路径存于 GitHub 仓库 Secret，不写进仓库
-
-### Nginx 职责
-- 托管静态文件、`/api/` 反代（127.0.0.1:8080）、SSE 支持、Range/流式透传、上传大小限制、头像静态服务
-
 ## 安全基线
 
 ### 网络隔离
@@ -242,7 +212,6 @@ Vue 3 Web 管理台          Android Java App
 ### 隐私与机密
 - 配置中避免出现真实用户路径/域名/硬编码凭据；每次代码调整涉及配置/路径/凭据时做隐私与机密核查，涉及隐私先确认「保留还是屏蔽 git」
 - 真实路径与域名已从仓库清除：`application.yml` 存储默认值改为中性的 `/data/baiflow/...`（生产实际值仍由 `BAIFLOW_*` 环境变量注入）、`application-dev.example.yml` 改为 `/path/to/...` 占位符
-- 含真实路径且与 web 容器抢 8088 端口的本地测试配置 `deploy/nginx.conf` 已删除，本地测试统一走 `baiflow-web/nginx.conf`（容器版）
 - 真实运行配置（`application-dev.yml`，含域名与凭据）gitignored，不随仓库分发
 
 ### 安全检查项

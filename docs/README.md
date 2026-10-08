@@ -1,10 +1,10 @@
 # BaiFlow 文档
 
-项目规则见根 [`CLAUDE.md`](../CLAUDE.md)；技术栈、快速启动与部署见根 [`README.md`](../README.md)。
+项目规则见根 [`CLAUDE.md`](../CLAUDE.md)；技术栈与快速启动见根 [`README.md`](../README.md)。
 
 | 文档 | 内容 |
 |---|---|
-| [01-architecture.md](01-architecture.md) | 技术架构、需求范围、部署与安全 |
+| [01-architecture.md](01-architecture.md) | 技术架构、需求范围与安全 |
 | [02-database.md](02-database.md) | 数据库表结构与索引 |
 | [03-api.md](03-api.md) | API 约定与接口清单 |
 | [04-frontend.md](04-frontend.md) | Web 前端设计与 Apple 风格 Design Token |

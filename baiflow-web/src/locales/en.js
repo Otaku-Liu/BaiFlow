@@ -71,7 +71,7 @@ export default {
   },
   setup: {
     subtitle: 'First-time setup — create the first administrator',
-    tokenHint: 'The setup token is printed in the server startup log (docker compose logs server), and also written to setup-token.txt in the data directory.',
+    tokenHint: 'The setup token is printed in the server startup log, and also written to setup-token.txt in the data directory.',
     token: 'Setup Token',
     tokenPlaceholder: 'Paste the token from the server startup log',
     tokenRequired: 'Enter the setup token',

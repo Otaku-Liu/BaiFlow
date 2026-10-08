@@ -8,7 +8,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * 静态资源映射：/avatars/** → 头像存储目录。
- * <p>生产环境由 nginx alias 直接服务 /avatars/（见 deploy/nginx.conf），请求到不了后端；
+ * <p>生产环境由前置的静态资源服务（Nginx 等）直接服务 /avatars/，请求到不了后端；
  * 此映射主要用于开发环境（Vite 将 /avatars 代理到后端）展示头像。仅暴露头像目录，不涉及其他存储路径。
  */
 @Configuration

@@ -5,7 +5,7 @@
 ## 字符集与排序规则
 
 - 库与表统一使用 `utf8mb4` + `utf8mb4_0900_ai_ci`（MySQL 8 默认排序规则，支持中文等 BMP + 辅助平面字符，比较不区分大小写、重音）
-- 建库语句见 `README.md`：`CREATE DATABASE ... CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`
+- 建库：`CREATE DATABASE baiflow CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;`
 
 ## 命名规范
 
@@ -15,7 +15,7 @@
 - 密码/提取码/token 只存 hash
 - 注释：**所有表与字段必须带 `COMMENT` 注释**，说明其含义，便于管理与理解
 
-**时间约定**：时间列统一用 **`DATETIME`**（毫秒精度的同步游标用 `DATETIME(3)`），**存 UTC+8 墙钟**（与应用 JVM/连接时区 `Asia/Shanghai` 一致，`LocalDateTime.now()` 写入即 +8 字面值，读取/比较零转换）。**约束：JVM 必须运行在 Asia/Shanghai**（`baiflow-server/Dockerfile` 已设 `ENV TZ=Asia/Shanghai`；非 Docker 启动需 `-Duser.timezone=Asia/Shanghai`，否则 `LocalDateTime.now()` 写入非 +8）。不用 `TIMESTAMP`——它内部按 UTC 存取，多一层隐藏转换易偏移（历史 bug），且上限 2038。
+**时间约定**：时间列统一用 **`DATETIME`**（毫秒精度的同步游标用 `DATETIME(3)`），**存 UTC+8 墙钟**（与应用 JVM/连接时区 `Asia/Shanghai` 一致，`LocalDateTime.now()` 写入即 +8 字面值，读取/比较零转换）。**约束：JVM 必须运行在 Asia/Shanghai**（启动时显式设置时区，如 `-Duser.timezone=Asia/Shanghai` 或运行环境的 `TZ=Asia/Shanghai`，否则 `LocalDateTime.now()` 写入非 +8）。不用 `TIMESTAMP`——它内部按 UTC 存取，多一层隐藏转换易偏移（历史 bug），且上限 2038。
 
 ## 核心表
 

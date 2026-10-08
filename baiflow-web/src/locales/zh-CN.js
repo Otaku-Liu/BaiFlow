@@ -71,7 +71,7 @@ export default {
   },
   setup: {
     subtitle: '首次部署 — 创建第一个管理员账号',
-    tokenHint: '初始化令牌在服务器启动日志中打印（docker compose logs server），也可从数据目录的 setup-token.txt 读取。',
+    tokenHint: '初始化令牌在服务器启动日志中打印，也可从数据目录的 setup-token.txt 读取。',
     token: '初始化令牌',
     tokenPlaceholder: '粘贴服务器启动日志中的令牌',
     tokenRequired: '请输入初始化令牌',

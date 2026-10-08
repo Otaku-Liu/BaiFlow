@@ -17,7 +17,6 @@ BaiFlow（小白流转）——个人服务器上的下载与文件协同中心�
 | `baiflow-server` | Spring Boot API 服务端 |
 | `baiflow-web` | Vue 3 Web 管理台 |
 | `baiflow-android` | Android 客户端 |
-| `deploy` | Docker Compose 部署配置 |
 
 ## 快速启动
 
@@ -29,12 +28,6 @@ cd baiflow-server && mvn spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 前端（默认端口 5173，/api 自动代理到后端）
 cd baiflow-web && npm install && npm run dev
-
-# 部署 server + web（拉取 GHCR 镜像；MySQL/Redis 复用已有容器；先复制 deploy/.env.example 为 .env）
-cd deploy && docker compose pull && docker compose up -d
-
-# 本地从源码构建验证（改了代码、要验证镜像时）
-cd deploy && docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
 ## 文档
